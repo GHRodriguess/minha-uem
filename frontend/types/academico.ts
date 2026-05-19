@@ -15,6 +15,9 @@ export interface Materia {
   departamento: string;
   inicio: string;
   termino: string;
+  maximo_faltas: number;
+  faltas_atuais: number;
+  detalhes_faltas?: { data: string; aula: number; faltas: number }[];
   horarios?: Horario[];
 }
 

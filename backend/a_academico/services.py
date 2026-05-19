@@ -27,20 +27,17 @@ class ServicoExtracaoHorario:
                 self.texto += page.extract_text()
 
     def _extrair_curso(self):
-        # Tenta o padrão esperado: CURSO- [CODIGO] [NOME] -
         match = re.search(r'CURSO-\s*(\d+)\s*-\s*(.*?)\s*-', self.texto)
         if match:
             self.curso_codigo = match.group(1).strip()
             self.curso_nome = match.group(2).strip()
         else:
-            # Fallback mais genérico
             match_simples = re.search(r'CURSO-\s*(.*?)\s*-', self.texto)
             if match_simples:
                 conteudo = match_simples.group(1).strip()                
                 partes = conteudo.split(" ", 1)                    
                 self.curso_codigo = partes[0].strip()
                 self.curso_nome = partes[1].strip()
-
 
     def _extrair_materias(self):
         padrao_materia = re.compile(r'^(\d+)\s+(\d+)\s+(.*?)\s+([A-Z]{2,4})\s+([ASME\d\s]+?)\s+(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2})\s+(\d+)$')
@@ -50,8 +47,10 @@ class ServicoExtracaoHorario:
             match = padrao_materia.match(linha)
             if match:
                 codigo, turma, nome, depto, periodo, inicio, termino, faltas = match.groups()
+                # Normaliza turma removendo zeros à esquerda para consistência
+                turma_normalizada = str(int(turma)) if turma.isdigit() else turma.strip()
                 self.materias_data[codigo] = {
-                    "turma": turma,
+                    "turma": turma_normalizada,
                     "nome": nome.strip(),
                     "departamento": depto,
                     "periodo": periodo.strip(),
@@ -141,7 +140,9 @@ class ServicoExtracaoHorario:
                     if disciplina_raw:
                         partes = disciplina_raw.split('-')
                         codigo_materia = partes[0]
-                        turma = partes[1] if len(partes) > 1 else ""
+                        turma_raw = partes[1] if len(partes) > 1 else ""
+                        # Normaliza turma removendo zeros à esquerda para consistência
+                        turma_normalizada = str(int(turma_raw)) if turma_raw.isdigit() else turma_raw.strip()
                         dia_semana = dia_idx + 1
                         
                         chave = (bloco_detectado, aula_num, dia_semana, codigo_materia)
@@ -153,12 +154,14 @@ class ServicoExtracaoHorario:
                                 "inicio": datetime.strptime(inicio, '%H:%M').time(),
                                 "fim": datetime.strptime(fim, '%H:%M').time(),
                                 "codigo": codigo_materia,
-                                "turma": turma,
+                                "turma": turma_normalizada,
                                 "sala": sala
                             })
                             vistos.add(chave)
 
     def _salvar_dados(self):
+        print(f"Iniciando salvamento: {len(self.materias_data)} matérias, {len(self.horarios_data)} horários.")
+        
         with transaction.atomic():
             curso, _ = Curso.objects.get_or_create(
                 codigo=self.curso_codigo,
@@ -170,12 +173,12 @@ class ServicoExtracaoHorario:
                 materia, created = Materia.objects.get_or_create(
                     codigo=codigo,
                     turma=data['turma'],
-                    inicio=data['inicio'],
-                    termino=data['termino'],
                     defaults={
                         'nome': data['nome'],
                         'departamento': data['departamento'],
                         'periodo': data['periodo'],
+                        'inicio': data['inicio'],
+                        'termino': data['termino'],
                         'maximo_faltas': data['maximo_faltas']
                     }
                 )
@@ -184,19 +187,22 @@ class ServicoExtracaoHorario:
                     materia.nome = data['nome']
                     materia.departamento = data['departamento']
                     materia.periodo = data['periodo']
+                    materia.inicio = data['inicio']
+                    materia.termino = data['termino']
                     materia.maximo_faltas = data['maximo_faltas']
                     materia.save()
                 
                 materias_salvas.append(materia)
 
-            # Salvar horários para cada matéria
+            horarios_criados = 0
             for h_data in self.horarios_data:
                 materia = next((m for m in materias_salvas if m.codigo == h_data['codigo'] and m.turma == h_data['turma']), None)
                 
                 if not materia:
+                    print(f"Aviso: Matéria não encontrada para horário: {h_data['codigo']}-{h_data['turma']}")
                     continue
                     
-                Horario.objects.get_or_create(
+                obj, created = Horario.objects.get_or_create(
                     materia=materia,
                     bloco=h_data['bloco'],
                     aula=h_data['aula'],
@@ -204,9 +210,13 @@ class ServicoExtracaoHorario:
                     defaults={
                         'inicio': h_data['inicio'],
                         'fim': h_data['fim'],
-                        'sala': h_data['sala']
+                        'sala': h_data['sala'].strip()
                     }
                 )
+                if created:
+                    horarios_criados += 1
+
+            print(f"Horários criados com sucesso: {horarios_criados}")
 
             perfil, _ = PerfilAcademico.objects.get_or_create(user=self.user)
             perfil.curso = curso

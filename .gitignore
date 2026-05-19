@@ -31,7 +31,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -139,6 +138,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+!frontend/lib/
 
 # Spyder project settings
 .spyderproject

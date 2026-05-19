@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
-import { BookOpen, GraduationCap, Calendar, Clock, Loader2 } from 'lucide-react'
+import { BookOpen, GraduationCap, Calendar, Clock, Loader2, MapPin } from 'lucide-react'
 
 export default function Home() {
   const { data: session } = useSession()
@@ -29,6 +29,32 @@ export default function Home() {
     buscarPerfil()
   }, [buscarPerfil])
 
+  const filtrarAulasHoje = () => {
+    if (!perfil?.materias) return []
+    const hoje = new Date()
+    const diaSemana = hoje.getDay()
+    const backendDia = diaSemana === 0 ? 7 : diaSemana
+
+    const aulas: any[] = []
+    perfil.materias.forEach(m => {
+      const [anoI, mesI, diaI] = m.inicio.split('-').map(Number)
+      const [anoT, mesT, diaT] = m.termino.split('-').map(Number)
+      
+      const hojePura = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+      const inicioPura = new Date(anoI, mesI - 1, diaI)
+      const terminoPura = new Date(anoT, mesT - 1, diaT)
+
+      if (hojePura >= inicioPura && hojePura <= terminoPura) {
+        m.horarios?.forEach(h => {
+          if (h.dia === backendDia) {
+            aulas.push({ materia: m, horario: h })
+          }
+        })
+      }
+    })
+    return aulas.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio))
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
@@ -48,6 +74,8 @@ export default function Home() {
       </div>
     )
   }
+
+  const aulasHoje = filtrarAulasHoje()
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -90,7 +118,9 @@ export default function Home() {
             <Clock className="w-6 h-6 text-purple-500" />
           </div>
           <p className="text-sm font-medium text-muted-foreground">Próxima Aula</p>
-          <p className="text-lg font-bold text-foreground mt-1">Em breve</p>
+          <p className="text-lg font-bold text-foreground mt-1">
+            {aulasHoje.length > 0 ? aulasHoje[0].horario.inicio.substring(0, 5) : 'Em breve'}
+          </p>
         </div>
       </div>
 
@@ -116,9 +146,33 @@ export default function Home() {
 
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           <h3 className="text-xl font-bold text-foreground mb-6">Horário Hoje</h3>
-          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center">
-            <Calendar className="w-12 h-12 mb-4 opacity-20" />
-            <p>Seus horários aparecerão aqui em breve.</p>
+          <div className="space-y-4">
+            {aulasHoje.length > 0 ? (
+              aulasHoje.map((aula, idx) => (
+                <div key={idx} className="p-4 rounded-xl border border-border bg-muted/30">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-foreground">{aula.materia.nome}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <Clock className="w-3 h-3" />
+                        {aula.horario.inicio.substring(0, 5)} - {aula.horario.fim.substring(0, 5)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        <MapPin className="w-3 h-3" />
+                        {aula.horario.sala}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center">
+                <Calendar className="w-12 h-12 mb-4 opacity-20" />
+                <p>Nenhuma aula hoje.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
