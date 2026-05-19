@@ -125,9 +125,16 @@ export default function DisciplinasPage() {
                     <div className="mt-4 pt-4 border-t border-border">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Histórico de Ausências</p>
                       <div className="flex flex-wrap gap-2">
-                        {materia.detalhes_faltas.map((f, i) => (
-                          <span key={i} className="text-[10px] bg-muted px-2 py-1 rounded-lg text-foreground font-medium">
-                            {new Date(f.data + 'T12:00:00').toLocaleDateString('pt-BR')} ({f.faltas})
+                        {Object.entries(
+                          materia.detalhes_faltas.reduce((acc, f) => {
+                            acc[f.data] = (acc[f.data] || 0) + f.faltas;
+                            return acc;
+                          }, {} as Record<string, number>)
+                        )
+                        .sort((a, b) => b[0].localeCompare(a[0])) // Ordena das mais recentes para as mais antigas
+                        .map(([data, total]) => (
+                          <span key={data} className="text-[10px] bg-muted px-2 py-1 rounded-lg text-foreground font-medium">
+                            {new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')} ({total})
                           </span>
                         ))}
                       </div>

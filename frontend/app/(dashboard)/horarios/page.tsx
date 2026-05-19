@@ -45,7 +45,8 @@ export default function HorariosPage() {
     const ultimoDia = new Date(ano, mes + 1, 0).getDate()
     
     const dias = []
-    for (let i = 0; i < (primeiroDia === 0 ? 6 : primeiroDia - 1); i++) {
+    // Domingo (0) -> 0 slots vazios, Segunda (1) -> 1 slot, etc.
+    for (let i = 0; i < primeiroDia; i++) {
       dias.push(null)
     }
     for (let i = 1; i <= ultimoDia; i++) {
@@ -135,7 +136,7 @@ export default function HorariosPage() {
           </div>
 
           <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-muted-foreground mb-2">
-            <span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span><span>DOM</span>
+            <span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span>
           </div>
 
           <div className="grid grid-cols-7 gap-1">
