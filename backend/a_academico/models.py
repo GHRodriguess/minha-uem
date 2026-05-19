@@ -40,3 +40,16 @@ class PerfilAcademico(models.Model):
 
     def __str__(self):
         return f"Perfil de {self.user.username}"
+
+class RegistroFalta(models.Model):
+    perfil = models.ForeignKey(PerfilAcademico, on_delete=models.CASCADE, related_name='registros_falta')
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    data = models.DateField()
+    aula = models.IntegerField(default=1)
+    faltas = models.IntegerField(default=1)
+
+    class Meta:
+        unique_together = ('perfil', 'materia', 'data', 'aula')
+
+    def __str__(self):
+        return f"{self.perfil} - {self.materia.codigo} ({self.data} Aula {self.aula})"
