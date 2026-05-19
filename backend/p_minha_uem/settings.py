@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     # pessoais
     'a_auth',
     'a_docs_api',
+    'a_academico',
 ]
 
 MIDDLEWARE = [
