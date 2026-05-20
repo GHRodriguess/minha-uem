@@ -10,8 +10,8 @@ import { useAcademico } from '@/components/providers/ProvedorAcademico'
 
 export default function Home() {
   const { data: session } = useSession()
-  const { anoAtivoId, versao } = useAcademico()
-  const [perfil, setPerfil] = useState<Perfil | null>(null)
+  const { anoAtivoId: activeYearId, versao: version, anosDisponiveis: availableYears } = useAcademico()
+  const [profile, setProfile] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
 
   const buscarPerfil = useCallback(async () => {
@@ -19,46 +19,46 @@ export default function Home() {
 
     setLoading(true)
     try {
-      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
-      setPerfil(data)
+      const data = await academic_service.obterPerfil(session.accessToken, activeYearId || undefined)
+      setProfile(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
       setLoading(false)
     }
-  }, [session, anoAtivoId])
+  }, [session, activeYearId])
 
   useEffect(() => {
     buscarPerfil()
-  }, [buscarPerfil, versao])
+  }, [buscarPerfil, version])
 
   const filtrarAulasHoje = () => {
-    if (!perfil?.materias) return []
-    const hoje = new Date()
-    const diaSemana = hoje.getDay()
-    const backendDia = diaSemana === 0 ? 7 : diaSemana
+    if (!profile?.materias) return []
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const backendDay = dayOfWeek === 0 ? 7 : dayOfWeek
 
-    const aulas: any[] = []
-    perfil.materias.forEach(m => {
-      const primeiroHorario = m.horarios?.[0]
-      if (!primeiroHorario) return
+    const classes: any[] = []
+    profile.materias.forEach(m => {
+      const firstSchedule = m.horarios?.[0]
+      if (!firstSchedule) return
 
-      const [anoI, mesI, diaI] = primeiroHorario.data_inicio.split('-').map(Number)
-      const [anoT, mesT, diaT] = primeiroHorario.data_termino.split('-').map(Number)
+      const [yearS, monthS, dayS] = firstSchedule.data_inicio.split('-').map(Number)
+      const [yearE, monthE, dayE] = firstSchedule.data_termino.split('-').map(Number)
       
-      const hojePura = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
-      const inicioPura = new Date(anoI, mesI - 1, diaI)
-      const terminoPura = new Date(anoT, mesT - 1, diaT)
+      const todayPure = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const startPure = new Date(yearS, monthS - 1, dayS)
+      const endPure = new Date(yearE, monthE - 1, dayE)
 
-      if (hojePura >= inicioPura && hojePura <= terminoPura) {
+      if (todayPure >= startPure && todayPure <= endPure) {
         m.horarios?.forEach(h => {
-          if (h.dia === backendDia) {
-            aulas.push({ materia: m, horario: h })
+          if (h.dia === backendDay) {
+            classes.push({ materia: m, horario: h })
           }
         })
       }
     })
-    return aulas.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio))
+    return classes.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio))
   }
 
   if (loading) {
@@ -70,18 +70,27 @@ export default function Home() {
     )
   }
 
-  if (!perfil?.configurado) {
+  if (!profile?.configurado) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <CardUploadPDF 
           token={session?.accessToken || ''} 
-          onSuccess={(novoPerfil) => setPerfil(novoPerfil)} 
+          onSuccess={(newProfile) => setProfile(newProfile)} 
         />
       </div>
     )
   }
 
-  const aulasHoje = filtrarAulasHoje()
+  const todayClasses = filtrarAulasHoje()
+
+  const obterProximaAula = () => {
+    const now = new Date()
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    return todayClasses.find(a => a.horario.inicio > timeString)
+  }
+
+  const nextClass = obterProximaAula()
+  const activeAcademicYear = availableYears.find(a => a.id === activeYearId)?.ano
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -96,8 +105,8 @@ export default function Home() {
             <GraduationCap className="w-6 h-6 text-primary" />
           </div>
           <p className="text-sm font-medium text-muted-foreground">Curso</p>
-          <p className="text-lg font-bold text-foreground mt-1 truncate" title={`${perfil.curso?.codigo} - ${perfil.curso?.nome}`}>
-            {perfil.curso?.codigo} - {perfil.curso?.nome}
+          <p className="text-lg font-bold text-foreground mt-1 truncate" title={`${profile.curso?.codigo} - ${profile.curso?.nome}`}>
+            {profile.curso?.codigo} - {profile.curso?.nome}
           </p>
         </div>
 
@@ -107,7 +116,7 @@ export default function Home() {
           </div>
           <p className="text-sm font-medium text-muted-foreground">Disciplinas</p>
           <p className="text-2xl font-bold text-foreground mt-1">
-            {perfil.materias?.length}
+            {profile.materias?.length}
           </p>
         </div>
 
@@ -115,8 +124,8 @@ export default function Home() {
           <div className="bg-green-500/10 w-12 h-12 rounded-xl flex items-center justify-center mb-4">
             <Calendar className="w-6 h-6 text-green-500" />
           </div>
-          <p className="text-sm font-medium text-muted-foreground">Status do Período</p>
-          <p className="text-2xl font-bold text-foreground mt-1">Ativo</p>
+          <p className="text-sm font-medium text-muted-foreground">Ano Letivo</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{activeAcademicYear || '---'}</p>
         </div>
 
         <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
@@ -125,7 +134,7 @@ export default function Home() {
           </div>
           <p className="text-sm font-medium text-muted-foreground">Próxima Aula</p>
           <p className="text-lg font-bold text-foreground mt-1">
-            {aulasHoje.length > 0 ? aulasHoje[0].horario.inicio.substring(0, 5) : 'Em breve'}
+            {nextClass ? nextClass.horario.inicio.substring(0, 5) : 'Sem mais hoje'}
           </p>
         </div>
       </div>
@@ -134,7 +143,7 @@ export default function Home() {
         <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm">
           <h3 className="text-xl font-bold text-foreground mb-6">Suas Disciplinas</h3>
           <div className="space-y-4">
-            {perfil.materias?.map((materia: Materia) => (
+            {profile.materias?.map((materia: Materia) => (
               <div key={materia.id} className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors">
                 <div>
                   <p className="font-bold text-foreground">{materia.nome}</p>
@@ -153,8 +162,8 @@ export default function Home() {
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           <h3 className="text-xl font-bold text-foreground mb-6">Horário Hoje</h3>
           <div className="space-y-4">
-            {aulasHoje.length > 0 ? (
-              aulasHoje.map((aula, idx) => (
+            {todayClasses.length > 0 ? (
+              todayClasses.map((aula, idx) => (
                 <div key={idx} className="p-4 rounded-xl border border-border bg-muted/30">
                   <div className="flex justify-between items-start">
                     <div>
