@@ -20,6 +20,7 @@ export interface Avaliacao {
   peso: number;
   nota: number | null;
   data: string | null;
+  ordem: number;
 }
 
 export interface ConfiguracaoMateria {

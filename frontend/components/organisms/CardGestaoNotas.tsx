@@ -8,6 +8,21 @@ import { ItemAvaliacao } from '../molecules/ItemAvaliacao'
 import { Button } from '../ui/button'
 import { Plus, Calculator, Target, AlertCircle, Loader2 } from 'lucide-react'
 import { InputNota } from '../atoms/InputNota'
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 
 interface CardGestaoNotasProps {
   materia: Materia
@@ -18,6 +33,13 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
   const { data: session } = useSession()
   const [config, setConfig] = useState<ConfiguracaoMateria | null>(materia.configuracao_notas || null)
   const [loading, setLoading] = useState(!materia.configuracao_notas)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     if (!materia.configuracao_notas && session?.accessToken) {
@@ -38,13 +60,40 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
     }
   }
 
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+
+    if (over && active.id !== over.id && config) {
+      const oldIndex = config.avaliacoes.findIndex((a) => a.id === active.id)
+      const newIndex = config.avaliacoes.findIndex((a) => a.id === over.id)
+
+      const novasAvaliacoes = arrayMove(config.avaliacoes, oldIndex, newIndex)
+      
+      setConfig({ ...config, avaliacoes: novasAvaliacoes })
+
+      if (session?.accessToken) {
+        try {
+          await Promise.all(
+            novasAvaliacoes.map((a, index) => 
+              academic_service.atualizarAvaliacao(session.accessToken!, a.id, { ordem: index })
+            )
+          )
+        } catch (error) {
+          console.error('Erro ao salvar nova ordem:', error)
+          buscarConfiguracao()
+        }
+      }
+    }
+  }
+
   async function adicionarAvaliacao() {
     if (!session?.accessToken || !config) return
     try {
       const nova = await academic_service.criarAvaliacao(session.accessToken, config.id, {
         nome: `Avaliação ${config.avaliacoes.length + 1}`,
         peso: 1,
-        tipo: 'PROVA'
+        tipo: 'PROVA',
+        ordem: config.avaliacoes.length
       })
       setConfig({
         ...config,
@@ -59,9 +108,14 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
     if (!session?.accessToken || !config) return
     try {
       const atualizada = await academic_service.atualizarAvaliacao(session.accessToken, id, data)
-      const novasAvaliacoes = config.avaliacoes.map(a => a.id === id ? atualizada : a)
+      setConfig(prev => {
+        if (!prev) return null
+        const novasAvaliacoes = prev.avaliacoes.map(a => a.id === id ? { ...a, ...atualizada } : a)
+        return { ...prev, avaliacoes: novasAvaliacoes }
+      })
       
-      // Recalcular médias localmente para feedback instantâneo ou refetch
+      // Recalcular médias localmente sem dar fetch em tudo se possível, 
+      // mas para garantir precisão do backend (que tem a lógica central):
       const configAtualizada = await academic_service.obterConfiguracaoNotas(session.accessToken, materia.id, anoId)
       setConfig(configAtualizada)
     } catch (error) {
@@ -102,7 +156,6 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
 
   if (!config) return null
 
-  const temNotas = config.avaliacoes.some(a => a.nota !== null)
   const todasNotas = config.avaliacoes.every(a => a.nota !== null) && config.avaliacoes.length > 0
   const aprovado = config.media_atual >= config.media_minima
 
@@ -182,14 +235,27 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
               </Button>
             </div>
           ) : (
-            config.avaliacoes.map(avaliacao => (
-              <ItemAvaliacao
-                key={avaliacao.id}
-                avaliacao={avaliacao}
-                onUpdate={atualizarAvaliacao}
-                onDelete={excluirAvaliacao}
-              />
-            ))
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={config.avaliacoes.map(a => a.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {config.avaliacoes.map(avaliacao => (
+                    <ItemAvaliacao
+                      key={avaliacao.id}
+                      avaliacao={avaliacao}
+                      onUpdate={atualizarAvaliacao}
+                      onDelete={excluirAvaliacao}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>

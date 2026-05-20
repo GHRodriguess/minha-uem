@@ -23,7 +23,7 @@ export default function Sidebar() {
     { href: '/', icon: LayoutDashboard, label: 'Início' },
     { href: '/disciplinas', icon: BookOpen, label: 'Disciplinas' },
     { href: '/curso', icon: GraduationCap, label: 'Curso' },
-    { href: '/horarios', icon: Calendar, label: 'Horários' },
+    { href: '/horarios', icon: Calendar, label: 'Calendário' },
   ]
 
   return (

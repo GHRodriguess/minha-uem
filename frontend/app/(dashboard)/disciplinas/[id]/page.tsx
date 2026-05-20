@@ -11,7 +11,8 @@ import {
   Calendar,
   GraduationCap,
   FileText,
-  Clock
+  Clock,
+  Timer
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
@@ -73,6 +74,25 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const primeiroHorario = materia.horarios?.[0]
   const maxFaltas = primeiroHorario?.maximo_faltas || 0
   const porcentagemFaltas = (materia.faltas_atuais / maxFaltas) * 100
+
+  // Lógica para próximos compromissos
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+
+  const proximasAvaliacoes = (materia.configuracao_notas?.avaliacoes || [])
+    .filter(a => a.data && new Date(a.data + 'T12:00:00') >= hoje && a.nota === null)
+    .sort((a, b) => a.data!.localeCompare(b.data!))
+    .slice(0, 3)
+
+  const calcularDiasRestantes = (dataStr: string) => {
+    const dataAlvo = new Date(dataStr)
+    const diffTime = dataAlvo.getTime() - hoje.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return 'Hoje'
+    if (diffDays === 1) return 'Amanhã'
+    return `Em ${diffDays} dias`
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
@@ -137,6 +157,37 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
         {/* Coluna Lateral: Faltas e Horários */}
         <div className="space-y-8">
+          {/* Card de Próximos Compromissos */}
+          {proximasAvaliacoes.length > 0 && (
+            <div className="bg-primary border border-primary/20 rounded-3xl p-8 shadow-lg shadow-primary/10 text-primary-foreground">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="bg-white/20 p-2.5 rounded-xl">
+                  <Timer className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Próximos Prazos</h2>
+                  <p className="text-xs text-white/60 font-bold uppercase tracking-wider">Fique atento!</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {proximasAvaliacoes.map((a, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-white/10 rounded-xl border border-white/5">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-tight">{a.nome}</p>
+                      <p className="text-[10px] font-bold text-white/60 uppercase">
+                        {new Date(a.data! + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <span className="text-xs font-black bg-white text-primary px-2.5 py-1 rounded-full shadow-sm uppercase">
+                      {calcularDiasRestantes(a.data!)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Card de Faltas */}
           <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-8">
@@ -201,11 +252,11 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
                 <div key={i} className="flex items-center gap-4 p-3 bg-muted/20 rounded-xl">
                   <div className="bg-background w-10 h-10 rounded-lg flex flex-col items-center justify-center border border-border">
                     <span className="text-[10px] font-black text-muted-foreground uppercase leading-none">DIA</span>
-                    <span className="text-sm font-black text-primary">{h.dia}</span>
+                    <span className="text-sm font-black text-primary">{h.dia + 1}</span>
                   </div>
                   <div>
                     <p className="text-sm font-bold text-foreground uppercase tracking-tight">
-                      {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][h.dia - 2]}
+                      {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][h.dia - 1]}
                     </p>
                     <p className="text-xs text-muted-foreground font-bold">
                       {h.inicio.slice(0, 5)} - {h.fim.slice(0, 5)} • Bloco {h.bloco} ({h.sala})

@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react"
 
 interface InputNotaProps {
   value: number | null
@@ -12,23 +13,38 @@ interface InputNotaProps {
 }
 
 export function InputNota({ value, onChange, placeholder = "0.00", className, disabled }: InputNotaProps) {
-  const formatarValor = (val: number | null) => {
-    if (val === null) return ""
-    return val.toString()
-  }
+  const [localValue, setLocalValue] = useState<string>(value !== null ? value.toString() : "")
+
+  useEffect(() => {
+    setLocalValue(value !== null ? value.toString() : "")
+  }, [value])
 
   const lidarComMudanca = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    if (val === "") {
+    setLocalValue(e.target.value.replace(',', '.'))
+  }
+
+  const salvar = () => {
+    if (localValue === "") {
       onChange(null)
       return
     }
 
-    const num = parseFloat(val.replace(',', '.'))
+    const num = parseFloat(localValue)
     if (!isNaN(num)) {
       if (num >= 0 && num <= 10) {
         onChange(num)
+      } else {
+        setLocalValue(value !== null ? value.toString() : "")
       }
+    } else {
+      setLocalValue(value !== null ? value.toString() : "")
+    }
+  }
+
+  const lidarComTecla = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      salvar()
+      ;(e.target as HTMLInputElement).blur()
     }
   }
 
@@ -37,8 +53,10 @@ export function InputNota({ value, onChange, placeholder = "0.00", className, di
       type="text"
       inputMode="decimal"
       placeholder={placeholder}
-      value={formatarValor(value)}
+      value={localValue}
       onChange={lidarComMudanca}
+      onBlur={salvar}
+      onKeyDown={lidarComTecla}
       className={cn("w-20 text-center font-bold", className)}
       disabled={disabled}
     />
