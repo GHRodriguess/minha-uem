@@ -55,7 +55,7 @@ export default function DisciplinasPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <section>
         <h2 className="text-3xl font-bold text-foreground">Minhas Disciplinas</h2>
-        <p className="text-muted-foreground mt-2">Gerencie suas faltas através do calendário de horários.</p>
+        <p className="text-muted-foreground mt-2">Selecione uma disciplina para gerenciar notas, faltas e materiais.</p>
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -69,16 +69,20 @@ export default function DisciplinasPage() {
           const reprovado = materia.faltas_atuais > maxFaltas
 
           return (
-            <div key={materia.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <Link 
+              key={materia.id} 
+              href={`/disciplinas/${materia.id}`}
+              className="group bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between transition-all hover:border-primary/50 hover:shadow-md active:scale-[0.98]"
+            >
               <div>
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xl font-bold text-foreground leading-tight">{materia.nome}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <h3 className="text-xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{materia.nome}</h3>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">
                       {materia.codigo} • Turma {primeiroHorario.turma}
                     </p>
                   </div>
-                  <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded">
+                  <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">
                     {primeiroHorario.departamento}
                   </span>
                 </div>
@@ -86,18 +90,15 @@ export default function DisciplinasPage() {
                 <div className="space-y-4 mt-6">
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total de Faltas</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total de Faltas</p>
                       <p className="text-3xl font-black text-foreground">
                         {materia.faltas_atuais} <span className="text-sm font-normal text-muted-foreground">/ {maxFaltas}</span>
                       </p>
                     </div>
-                    <Link 
-                      href="/horarios"
-                      className="flex items-center gap-2 text-xs font-bold text-primary hover:underline"
-                    >
-                      <CalendarDays className="w-4 h-4" />
-                      Marcar no Calendário
-                    </Link>
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
+                      Ver detalhes
+                      <BookOpen className="w-3 h-3" />
+                    </div>
                   </div>
 
                   <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
@@ -111,50 +112,30 @@ export default function DisciplinasPage() {
 
                   <div className="flex items-center gap-2 mt-2">
                     {reprovado ? (
-                      <div className="flex items-center gap-1.5 text-destructive font-bold text-sm">
+                      <div className="flex items-center gap-1.5 text-destructive font-bold text-xs uppercase">
                         <AlertTriangle className="w-4 h-4" />
                         Reprovado por faltas
                       </div>
                     ) : noLimite ? (
-                      <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm">
+                      <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-xs uppercase">
                         <AlertTriangle className="w-4 h-4" />
                         Atenção ao limite de faltas
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-green-500 font-bold text-sm">
+                      <div className="flex items-center gap-1.5 text-green-500 font-bold text-xs uppercase">
                         <CheckCircle2 className="w-4 h-4" />
                         Frequência regular
                       </div>
                     )}
                   </div>
-                  
-                  {materia.detalhes_faltas && materia.detalhes_faltas.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Histórico de Ausências</p>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(
-                          materia.detalhes_faltas.reduce((acc, f) => {
-                            acc[f.data] = (acc[f.data] || 0) + f.faltas;
-                            return acc;
-                          }, {} as Record<string, number>)
-                        )
-                        .sort((a, b) => b[0].localeCompare(a[0])) // Ordena das mais recentes para as mais antigas
-                        .map(([data, total]) => (
-                          <span key={data} className="text-[10px] bg-muted px-2 py-1 rounded-lg text-foreground font-medium">
-                            {new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')} ({total})
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <div className="mt-6 pt-6 border-t border-border flex justify-between text-[10px] text-muted-foreground uppercase font-bold">
+              <div className="mt-6 pt-6 border-t border-border flex justify-between text-[10px] text-muted-foreground uppercase font-black tracking-widest">
                 <span>Início: {new Date(primeiroHorario.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                 <span>Término: {new Date(primeiroHorario.data_termino + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
               </div>
-            </div>
+            </Link>
           )
         })}
       </div>

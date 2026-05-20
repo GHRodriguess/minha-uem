@@ -70,3 +70,37 @@ class RegistroFalta(models.Model):
 
     def __str__(self):
         return f"{self.perfil} - {self.materia.codigo} ({self.data} Aula {self.aula})"
+
+class ConfiguracaoMateria(models.Model):
+    perfil = models.ForeignKey(PerfilAcademico, on_delete=models.CASCADE, related_name='configuracoes_materias')
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    ano_letivo = models.ForeignKey(AnoLetivo, on_delete=models.CASCADE, related_name='configuracoes_materias')
+    media_minima = models.DecimalField(max_digits=4, decimal_places=2, default=6.0)
+
+    class Meta:
+        unique_together = ('perfil', 'materia', 'ano_letivo')
+
+    def __str__(self):
+        return f"Config de {self.materia.nome} ({self.ano_letivo.ano}) - {self.perfil.user.username}"
+
+class Avaliacao(models.Model):
+    TIPO_CHOICES = [
+        ('PROVA', 'Prova'),
+        ('TRABALHO', 'Trabalho'),
+        ('EXAME', 'Exame'),
+        ('OUTRO', 'Outro'),
+    ]
+
+    configuracao = models.ForeignKey(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='avaliacoes')
+    nome = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='PROVA')
+    peso = models.DecimalField(max_digits=5, decimal_places=2, default=1.0)
+    nota = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    data = models.DateField(null=True, blank=True)
+    ordem = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['ordem', 'id']
+
+    def __str__(self):
+        return f"{self.nome} ({self.configuracao.materia.nome})"

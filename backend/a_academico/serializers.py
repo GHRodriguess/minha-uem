@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao
+from django.db.models import Sum, F
 
 class CursoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,14 +17,66 @@ class AnoLetivoSerializer(serializers.ModelSerializer):
         model = AnoLetivo
         fields = ['id', 'ano']
 
+class AvaliacaoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Avaliacao
+        fields = ['id', 'nome', 'tipo', 'peso', 'nota', 'data', 'ordem']
+
+class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
+    avaliacoes = AvaliacaoSerializer(many=True, read_only=True)
+    media_atual = serializers.SerializerMethodField()
+    quanto_falta = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConfiguracaoMateria
+        fields = ['id', 'media_minima', 'avaliacoes', 'media_atual', 'quanto_falta']
+
+    def get_media_atual(self, obj):
+        avaliacoes = obj.avaliacoes.filter(nota__isnull=False)
+        if not avaliacoes.exists():
+            return 0
+        
+        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes)
+        soma_pesos = sum(a.peso for a in obj.avaliacoes.all())
+        
+        if soma_pesos == 0:
+            return 0
+            
+        return round(float(soma_ponderada / soma_pesos), 2)
+
+    def get_quanto_falta(self, obj):
+        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
+        avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
+        
+        if not avaliacoes_sem_nota.exists():
+            media = self.get_media_atual(obj)
+            return max(0, float(obj.media_minima) - media) if media < float(obj.media_minima) else 0
+
+        soma_ponderada_atual = sum(a.nota * a.peso for a in avaliacoes_com_nota)
+        soma_pesos_total = sum(a.peso for a in obj.avaliacoes.all())
+        soma_pesos_restante = sum(a.peso for a in avaliacoes_sem_nota)
+        
+        if soma_pesos_total == 0:
+            return 0
+            
+        necessario_total = float(obj.media_minima) * float(soma_pesos_total)
+        falta_pontos = necessario_total - float(soma_ponderada_atual)
+        
+        if falta_pontos <= 0:
+            return 0
+            
+        media_necessaria_restante = falta_pontos / float(soma_pesos_restante)
+        return round(media_necessaria_restante, 2)
+
 class MateriaSerializer(serializers.ModelSerializer):
     horarios = serializers.SerializerMethodField()
     faltas_atuais = serializers.SerializerMethodField()
     detalhes_faltas = serializers.SerializerMethodField()
+    configuracao_notas = serializers.SerializerMethodField()
 
     class Meta:
         model = Materia
-        fields = ['id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas']
+        fields = ['id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas', 'configuracao_notas']
 
     def get_horarios(self, obj):
         perfil = self.context.get('perfil')
@@ -39,7 +92,6 @@ class MateriaSerializer(serializers.ModelSerializer):
         if not perfil or not ano_letivo:
             return 0
         from .models import RegistroFalta
-        from django.db.models import Sum
         total = RegistroFalta.objects.filter(
             perfil=perfil, 
             materia=obj, 
@@ -58,6 +110,22 @@ class MateriaSerializer(serializers.ModelSerializer):
             materia=obj, 
             ano_letivo=ano_letivo
         ).values('data', 'aula', 'faltas')
+
+    def get_configuracao_notas(self, obj):
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return None
+        
+        config = ConfiguracaoMateria.objects.filter(
+            perfil=perfil,
+            materia=obj,
+            ano_letivo=ano_letivo
+        ).first()
+        
+        if config:
+            return ConfiguracaoMateriaSerializer(config).data
+        return None
 
 class PerfilAcademicoSerializer(serializers.ModelSerializer):
     curso = CursoSerializer(read_only=True)
