@@ -9,16 +9,23 @@ class CursoSerializer(serializers.ModelSerializer):
 class HorarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Horario
-        fields = ['bloco', 'aula', 'dia', 'inicio', 'fim', 'sala']
+        fields = ['bloco', 'aula', 'dia', 'inicio', 'fim', 'sala', 'turma', 'departamento', 'periodo', 'data_inicio', 'data_termino', 'maximo_faltas']
 
 class MateriaSerializer(serializers.ModelSerializer):
-    horarios = HorarioSerializer(many=True, read_only=True)
+    horarios = serializers.SerializerMethodField()
     faltas_atuais = serializers.SerializerMethodField()
     detalhes_faltas = serializers.SerializerMethodField()
 
     class Meta:
         model = Materia
-        fields = ['id', 'codigo', 'turma', 'nome', 'departamento', 'periodo', 'inicio', 'termino', 'maximo_faltas', 'horarios', 'faltas_atuais', 'detalhes_faltas']
+        fields = ['id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas']
+
+    def get_horarios(self, obj):
+        perfil = self.context.get('perfil')
+        if not perfil:
+            return []
+        horarios = perfil.horarios.filter(materia=obj)
+        return HorarioSerializer(horarios, many=True).data
 
     def get_faltas_atuais(self, obj):
         perfil = self.context.get('perfil')

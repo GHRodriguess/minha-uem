@@ -72,8 +72,11 @@ export default function HorariosPage() {
     const aulas: { materia: Materia; horario: Horario }[] = []
 
     perfil.materias.forEach(materia => {
-      const [anoI, mesI, diaI] = materia.inicio.split('-').map(Number)
-      const [anoT, mesT, diaT] = materia.termino.split('-').map(Number)
+      const primeiroHorario = materia.horarios?.[0]
+      if (!primeiroHorario) return
+
+      const [anoI, mesI, diaI] = primeiroHorario.data_inicio.split('-').map(Number)
+      const [anoT, mesT, diaT] = primeiroHorario.data_termino.split('-').map(Number)
       
       const dataPura = new Date(data.getFullYear(), data.getMonth(), data.getDate())
       const inicioPura = new Date(anoI, mesI - 1, diaI)
@@ -202,7 +205,7 @@ export default function HorariosPage() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {aula.materia.codigo} • Turma {aula.materia.turma}
+                          {aula.materia.codigo} • Turma {aula.horario.turma}
                         </p>
                       </div>
                     </div>

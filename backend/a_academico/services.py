@@ -147,6 +147,7 @@ class ServicoExtracaoHorario:
                         
                         chave = (bloco_detectado, aula_num, dia_semana, codigo_materia)
                         if chave not in vistos:
+                            m_data = self.materias_data.get(codigo_materia, {})
                             self.horarios_data.append({
                                 "bloco": bloco_detectado,
                                 "aula": aula_num,
@@ -155,7 +156,12 @@ class ServicoExtracaoHorario:
                                 "fim": datetime.strptime(fim, '%H:%M').time(),
                                 "codigo": codigo_materia,
                                 "turma": turma_normalizada,
-                                "sala": sala
+                                "sala": sala,
+                                "departamento": m_data.get("departamento", ""),
+                                "periodo": m_data.get("periodo", ""),
+                                "data_inicio": m_data.get("inicio"),
+                                "data_termino": m_data.get("termino"),
+                                "maximo_faltas": m_data.get("maximo_faltas", 0)
                             })
                             vistos.add(chave)
 
@@ -172,55 +178,50 @@ class ServicoExtracaoHorario:
             for codigo, data in self.materias_data.items():
                 materia, created = Materia.objects.get_or_create(
                     codigo=codigo,
-                    turma=data['turma'],
                     defaults={
                         'nome': data['nome'],
-                        'departamento': data['departamento'],
-                        'periodo': data['periodo'],
-                        'inicio': data['inicio'],
-                        'termino': data['termino'],
-                        'maximo_faltas': data['maximo_faltas']
                     }
                 )
                 
                 if not created:
                     materia.nome = data['nome']
-                    materia.departamento = data['departamento']
-                    materia.periodo = data['periodo']
-                    materia.inicio = data['inicio']
-                    materia.termino = data['termino']
-                    materia.maximo_faltas = data['maximo_faltas']
                     materia.save()
                 
                 materias_salvas.append(materia)
 
-            horarios_criados = 0
+            horarios_criados_objs = []
             for h_data in self.horarios_data:
-                materia = next((m for m in materias_salvas if m.codigo == h_data['codigo'] and m.turma == h_data['turma']), None)
+                materia = next((m for m in materias_salvas if m.codigo == h_data['codigo']), None)
                 
                 if not materia:
-                    print(f"Aviso: Matéria não encontrada para horário: {h_data['codigo']}-{h_data['turma']}")
+                    print(f"Aviso: Matéria não encontrada para horário: {h_data['codigo']}")
                     continue
                     
                 obj, created = Horario.objects.get_or_create(
                     materia=materia,
+                    turma=h_data['turma'],
                     bloco=h_data['bloco'],
                     aula=h_data['aula'],
                     dia=h_data['dia'],
                     defaults={
                         'inicio': h_data['inicio'],
                         'fim': h_data['fim'],
-                        'sala': h_data['sala'].strip()
+                        'sala': h_data['sala'].strip(),
+                        'departamento': h_data['departamento'],
+                        'periodo': h_data['periodo'],
+                        'data_inicio': h_data['data_inicio'],
+                        'data_termino': h_data['data_termino'],
+                        'maximo_faltas': h_data['maximo_faltas']
                     }
                 )
-                if created:
-                    horarios_criados += 1
+                horarios_criados_objs.append(obj)
 
-            print(f"Horários criados com sucesso: {horarios_criados}")
+            print(f"Horários vinculados: {len(horarios_criados_objs)}")
 
             perfil, _ = PerfilAcademico.objects.get_or_create(user=self.user)
             perfil.curso = curso
             perfil.materias.set(materias_salvas)
+            perfil.horarios.set(horarios_criados_objs)
             perfil.save()
             
             return perfil
