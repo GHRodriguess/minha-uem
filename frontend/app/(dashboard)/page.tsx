@@ -37,8 +37,11 @@ export default function Home() {
 
     const aulas: any[] = []
     perfil.materias.forEach(m => {
-      const [anoI, mesI, diaI] = m.inicio.split('-').map(Number)
-      const [anoT, mesT, diaT] = m.termino.split('-').map(Number)
+      const primeiroHorario = m.horarios?.[0]
+      if (!primeiroHorario) return
+
+      const [anoI, mesI, diaI] = primeiroHorario.data_inicio.split('-').map(Number)
+      const [anoT, mesT, diaT] = primeiroHorario.data_termino.split('-').map(Number)
       
       const hojePura = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
       const inicioPura = new Date(anoI, mesI - 1, diaI)
@@ -132,11 +135,11 @@ export default function Home() {
               <div key={materia.id} className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors">
                 <div>
                   <p className="font-bold text-foreground">{materia.nome}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{materia.codigo} • Turma {materia.turma}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{materia.codigo} • Turma {materia.horarios?.[0]?.turma}</p>
                 </div>
                 <div className="text-right">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                    {materia.departamento}
+                    {materia.horarios?.[0]?.departamento}
                   </span>
                 </div>
               </div>

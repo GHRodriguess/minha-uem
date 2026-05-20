@@ -57,9 +57,13 @@ export default function DisciplinasPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {perfil.materias.map((materia: Materia) => {
-          const porcentagemFaltas = (materia.faltas_atuais / materia.maximo_faltas) * 100
+          const primeiroHorario = materia.horarios?.[0]
+          if (!primeiroHorario) return null
+
+          const maxFaltas = primeiroHorario.maximo_faltas
+          const porcentagemFaltas = (materia.faltas_atuais / maxFaltas) * 100
           const noLimite = porcentagemFaltas >= 80
-          const reprovado = materia.faltas_atuais > materia.maximo_faltas
+          const reprovado = materia.faltas_atuais > maxFaltas
 
           return (
             <div key={materia.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between">
@@ -68,11 +72,11 @@ export default function DisciplinasPage() {
                   <div>
                     <h3 className="text-xl font-bold text-foreground leading-tight">{materia.nome}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {materia.codigo} • Turma {materia.turma}
+                      {materia.codigo} • Turma {primeiroHorario.turma}
                     </p>
                   </div>
                   <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded">
-                    {materia.departamento}
+                    {primeiroHorario.departamento}
                   </span>
                 </div>
 
@@ -81,7 +85,7 @@ export default function DisciplinasPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total de Faltas</p>
                       <p className="text-3xl font-black text-foreground">
-                        {materia.faltas_atuais} <span className="text-sm font-normal text-muted-foreground">/ {materia.maximo_faltas}</span>
+                        {materia.faltas_atuais} <span className="text-sm font-normal text-muted-foreground">/ {maxFaltas}</span>
                       </p>
                     </div>
                     <Link 
@@ -144,8 +148,8 @@ export default function DisciplinasPage() {
               </div>
 
               <div className="mt-6 pt-6 border-t border-border flex justify-between text-[10px] text-muted-foreground uppercase font-bold">
-                <span>Início: {new Date(materia.inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-                <span>Término: {new Date(materia.termino + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                <span>Início: {new Date(primeiroHorario.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                <span>Término: {new Date(primeiroHorario.data_termino + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
               </div>
             </div>
           )
