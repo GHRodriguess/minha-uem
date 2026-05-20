@@ -1,8 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo
-from .serializers import PerfilAcademicoSerializer
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao
+from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer
 from .services import ServicoExtracaoHorario
 
 class PerfilAcademicoView(APIView):
@@ -96,3 +96,83 @@ class ControleFaltaView(APIView):
             return Response({"materia_id": materia.id, "data": data_falta, "aula": aula_num, "faltas": faltas_result})
         except Exception as e:
             return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class ConfiguracaoMateriaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, materia_id, ano_id):
+        perfil, _ = PerfilAcademico.objects.get_or_create(user=self.request.user)
+        ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=perfil)
+        materia = Materia.objects.get(id=materia_id)
+        config, _ = ConfiguracaoMateria.objects.get_or_create(
+            perfil=perfil,
+            materia=materia,
+            ano_letivo=ano_letivo
+        )
+        return config
+
+    def get(self, request):
+        materia_id = request.query_params.get('materia_id')
+        ano_id = request.query_params.get('ano_id')
+        if not materia_id or not ano_id:
+            return Response({"erro": "materia_id e ano_id são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            config = self.get_object(materia_id, ano_id)
+            serializer = ConfiguracaoMateriaSerializer(config)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request):
+        materia_id = request.data.get('materia_id')
+        ano_id = request.data.get('ano_id')
+        if not materia_id or not ano_id:
+            return Response({"erro": "materia_id e ano_id são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            config = self.get_object(materia_id, ano_id)
+            serializer = ConfiguracaoMateriaSerializer(config, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class AvaliacaoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        config_id = request.data.get('configuracao_id')
+        if not config_id:
+            return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=request.user)
+            serializer = AvaliacaoSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(configuracao=config)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ConfiguracaoMateria.DoesNotExist:
+            return Response({"erro": "Configuração não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request, pk):
+        try:
+            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=request.user)
+            serializer = AvaliacaoSerializer(avaliacao, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Avaliacao.DoesNotExist:
+            return Response({"erro": "Avaliação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=request.user)
+            avaliacao.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Avaliacao.DoesNotExist:
+            return Response({"erro": "Avaliação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
