@@ -1,34 +1,55 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, Loader2, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAcademico } from '@/components/providers/ProvedorAcademico'
 
 export default function HorariosPage() {
   const { data: session } = useSession()
+  const { anoAtivoId, anosDisponiveis, versao } = useAcademico()
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
   const [dataSelecionada, setDataSelecionada] = useState(new Date())
+  const prevAnoId = useRef<number | null>(null)
 
   const buscarPerfil = useCallback(async () => {
     if (!session?.accessToken) return
 
+    setLoading(true)
     try {
-      const data = await academic_service.obterPerfil(session.accessToken)
+      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
       setPerfil(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
       setLoading(false)
     }
-  }, [session])
+  }, [session, anoAtivoId])
 
   useEffect(() => {
     buscarPerfil()
-  }, [buscarPerfil])
+  }, [buscarPerfil, versao])
+
+  // Atualiza o calendário para o ano selecionado quando o contexto muda
+  useEffect(() => {
+    if (anoAtivoId && prevAnoId.current !== anoAtivoId) {
+      const anoEncontrado = anosDisponiveis.find(a => a.id === anoAtivoId)
+      if (anoEncontrado) {
+        const novaData = new Date(dataSelecionada)
+        novaData.setFullYear(anoEncontrado.ano)
+        // Se estivermos em outro ano, reseta para Março (início comum na UEM)
+        if (dataSelecionada.getFullYear() !== anoEncontrado.ano) {
+            novaData.setMonth(2) // Março
+        }
+        setDataSelecionada(novaData)
+      }
+      prevAnoId.current = anoAtivoId
+    }
+  }, [anoAtivoId, anosDisponiveis, dataSelecionada])
 
   const mudarMes = (delta: number) => {
     setDataSelecionada(prev => {
@@ -99,7 +120,7 @@ export default function HorariosPage() {
 
     const novasFaltas = temFalta ? 0 : 1
     try {
-      await academic_service.atualizarFaltas(session.accessToken, materiaId, data, aulaNum, novasFaltas)
+      await academic_service.atualizarFaltas(session.accessToken, materiaId, data, aulaNum, novasFaltas, anoAtivoId || undefined)
       buscarPerfil()
     } catch (error) {
       console.error('Erro ao atualizar faltas:', error)
@@ -142,7 +163,7 @@ export default function HorariosPage() {
             <span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 z-10 gap-1">
             {getDiasDoMes().map((dia, idx) => {
               if (!dia) return <div key={`empty-${idx}`} className="h-10" />
               
@@ -154,7 +175,7 @@ export default function HorariosPage() {
                 <button
                   key={dia.toISOString()}
                   onClick={() => setDataSelecionada(dia)}
-                  className={`h-10 rounded-lg flex flex-col items-center justify-center transition-all relative ${
+                  className={`h-10 rounded-lg flex flex-col z-10 items-center justify-center transition-all relative ${
                     isSelecionado 
                       ? 'bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20' 
                       : 'hover:bg-muted text-foreground'

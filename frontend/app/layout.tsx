@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import ProvedorSessao from "@/components/providers/ProvedorSessao";
 import { ProvedorTema } from "@/components/providers/ProvedorTema";
+import { ProvedorAcademico } from "@/components/providers/ProvedorAcademico";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
@@ -41,7 +42,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ProvedorSessao>
-            {children}
+            <ProvedorAcademico>
+              {children}
+            </ProvedorAcademico>
           </ProvedorSessao>
         </ProvedorTema>
       </body>

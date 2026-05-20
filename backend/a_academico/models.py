@@ -30,6 +30,9 @@ class Horario(models.Model):
     fim = models.TimeField()
     sala = models.CharField(max_length=50)
 
+    class Meta:
+        unique_together = ('materia', 'turma', 'aula', 'dia')
+
     def __str__(self):
         return f"{self.materia.nome} ({self.turma}) - Bloco {self.bloco} - Dia {self.dia} - Aula {self.aula}"
 
@@ -42,8 +45,21 @@ class PerfilAcademico(models.Model):
     def __str__(self):
         return f"Perfil de {self.user.username}"
 
+class AnoLetivo(models.Model):
+    perfil = models.ForeignKey(PerfilAcademico, on_delete=models.CASCADE, related_name='anos')
+    ano = models.IntegerField()
+    materias = models.ManyToManyField(Materia, blank=True)
+    horarios = models.ManyToManyField(Horario, blank=True)
+
+    class Meta:
+        unique_together = ('perfil', 'ano')
+
+    def __str__(self):
+        return f"{self.ano} - {self.perfil.user.username}"
+
 class RegistroFalta(models.Model):
     perfil = models.ForeignKey(PerfilAcademico, on_delete=models.CASCADE, related_name='registros_falta')
+    ano_letivo = models.ForeignKey(AnoLetivo, on_delete=models.CASCADE, related_name='registros_falta', null=True, blank=True)
     materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
     data = models.DateField()
     aula = models.IntegerField(default=1)

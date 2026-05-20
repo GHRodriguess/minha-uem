@@ -28,8 +28,14 @@ export interface Curso {
   nome: string;
 }
 
+export interface AnoLetivo {
+  id: number;
+  ano: number;
+}
+
 export interface Perfil {
   configurado: boolean;
   curso?: Curso;
   materias?: Materia[];
+  anos?: AnoLetivo[];
 }

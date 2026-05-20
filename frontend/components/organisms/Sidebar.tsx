@@ -1,14 +1,19 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut } from 'lucide-react'
+import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+import Modal from '../shared/Modal'
+import CardUploadPDF from './CardUploadPDF'
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const [modalAberto, setModalAberto] = useState(false)
 
   const handleSair = () => {
     signOut({ callbackUrl: '/login' })
@@ -36,6 +41,17 @@ export default function Sidebar() {
           />
         ))}
       </nav>
+    
+      <div className="">
+        <Button 
+          onClick={() => setModalAberto(true)}
+          variant='ghost'
+          className="w-full justify-start gap-3 rounded-xl py-6 font-bold"
+        >
+          <PlusCircle className="w-5 h-5" />
+          Novo Horário
+        </Button>
+      </div>
 
       <Button
         variant="ghost"
@@ -45,6 +61,19 @@ export default function Sidebar() {
         <LogOut className="w-5 h-5" />
         <span className="font-medium">Sair</span>
       </Button>
+
+      <Modal 
+        isOpen={modalAberto}         
+        onClose={() => setModalAberto(false)}
+        title="Inserir Novo Horário"
+      >
+        <div className="p-1">
+          <CardUploadPDF 
+            token={session?.accessToken || ''}
+            onSuccess={() => setModalAberto(false)}
+          />
+        </div>
+      </Modal>
     </aside>
   )
 }
