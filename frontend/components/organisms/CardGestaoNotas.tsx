@@ -1,0 +1,210 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
+import { academic_service } from '@/lib/api/academico'
+import { ItemAvaliacao } from '../molecules/ItemAvaliacao'
+import { Button } from '../ui/button'
+import { Plus, Calculator, Target, AlertCircle, Loader2 } from 'lucide-react'
+import { InputNota } from '../atoms/InputNota'
+
+interface CardGestaoNotasProps {
+  materia: Materia
+  anoId: number
+}
+
+export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
+  const { data: session } = useSession()
+  const [config, setConfig] = useState<ConfiguracaoMateria | null>(materia.configuracao_notas || null)
+  const [loading, setLoading] = useState(!materia.configuracao_notas)
+
+  useEffect(() => {
+    if (!materia.configuracao_notas && session?.accessToken) {
+      buscarConfiguracao()
+    }
+  }, [materia.id, anoId, session])
+
+  async function buscarConfiguracao() {
+    if (!session?.accessToken) return
+    setLoading(true)
+    try {
+      const data = await academic_service.obterConfiguracaoNotas(session.accessToken, materia.id, anoId)
+      setConfig(data)
+    } catch (error) {
+      console.error('Erro ao buscar configuração de notas:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function adicionarAvaliacao() {
+    if (!session?.accessToken || !config) return
+    try {
+      const nova = await academic_service.criarAvaliacao(session.accessToken, config.id, {
+        nome: `Avaliação ${config.avaliacoes.length + 1}`,
+        peso: 1,
+        tipo: 'PROVA'
+      })
+      setConfig({
+        ...config,
+        avaliacoes: [...config.avaliacoes, nova]
+      })
+    } catch (error) {
+      console.error('Erro ao adicionar avaliação:', error)
+    }
+  }
+
+  async function atualizarAvaliacao(id: number, data: Partial<Avaliacao>) {
+    if (!session?.accessToken || !config) return
+    try {
+      const atualizada = await academic_service.atualizarAvaliacao(session.accessToken, id, data)
+      const novasAvaliacoes = config.avaliacoes.map(a => a.id === id ? atualizada : a)
+      
+      // Recalcular médias localmente para feedback instantâneo ou refetch
+      const configAtualizada = await academic_service.obterConfiguracaoNotas(session.accessToken, materia.id, anoId)
+      setConfig(configAtualizada)
+    } catch (error) {
+      console.error('Erro ao atualizar avaliação:', error)
+    }
+  }
+
+  async function excluirAvaliacao(id: number) {
+    if (!session?.accessToken || !config) return
+    try {
+      await academic_service.excluirAvaliacao(session.accessToken, id)
+      const configAtualizada = await academic_service.obterConfiguracaoNotas(session.accessToken, materia.id, anoId)
+      setConfig(configAtualizada)
+    } catch (error) {
+      console.error('Erro ao excluir avaliação:', error)
+    }
+  }
+
+  async function atualizarMediaMinima(val: number | null) {
+    if (!session?.accessToken || !config || val === null) return
+    try {
+      const atualizada = await academic_service.atualizarConfiguracaoNotas(session.accessToken, materia.id, anoId, {
+        media_minima: val
+      })
+      setConfig(atualizada)
+    } catch (error) {
+      console.error('Erro ao atualizar média mínima:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!config) return null
+
+  const temNotas = config.avaliacoes.some(a => a.nota !== null)
+  const todasNotas = config.avaliacoes.every(a => a.nota !== null) && config.avaliacoes.length > 0
+  const aprovado = config.media_atual >= config.media_minima
+
+  return (
+    <div className="space-y-6">
+      {/* Resumo de Médias */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center gap-4">
+          <div className="bg-primary/10 p-3 rounded-xl">
+            <Calculator className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase">Média Atual</p>
+            <p className="text-2xl font-black text-foreground">{config.media_atual.toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div className={`border rounded-2xl p-4 flex items-center gap-4 transition-colors ${
+          todasNotas 
+            ? (aprovado ? 'bg-green-500/5 border-green-500/10' : 'bg-destructive/5 border-destructive/10')
+            : 'bg-muted/5 border-border'
+        }`}>
+          <div className={`p-3 rounded-xl ${
+            todasNotas 
+              ? (aprovado ? 'bg-green-500/10' : 'bg-destructive/10')
+              : 'bg-muted'
+          }`}>
+            <Target className={`w-6 h-6 ${
+              todasNotas 
+                ? (aprovado ? 'text-green-500' : 'text-destructive')
+                : 'text-muted-foreground'
+            }`} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase">
+              {todasNotas ? 'Status Final' : 'Precisa Tirar'}
+            </p>
+            <p className={`text-2xl font-black ${
+              todasNotas 
+                ? (aprovado ? 'text-green-500' : 'text-destructive')
+                : 'text-foreground'
+            }`}>
+              {todasNotas 
+                ? (aprovado ? 'Aprovado' : 'Reprovado')
+                : config.quanto_falta.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de Avaliações */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">Avaliações e Pesos</h4>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={adicionarAvaliacao}
+            className="h-8 gap-2 font-bold text-xs border-dashed"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {config.avaliacoes.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed border-border rounded-2xl">
+              <AlertCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-20" />
+              <p className="text-sm text-muted-foreground">Nenhuma avaliação cadastrada.</p>
+              <Button 
+                variant="link" 
+                onClick={adicionarAvaliacao}
+                className="text-primary font-bold text-xs"
+              >
+                Clique aqui para começar
+              </Button>
+            </div>
+          ) : (
+            config.avaliacoes.map(avaliacao => (
+              <ItemAvaliacao
+                key={avaliacao.id}
+                avaliacao={avaliacao}
+                onUpdate={atualizarAvaliacao}
+                onDelete={excluirAvaliacao}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Configuração Extra */}
+      <div className="pt-4 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+          Média mínima para aprovação:
+        </div>
+        <InputNota
+          value={config.media_minima}
+          onChange={atualizarMediaMinima}
+          className="h-8 w-16 text-sm"
+        />
+      </div>
+    </div>
+  )
+}

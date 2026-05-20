@@ -13,6 +13,23 @@ export interface Horario {
   maximo_faltas: number;
 }
 
+export interface Avaliacao {
+  id: number;
+  nome: string;
+  tipo: 'PROVA' | 'TRABALHO' | 'EXAME' | 'OUTRO';
+  peso: number;
+  nota: number | null;
+  data: string | null;
+}
+
+export interface ConfiguracaoMateria {
+  id: number;
+  media_minima: number;
+  avaliacoes: Avaliacao[];
+  media_atual: number;
+  quanto_falta: number;
+}
+
 export interface Materia {
   id: number;
   nome: string;
@@ -20,6 +37,7 @@ export interface Materia {
   faltas_atuais: number;
   detalhes_faltas?: { data: string; aula: number; faltas: number }[];
   horarios?: Horario[];
+  configuracao_notas?: ConfiguracaoMateria | null;
 }
 
 export interface Curso {

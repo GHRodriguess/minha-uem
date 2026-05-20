@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback } from 'react'
 import { academic_service } from '@/lib/api/academico'
-import { Perfil, Materia } from '@/types/academico'
+import { Perfil, Materia, Horario } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
 import { BookOpen, GraduationCap, Calendar, Clock, Loader2, MapPin } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
@@ -38,7 +38,7 @@ export default function Home() {
     const dayOfWeek = today.getDay()
     const backendDay = dayOfWeek === 0 ? 7 : dayOfWeek
 
-    const classes: any[] = []
+    const classes: { materia: Materia; horario: Horario }[] = []
     profile.materias.forEach(m => {
       const firstSchedule = m.horarios?.[0]
       if (!firstSchedule) return
@@ -76,7 +76,6 @@ export default function Home() {
         <CardUploadPDF 
           token={session?.accessToken || ''} 
           onSuccess={(newProfile) => setProfile(newProfile)} 
-          exibirConfirmacao={false}
         />
       </div>
     )
