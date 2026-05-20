@@ -32,16 +32,6 @@ export default function Sidebar() {
         <Logo />
       </div>
 
-      <div className="mb-8">
-        <Button 
-          onClick={() => setModalAberto(true)}
-          className="w-full justify-start gap-3 rounded-xl py-6 font-bold shadow-lg shadow-primary/20"
-        >
-          <PlusCircle className="w-5 h-5" />
-          Novo Horário
-        </Button>
-      </div>
-
       <nav className="flex-1 space-y-2">
         {links.map((link) => (
           <ItemNavegacao
@@ -51,6 +41,17 @@ export default function Sidebar() {
           />
         ))}
       </nav>
+    
+      <div className="">
+        <Button 
+          onClick={() => setModalAberto(true)}
+          variant='ghost'
+          className="w-full justify-start gap-3 rounded-xl py-6 font-bold"
+        >
+          <PlusCircle className="w-5 h-5" />
+          Novo Horário
+        </Button>
+      </div>
 
       <Button
         variant="ghost"
@@ -62,7 +63,7 @@ export default function Sidebar() {
       </Button>
 
       <Modal 
-        isOpen={modalAberto} 
+        isOpen={modalAberto}         
         onClose={() => setModalAberto(false)}
         title="Inserir Novo Horário"
       >
