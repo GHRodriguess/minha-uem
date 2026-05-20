@@ -3,12 +3,14 @@
 import { useState, useRef } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil } from '@/types/academico'
-import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Upload, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAcademico } from '../providers/ProvedorAcademico'
+import Modal from '../shared/Modal'
+import { Button } from '../ui/button'
 
 interface CardUploadPDFProps {
-  onSuccess: (dados: Perfil) => void
+  onSuccess: (data: Perfil) => void
   token: string
 }
 
@@ -16,17 +18,14 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
   const { atualizarAnos, notificarMudanca } = useAcademico()
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const handleUpload = async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      setErro('Por favor, envie um arquivo PDF.')
-      return
-    }
-
+  const processarUpload = async (file: File) => {
     setLoading(true)
-    setErro(null)
+    setError(null)
 
     try {
       const data = await academic_service.enviarHorario(token, file)
@@ -34,10 +33,35 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
       notificarMudanca()
       onSuccess(data)
     } catch (err: unknown) {
-      const error_message = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
-      setErro(error_message)
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
+      setPendingFile(null)
+    }
+  }
+
+  const validarESolicitarUpload = (file: File) => {
+    if (file.type !== 'application/pdf') {
+      setError('Por favor, envie um arquivo PDF.')
+      return
+    }
+    setPendingFile(file)
+    setIsModalOpen(true)
+  }
+
+  const confirmarUpload = () => {
+    if (pendingFile) {
+      processarUpload(pendingFile)
+    }
+    setIsModalOpen(false)
+  }
+
+  const cancelarUpload = () => {
+    setPendingFile(null)
+    setIsModalOpen(false)
+    if (inputRef.current) {
+      inputRef.current.value = ''
     }
   }
 
@@ -56,7 +80,7 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
     e.stopPropagation()
     setDragActive(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleUpload(e.dataTransfer.files[0])
+      validarESolicitarUpload(e.dataTransfer.files[0])
     }
   }
 
@@ -86,7 +110,7 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
           type="file"
           accept=".pdf"
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+          onChange={(e) => e.target.files?.[0] && validarESolicitarUpload(e.target.files[0])}
         />
 
         {loading ? (
@@ -111,10 +135,10 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
         )}
       </div>
 
-      {erro && (
+      {error && (
         <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-xl flex items-start gap-3 text-red-600 dark:text-red-400">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <p className="text-sm font-medium">{erro}</p>
+          <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
@@ -136,6 +160,46 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
           <span>Controle de faltas integrado</span>
         </div>
       </div>
+
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={cancelarUpload}
+        title="Confirmar Envio de Horário"
+      >
+        <div className="flex flex-col items-center text-center gap-4">
+          <div className="bg-destructive/10 p-4 rounded-full">
+            <AlertTriangle className="w-12 h-12 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-foreground font-bold text-lg">Substituir dados atuais?</p>
+            <p className="text-muted-foreground">
+              Ao enviar um novo arquivo, as informações do seu horário atual serão substituídas 
+              pelo novo conteúdo. Esta ação não pode ser desfeita.
+            </p>
+            {pendingFile && (
+              <p className="text-sm font-medium text-primary bg-primary/5 py-1 px-3 rounded-lg inline-block">
+                Arquivo: {pendingFile.name}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-3 w-full mt-4">
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={cancelarUpload}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="flex-1"
+              onClick={confirmarUpload}
+            >
+              Confirmar e Enviar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
