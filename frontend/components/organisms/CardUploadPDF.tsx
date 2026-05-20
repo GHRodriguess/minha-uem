@@ -5,6 +5,7 @@ import { academic_service } from '@/lib/api/academico'
 import { Perfil } from '@/types/academico'
 import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useAcademico } from '../providers/ProvedorAcademico'
 
 interface CardUploadPDFProps {
   onSuccess: (dados: Perfil) => void
@@ -12,6 +13,7 @@ interface CardUploadPDFProps {
 }
 
 export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) {
+  const { atualizarAnos, notificarMudanca } = useAcademico()
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -28,6 +30,8 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
 
     try {
       const data = await academic_service.enviarHorario(token, file)
+      await atualizarAnos()
+      notificarMudanca()
       onSuccess(data)
     } catch (err: unknown) {
       const error_message = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'

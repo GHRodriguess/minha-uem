@@ -6,28 +6,31 @@ import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
 import { BookOpen, GraduationCap, Calendar, Clock, Loader2, MapPin } from 'lucide-react'
+import { useAcademico } from '@/components/providers/ProvedorAcademico'
 
 export default function Home() {
   const { data: session } = useSession()
+  const { anoAtivoId, versao } = useAcademico()
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
 
   const buscarPerfil = useCallback(async () => {
     if (!session?.accessToken) return
 
+    setLoading(true)
     try {
-      const data = await academic_service.obterPerfil(session.accessToken)
+      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
       setPerfil(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
       setLoading(false)
     }
-  }, [session])
+  }, [session, anoAtivoId])
 
   useEffect(() => {
     buscarPerfil()
-  }, [buscarPerfil])
+  }, [buscarPerfil, versao])
 
   const filtrarAulasHoje = () => {
     if (!perfil?.materias) return []

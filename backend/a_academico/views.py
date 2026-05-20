@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import PerfilAcademico, RegistroFalta, Materia
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo
 from .serializers import PerfilAcademicoSerializer
 from .services import ServicoExtracaoHorario
 
@@ -10,7 +10,8 @@ class PerfilAcademicoView(APIView):
 
     def get(self, request):
         perfil, created = PerfilAcademico.objects.get_or_create(user=request.user)
-        serializer = PerfilAcademicoSerializer(perfil, context={'perfil': perfil})
+        ano_id = request.query_params.get('ano_id')
+        serializer = PerfilAcademicoSerializer(perfil, context={'perfil': perfil, 'ano_id': ano_id})
         return Response(serializer.data)
 
 class UploadHorarioView(APIView):
@@ -38,6 +39,7 @@ class ControleFaltaView(APIView):
         data_falta = request.data.get('data')
         aula_num = request.data.get('aula')
         quantidade = request.data.get('faltas')
+        ano_id = request.data.get('ano_id')
 
         if materia_id is None or data_falta is None or aula_num is None or quantidade is None:
             return Response({"erro": "materia_id, data, aula e faltas são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
@@ -46,13 +48,28 @@ class ControleFaltaView(APIView):
             perfil, _ = PerfilAcademico.objects.get_or_create(user=request.user)
             materia = Materia.objects.get(id=materia_id)
             
+            # Se ano_id não for fornecido, tenta encontrar o AnoLetivo mais adequado pela data
+            from .models import AnoLetivo
+            if ano_id:
+                ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=perfil)
+            else:
+                from datetime import datetime
+                data_dt = datetime.strptime(data_falta, '%Y-%m-%d').date()
+                ano_letivo = perfil.anos.filter(horarios__data_inicio__lte=data_dt, horarios__data_termino__gte=data_dt).first()
+                if not ano_letivo:
+                    ano_letivo = perfil.anos.order_by('-ano').first()
+
             registro, created = RegistroFalta.objects.get_or_create(
                 perfil=perfil, 
                 materia=materia, 
                 data=data_falta,
-                aula=aula_num
+                aula=aula_num,
+                defaults={'ano_letivo': ano_letivo}
             )
             
+            if not created:
+                registro.ano_letivo = ano_letivo
+
             if int(quantidade) <= 0:
                 registro.delete()
                 faltas_result = 0

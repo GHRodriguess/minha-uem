@@ -2,7 +2,7 @@ import pdfplumber
 import re
 from datetime import datetime
 from django.db import transaction
-from .models import Curso, Materia, Horario, PerfilAcademico
+from .models import Curso, Materia, Horario, PerfilAcademico, AnoLetivo
 
 class ServicoExtracaoHorario:
     def __init__(self, pdf_file, user):
@@ -13,9 +13,11 @@ class ServicoExtracaoHorario:
         self.curso_codigo = ""
         self.curso_nome = ""
         self.texto = ""
+        self.ano = None
 
     def processar(self):
         self._extrair_texto()
+        self._extrair_ano()
         self._extrair_curso()
         self._extrair_materias()
         self._extrair_horarios()
@@ -24,7 +26,16 @@ class ServicoExtracaoHorario:
     def _extrair_texto(self):
         with pdfplumber.open(self.pdf_file) as pdf:
             for page in pdf.pages:
-                self.texto += page.extract_text()
+                self.texto += page.extract_text() + "\n---PAGE_BREAK---\n"
+
+    def _extrair_ano(self):
+        match = re.search(r'ANO LETIVO\s*-\s*SEMESTRE\s*:\s*(\d{4})', self.texto)
+        if match:
+            self.ano = int(match.group(1))
+        else:
+            match_alt = re.search(r'ANO LETIVO\s*:\s*(\d{4})', self.texto)
+            if match_alt:
+                self.ano = int(match_alt.group(1))
 
     def _extrair_curso(self):
         match = re.search(r'CURSO-\s*(\d+)\s*-\s*(.*?)\s*-', self.texto)
@@ -65,8 +76,14 @@ class ServicoExtracaoHorario:
         linhas_texto = self.texto.split('\n')
         colunas_horarios = []
         buffer_matches = None
+        seen_intervals = set()
         
         for linha in linhas_texto:
+            if "---PAGE_BREAK---" in linha:
+                seen_intervals = set()
+                buffer_matches = None
+                continue
+
             matches_na_linha = list(padrao.finditer(linha))
             if not matches_na_linha:
                 continue
@@ -75,6 +92,16 @@ class ServicoExtracaoHorario:
                 buffer_matches = matches_na_linha
             else:
                 if len(matches_na_linha) == len(buffer_matches):
+                    # Verifica se este intervalo de tempo já foi processado nesta página
+                    # (Evita duplicações comuns em PDFs da UEM)
+                    if len(matches_na_linha) == 1:
+                        inicio = buffer_matches[0].group(1)
+                        fim = matches_na_linha[0].group(1)
+                        if (inicio, fim) in seen_intervals:
+                            buffer_matches = None
+                            continue
+                        seen_intervals.add((inicio, fim))
+
                     while len(colunas_horarios) < len(matches_na_linha):
                         colunas_horarios.append([])
                     
@@ -145,7 +172,9 @@ class ServicoExtracaoHorario:
                         turma_normalizada = str(int(turma_raw)) if turma_raw.isdigit() else turma_raw.strip()
                         dia_semana = dia_idx + 1
                         
-                        chave = (bloco_detectado, aula_num, dia_semana, codigo_materia)
+                        # A chave de de-duplicação ignora o bloco para evitar que matérias anuais
+                        # (que aparecem em múltiplas páginas/semestres) gerem horários duplicados no mesmo dia/hora.
+                        chave = (aula_num, dia_semana, codigo_materia)
                         if chave not in vistos:
                             m_data = self.materias_data.get(codigo_materia, {})
                             self.horarios_data.append({
@@ -166,7 +195,16 @@ class ServicoExtracaoHorario:
                             vistos.add(chave)
 
     def _salvar_dados(self):
-        print(f"Iniciando salvamento: {len(self.materias_data)} matérias, {len(self.horarios_data)} horários.")
+        if not self.ano and self.materias_data:
+            from collections import Counter
+            anos = [data['inicio'].year for data in self.materias_data.values()]
+            if anos:
+                self.ano = Counter(anos).most_common(1)[0][0]
+        
+        if not self.ano:
+            self.ano = datetime.now().year
+
+        print(f"Iniciando salvamento para o ano {self.ano}: {len(self.materias_data)} matérias, {len(self.horarios_data)} horários.")
         
         with transaction.atomic():
             curso, _ = Curso.objects.get_or_create(
@@ -194,16 +232,15 @@ class ServicoExtracaoHorario:
                 materia = next((m for m in materias_salvas if m.codigo == h_data['codigo']), None)
                 
                 if not materia:
-                    print(f"Aviso: Matéria não encontrada para horário: {h_data['codigo']}")
                     continue
                     
-                obj, created = Horario.objects.get_or_create(
+                obj, created = Horario.objects.update_or_create(
                     materia=materia,
                     turma=h_data['turma'],
-                    bloco=h_data['bloco'],
                     aula=h_data['aula'],
                     dia=h_data['dia'],
                     defaults={
+                        'bloco': h_data['bloco'],
                         'inicio': h_data['inicio'],
                         'fim': h_data['fim'],
                         'sala': h_data['sala'].strip(),
@@ -216,12 +253,19 @@ class ServicoExtracaoHorario:
                 )
                 horarios_criados_objs.append(obj)
 
-            print(f"Horários vinculados: {len(horarios_criados_objs)}")
-
             perfil, _ = PerfilAcademico.objects.get_or_create(user=self.user)
             perfil.curso = curso
-            perfil.materias.set(materias_salvas)
-            perfil.horarios.set(horarios_criados_objs)
             perfil.save()
+
+            # Limpa dados anteriores do mesmo ano letivo (incluindo faltas via CASCADE)
+            AnoLetivo.objects.filter(perfil=perfil, ano=self.ano).delete()
+
+            ano_letivo = AnoLetivo.objects.create(
+                perfil=perfil,
+                ano=self.ano
+            )
+            ano_letivo.materias.set(materias_salvas)
+            ano_letivo.horarios.set(horarios_criados_objs)
+            ano_letivo.save()
             
             return perfil
