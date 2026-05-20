@@ -22,11 +22,26 @@ class UploadHorarioView(APIView):
             return Response({"erro": "Nenhum arquivo enviado."}, status=status.HTTP_400_BAD_REQUEST)
         
         pdf_file = request.FILES['file']
+        confirmar = request.data.get('confirmar') == 'true'
         servico = ServicoExtracaoHorario(pdf_file, request.user)
         
         try:
-            perfil = servico.processar()
-            serializer = PerfilAcademicoSerializer(perfil, context={'perfil': perfil})
+            perfil, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+            
+            # Se não houver confirmação, verifica se o ano já existe
+            if not confirmar:
+                analise = servico.processar(apenas_analisar=True)
+                ano_detectado = analise.get("ano")
+                
+                if ano_detectado and AnoLetivo.objects.filter(perfil=perfil, ano=ano_detectado).exists():
+                    return Response({
+                        "conflito": True,
+                        "ano": ano_detectado,
+                        "mensagem": f"Já existem dados para o ano {ano_detectado}. Deseja sobrescrever?"
+                    }, status=status.HTTP_200_OK)
+
+            perfil_atualizado = servico.processar()
+            serializer = PerfilAcademicoSerializer(perfil_atualizado, context={'perfil': perfil_atualizado})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"erro": f"Erro ao processar PDF: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

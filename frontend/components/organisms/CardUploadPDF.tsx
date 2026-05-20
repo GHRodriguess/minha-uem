@@ -20,24 +20,36 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [conflictYear, setConflictYear] = useState<number | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const processarUpload = async (file: File) => {
+  const processarUpload = async (file: File, confirmed: boolean = false) => {
     setLoading(true)
     setError(null)
 
     try {
-      const data = await academic_service.enviarHorario(token, file)
+      const response = await academic_service.enviarHorario(token, file, confirmed)
+      
+      if ('conflito' in response && response.conflito) {
+        setPendingFile(file)
+        setConflictYear(response.ano)
+        setIsModalOpen(true)
+        setLoading(false)
+        return
+      }
+
+      const data = response as Perfil
       await atualizarAnos()
       notificarMudanca()
       onSuccess(data)
+      setPendingFile(null)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
       setError(errorMessage)
+      setPendingFile(null)
     } finally {
       setLoading(false)
-      setPendingFile(null)
     }
   }
 
@@ -46,19 +58,19 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
       setError('Por favor, envie um arquivo PDF.')
       return
     }
-    setPendingFile(file)
-    setIsModalOpen(true)
+    processarUpload(file)
   }
 
   const confirmarUpload = () => {
     if (pendingFile) {
-      processarUpload(pendingFile)
+      processarUpload(pendingFile, true)
     }
     setIsModalOpen(false)
   }
 
   const cancelarUpload = () => {
     setPendingFile(null)
+    setConflictYear(null)
     setIsModalOpen(false)
     if (inputRef.current) {
       inputRef.current.value = ''
@@ -137,7 +149,7 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
 
       {error && (
         <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-xl flex items-start gap-3 text-red-600 dark:text-red-400">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
@@ -171,10 +183,9 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
             <AlertTriangle className="w-12 h-12 text-destructive" />
           </div>
           <div className="space-y-2">
-            <p className="text-foreground font-bold text-lg">Substituir dados atuais?</p>
+            <p className="text-foreground font-bold text-lg">Substituir dados de {conflictYear}?</p>
             <p className="text-muted-foreground">
-              Ao enviar um novo arquivo, as informações do seu horário atual serão substituídas 
-              pelo novo conteúdo. Esta ação não pode ser desfeita.
+              Detectamos que este horário é para o ano de {conflictYear}. Você já possui dados cadastrados para este período. Deseja sobrescrevê-los?
             </p>
             {pendingFile && (
               <p className="text-sm font-medium text-primary bg-primary/5 py-1 px-3 rounded-lg inline-block">

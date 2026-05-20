@@ -15,28 +15,66 @@ class ServicoExtracaoHorario:
         self.texto = ""
         self.ano = None
 
-    def processar(self):
+    def processar(self, apenas_analisar=False):
         self._extrair_texto()
         self._extrair_ano()
+        print(f"Ano letivo identificado: {self.ano}")
+        
+        if apenas_analisar:
+            return {"ano": self.ano}
+
         self._extrair_curso()
         self._extrair_materias()
         self._extrair_horarios()
         return self._salvar_dados()
 
     def _extrair_texto(self):
+        if self.texto:
+            return
         with pdfplumber.open(self.pdf_file) as pdf:
             for page in pdf.pages:
                 self.texto += page.extract_text() + "\n---PAGE_BREAK---\n"
 
     def _extrair_ano(self):
-        match = re.search(r'ANO LETIVO\s*-\s*SEMESTRE\s*:\s*(\d{4})', self.texto)
-        if match:
-            self.ano = int(match.group(1))
-        else:
-            match_alt = re.search(r'ANO LETIVO\s*:\s*(\d{4})', self.texto)
-            if match_alt:
-                self.ano = int(match_alt.group(1))
+        cabecalho = self.texto.split("---PAGE_BREAK---")[0][:2000]
+                
+        padroes = [
+            r'ANO\s*LETIVO.*?:?\s*(\d{4})',
+            r'(\d{4})\s*-\s*ANO\s*LETIVO',
+            r'LETIVO.*?:?\s*(\d{4})'
+        ]
+        
+        for padrao in padroes:
+            match = re.search(padrao, cabecalho, re.IGNORECASE)
+            if match:
+                self.ano = int(match.group(1))
+                return
 
+        for padrao in padroes:
+            match = re.search(padrao, self.texto, re.IGNORECASE)
+            if match:
+                self.ano = int(match.group(1))
+                return
+
+        datas = re.findall(r'(\d{2}/\d{2}/\d{2})', self.texto)
+        if datas:
+            anos_inferidos = []
+            for data_str in datas:
+                try:
+                    ano_yy = int(data_str.split('/')[-1])
+                    ano_full = 2000 + ano_yy if ano_yy < 50 else 1900 + ano_yy
+                    anos_inferidos.append(ano_full)
+                except:
+                    continue
+            
+            if anos_inferidos:
+                from collections import Counter
+                self.ano = Counter(anos_inferidos).most_common(1)[0][0]
+                return
+
+        if not self.ano:
+            self.ano = datetime.now().year
+                
     def _extrair_curso(self):
         match = re.search(r'CURSO-\s*(\d+)\s*-\s*(.*?)\s*-', self.texto)
         if match:

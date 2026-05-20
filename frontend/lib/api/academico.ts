@@ -8,10 +8,13 @@ export const academic_service = {
     return api_client.obter<Perfil>(`${base_path}/perfil/`, { ano_id }, token, signal);
   },
 
-  enviarHorario(token: string, file: File, signal?: AbortSignal) {
+  enviarHorario(token: string, file: File, confirmar: boolean = false, signal?: AbortSignal) {
     const form_data = new FormData();
     form_data.append("file", file);
-    return api_client.postar<Perfil>(`${base_path}/upload-horario/`, form_data, token, signal);
+    if (confirmar) {
+      form_data.append("confirmar", "true");
+    }
+    return api_client.postar<Perfil | { conflito: boolean, ano: number, mensagem: string }>(`${base_path}/upload-horario/`, form_data, token, signal);
   },
 
   atualizarFaltas(token: string, materia_id: number, data: string, aula: number, faltas: number, ano_id?: number, signal?: AbortSignal) {

@@ -76,6 +76,7 @@ export default function Home() {
         <CardUploadPDF 
           token={session?.accessToken || ''} 
           onSuccess={(newProfile) => setProfile(newProfile)} 
+          exibirConfirmacao={false}
         />
       </div>
     )
