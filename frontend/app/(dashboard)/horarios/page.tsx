@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, Loader2, UserX, GraduationCap, Trophy } from 'lucide-react'
@@ -271,7 +272,10 @@ export default function HorariosPage() {
                   <div>
                     <h4 className="font-bold text-lg text-foreground leading-tight">{item.avaliacao.nome}</h4>
                     <p className="text-sm text-muted-foreground mt-1 font-medium">
-                      {item.materia.nome} • {item.avaliacao.tipo}
+                      <Link href={`/disciplinas/${item.materia.id}`} className="hover:underline hover:text-primary transition-colors">
+                        {item.materia.nome}
+                      </Link>
+                      {' '}• {item.avaliacao.tipo}
                     </p>
                   </div>
                 </div>
@@ -294,25 +298,29 @@ export default function HorariosPage() {
 
                 return (
                   <div key={`${aula.materia.id}-${idx}`} className={`bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${temFalta ? 'opacity-50 grayscale' : ''}`}>
-                    <div className="flex items-center gap-4">
-                      <div className="bg-muted w-16 h-16 rounded-xl flex flex-col items-center justify-center border border-border">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="bg-muted w-16 h-16 rounded-xl flex flex-col items-center justify-center border border-border shrink-0">
                         <span className="text-[10px] font-bold text-muted-foreground uppercase">Aula</span>
                         <span className="text-2xl font-black text-foreground">{aula.horario.aula}</span>
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-bold text-lg text-foreground leading-tight">{aula.materia.nome}</h4>
+                          <h4 className="font-bold text-lg text-foreground leading-tight truncate">
+                            <Link href={`/disciplinas/${aula.materia.id}`} className="hover:underline hover:text-primary transition-colors">
+                              {aula.materia.nome}
+                            </Link>
+                          </h4>
                           {temFalta && (
-                            <span className="text-[10px] font-bold bg-destructive/10 text-destructive px-2 py-0.5 rounded-full uppercase">Falta Marcada</span>
+                            <span className="text-[10px] font-bold bg-destructive/10 text-destructive px-2 py-0.5 rounded-full uppercase shrink-0">Falta Marcada</span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1 font-medium">
+                        <p className="text-sm text-muted-foreground mt-1 font-medium truncate">
                           {aula.materia.codigo} • Turma {aula.horario.turma}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-4 md:gap-8 items-center text-sm">
+                    <div className="flex items-center gap-4 md:gap-8 text-sm shrink-0">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Clock className="w-4 h-4 text-primary" />
