@@ -2,24 +2,24 @@
 
 import { useSession } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  classroom_service, 
-  ConfiguracaoClassroom, 
-  ArquivoClassroom, 
-  StatusVinculoClassroom 
+import {
+  classroom_service,
+  ConfiguracaoClassroom,
+  ArquivoClassroom,
+  StatusVinculoClassroom
 } from '@/lib/api/classroom'
-import { 
-  School, 
-  RefreshCw, 
-  Download, 
-  Edit2, 
-  Check, 
-  X, 
-  Folder, 
-  Settings, 
-  AlertCircle, 
-  CheckCircle2, 
-  Loader2, 
+import {
+  School,
+  RefreshCw,
+  Download,
+  Edit2,
+  Check,
+  X,
+  Folder,
+  Settings,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
   FileText,
   Filter,
   ArrowUpDown,
@@ -36,21 +36,21 @@ type AgrupamentoArquivo = 'nenhum' | 'tipo' | 'status'
 
 export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
   const { data: session } = useSession()
-  
+
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  
+
   const [statusVinculo, setStatusVinculo] = useState<StatusVinculoClassroom>({
     vinculado: false,
     arquivos: []
   })
-  
+
   const [configClassroom, setConfigClassroom] = useState<ConfiguracaoClassroom>({
     download_dir: 'Downloads/MinhaUEM',
     folder_options: 'documentos,exercicios'
   })
-  
+
   const [ordenacao, setOrdenacao] = useState<OrdenacaoArquivo>('nome')
   const [agrupamento, setAgrupamento] = useState<AgrupamentoArquivo>('nenhum')
 
@@ -59,23 +59,23 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
   const obterDados = useCallback(async (exibirSyncLoader: boolean = false) => {
     if (!session?.accessToken) return
-    
+
     if (exibirSyncLoader) {
       setSyncing(true)
     } else {
       setLoading(true)
     }
-    
+
     try {
       const googleToken = session.googleAccessToken || null
       const vinculo = await classroom_service.obterArquivos(
-        session.accessToken, 
-        googleToken, 
-        materiaId, 
+        session.accessToken,
+        googleToken,
+        materiaId,
         anoId
       )
       setStatusVinculo(vinculo)
-      
+
       const config = await classroom_service.obterConfiguracao(session.accessToken)
       setConfigClassroom(config)
     } catch (error) {
@@ -99,23 +99,23 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     if (!session?.accessToken) return
     try {
       const atualizado = await classroom_service.atualizarArquivo(
-        session.accessToken, 
-        driveFileId, 
-        materiaId, 
-        anoId, 
-        originalName, 
+        session.accessToken,
+        driveFileId,
+        materiaId,
+        anoId,
+        originalName,
         { custom_name: customNameInput.trim() || null }
       )
-      
+
       setStatusVinculo(prev => ({
         ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? { 
-          ...a, 
+        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
+          ...a,
           id: atualizado.id,
-          custom_name: atualizado.custom_name 
+          custom_name: atualizado.custom_name
         } : a)
       }))
-      
+
       setEditingFileId(null)
     } catch (error) {
       console.error(error)
@@ -126,20 +126,20 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     if (!session?.accessToken) return
     try {
       const atualizado = await classroom_service.atualizarArquivo(
-        session.accessToken, 
-        driveFileId, 
-        materiaId, 
-        anoId, 
-        originalName, 
+        session.accessToken,
+        driveFileId,
+        materiaId,
+        anoId,
+        originalName,
         { selected_folder: pasta }
       )
-      
+
       setStatusVinculo(prev => ({
         ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? { 
-          ...a, 
+        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
+          ...a,
           id: atualizado.id,
-          selected_folder: atualizado.selected_folder 
+          selected_folder: atualizado.selected_folder
         } : a)
       }))
     } catch (error) {
@@ -159,14 +159,14 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
         anoId,
         originalName
       )
-      
+
       setStatusVinculo(prev => ({
         ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? { 
-          ...a, 
+        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
+          ...a,
           id: baixado.id,
-          is_downloaded: baixado.is_downloaded, 
-          local_path: baixado.local_path 
+          is_downloaded: baixado.is_downloaded,
+          local_path: baixado.local_path
         } : a)
       }))
     } catch (error) {
@@ -228,15 +228,15 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
         const estaBaixando = downloadingId === arquivo.drive_file_id
 
         return (
-          <div 
-            key={arquivo.drive_file_id} 
+          <div
+            key={arquivo.drive_file_id}
             className={`flex flex-col gap-3 p-4 border border-border rounded-2xl bg-card transition-all duration-200 ${arquivo.is_downloaded ? 'opacity-70 grayscale-[0.5]' : 'hover:border-primary/30 shadow-sm'}`}
           >
             <div className="flex items-start gap-3">
               <div className={`p-2 rounded-lg shrink-0 ${arquivo.is_downloaded ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
                 <FileText className="w-4 h-4" />
               </div>
-              
+
               <div className="space-y-1 min-w-0 flex-1">
                 {estaEditando ? (
                   <div className="flex items-center gap-1">
@@ -273,14 +273,14 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                     </button>
                   </div>
                 )}
-                
+
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   {arquivo.custom_name && (
                     <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide truncate max-w-30">
                       Original: {arquivo.original_name}
                     </p>
                   )}
-                  
+
                   {arquivo.is_downloaded && (
                     <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-3 h-3 shrink-0" />
@@ -350,34 +350,34 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
         <div className="flex items-center justify-between">
-           <div className="flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Agrupar:</span>
-           </div>
-           <select 
-             value={agrupamento}
-             onChange={(e) => setAgrupamento(e.target.value as AgrupamentoArquivo)}
-             className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
-           >
-             <option value="nenhum">Nenhum</option>
-             <option value="tipo">Por Tipo</option>
-             <option value="status">Por Status</option>
-           </select>
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Agrupar:</span>
+          </div>
+          <select
+            value={agrupamento}
+            onChange={(e) => setAgrupamento(e.target.value as AgrupamentoArquivo)}
+            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
+          >
+            <option value="nenhum">Nenhum</option>
+            <option value="tipo">Por Tipo</option>
+            <option value="status">Por Status</option>
+          </select>
         </div>
 
         <div className="flex items-center justify-between">
-           <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Ordernar:</span>
-           </div>
-           <select 
-             value={ordenacao}
-             onChange={(e) => setOrdenacao(e.target.value as OrdenacaoArquivo)}
-             className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
-           >
-             <option value="nome">Nome (A-Z)</option>
-             <option value="recentes">Mais Recentes</option>
-           </select>
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Ordernar:</span>
+          </div>
+          <select
+            value={ordenacao}
+            onChange={(e) => setOrdenacao(e.target.value as OrdenacaoArquivo)}
+            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
+          >
+            <option value="nome">Nome (A-Z)</option>
+            <option value="recentes">Mais Recentes</option>
+          </select>
         </div>
 
         <button
@@ -403,10 +403,10 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
             return (
               <div key={cat} className="space-y-3">
                 <div className="flex items-center gap-2">
-                   <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
-                     {formatarNomeTipo(cat)}
-                   </span>
-                   <div className="h-px flex-1 bg-border/40" />
+                  <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
+                    {formatarNomeTipo(cat)}
+                  </span>
+                  <div className="h-px flex-1 bg-border/40" />
                 </div>
                 {renderizarLista(arqs)}
               </div>
@@ -419,10 +419,10 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
             return (
               <div key={status} className="space-y-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
-                      {status}
-                    </span>
-                    <div className="h-px flex-1 bg-border/40" />
+                  <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
+                    {status}
+                  </span>
+                  <div className="h-px flex-1 bg-border/40" />
                 </div>
                 {renderizarLista(arqs)}
               </div>

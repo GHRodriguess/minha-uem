@@ -19,17 +19,21 @@ export default function DisciplinasPage() {
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('andamento')
   const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
 
-  const buscarPerfil = useCallback(async () => {
+  const buscarPerfil = useCallback(async (silencioso = false) => {
     if (!session?.accessToken) return
 
-    setLoading(true)
+    if (!silencioso) {
+      setLoading(true)
+    }
     try {
       const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
       setPerfil(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
-      setLoading(false)
+      if (!silencioso) {
+        setLoading(false)
+      }
     }
   }, [session, anoAtivoId])
 

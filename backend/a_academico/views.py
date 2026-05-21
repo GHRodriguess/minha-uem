@@ -8,6 +8,31 @@ import requests
 import re
 import unicodedata
 
+def normalizar_para_busca(text):
+    text_lower = text.lower()
+    text_normalized = unicodedata.normalize('NFKD', text_lower)
+    text_ascii = ''.join(c for c in text_normalized if not unicodedata.combining(c))
+    return re.findall(r'\b\w+\b', text_ascii)
+
+def nomes_sao_compativeis(subject_name, course_name):
+    subject_words = normalizar_para_busca(subject_name)
+    course_words = normalizar_para_busca(course_name)
+    
+    if not subject_words or not course_words:
+        return False
+        
+    if subject_words == course_words:
+        return True
+        
+    def eh_subsequencia(sub_seq, main_seq):
+        len_sub, len_main = len(sub_seq), len(main_seq)
+        for index in range(len_main - len_sub + 1):
+            if main_seq[index:index+len_sub] == sub_seq:
+                return True
+        return False
+        
+    return eh_subsequencia(subject_words, course_words) or eh_subsequencia(course_words, subject_words)
+
 class PerfilAcademicoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -361,7 +386,7 @@ class ArquivosMateriaClassroomView(APIView):
                         
                         for course in courses_data:
                             nome_curso_normalizado = course.get('name', '')
-                            if nome_materia_normalizado in nome_curso_normalizado or nome_curso_normalizado in nome_materia_normalizado:
+                            if nomes_sao_compativeis(nome_materia_normalizado, nome_curso_normalizado):
                                 connection = VinculoGoogleClassroom.objects.create(
                                     subject_config=config_materia,
                                     classroom_course_id=course.get('id'),

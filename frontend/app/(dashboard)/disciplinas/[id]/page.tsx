@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
+import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { CardGestaoNotas } from '@/components/organisms/CardGestaoNotas'
 import { CardClassroom } from '@/components/organisms/CardClassroom'
 
@@ -29,11 +30,14 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const { anoAtivoId } = useAcademico()
   const [materia, setMateria] = useState<Materia | null>(null)
   const [loading, setLoading] = useState(true)
+  const { preCarregarArquivos, filesCache } = useClassroom()
 
-  const buscarDados = useCallback(async () => {
+  const buscarDados = useCallback(async (silencioso = false) => {
     if (!session?.accessToken || !anoAtivoId) return
 
-    setLoading(true)
+    if (!silencioso) {
+      setLoading(true)
+    }
     try {
       const perfil = await academic_service.obterPerfil(session.accessToken, anoAtivoId)
       const encontrada = perfil.materias?.find(m => m.id === parseInt(id))
@@ -43,13 +47,18 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
     } catch (error) {
       console.error('Erro ao buscar detalhes da disciplina:', error)
     } finally {
-      setLoading(false)
+      if (!silencioso) {
+        setLoading(false)
+      }
     }
   }, [session, anoAtivoId, id])
 
   useEffect(() => {
     buscarDados()
-  }, [buscarDados])
+    if (anoAtivoId) {
+      preCarregarArquivos(parseInt(id), anoAtivoId)
+    }
+  }, [buscarDados, id, anoAtivoId, preCarregarArquivos])
 
   if (loading) {
     return (
@@ -134,7 +143,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Coluna Principal: Notas */}
-          <div className="lg:col-span-2 flex flex-col">
+          <div className="lg:col-span-2 flex flex-col gap-8">
             <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex-1">
               <div className="flex items-center gap-3 mb-8">
                 <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -147,6 +156,43 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
               </div>
               <CardGestaoNotas materia={materia} anoId={anoAtivoId || 0} />
             </div>
+
+            {filesCache[materia.id]?.vinculado ? (
+              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in">
+                <div className="flex items-start gap-4">
+                  <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {filesCache[materia.id]?.arquivos?.length > 0
+                        ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
+                        : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
+                    </p>
+                  </div>
+                </div>
+                <Link 
+                  href={`/disciplinas/${materia.id}/arquivos`}
+                  className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
+                >
+                  Visualizar Arquivos
+                </Link>
+              </div>
+            ) : (
+              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="bg-primary/10 p-2.5 rounded-xl">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                    <p className="text-xs text-muted-foreground font-medium">Arquivos e documentos sincronizados do Google Classroom</p>
+                  </div>
+                </div>
+                <CardClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
+              </div>
+            )}
           </div>
 
           {/* Coluna Lateral: Status e Alertas */}
@@ -262,20 +308,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Materiais (Full Width) */}
-        <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-primary/10 p-2.5 rounded-xl">
-              <FileText className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
-              <p className="text-xs text-muted-foreground font-medium">Arquivos e documentos sincronizados do Google Classroom</p>
-            </div>
-          </div>
-          <CardClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
         </div>
       </div>
     </div>

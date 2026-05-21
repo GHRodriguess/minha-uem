@@ -17,17 +17,21 @@ export default function HorariosPage() {
   const [filtros, setFiltros] = useState({ aulas: true, avaliacoes: true })
   const prevAnoId = useRef<number | null>(null)
 
-  const buscarPerfil = useCallback(async () => {
+  const buscarPerfil = useCallback(async (silencioso = false) => {
     if (!session?.accessToken) return
 
-    setLoading(true)
+    if (!silencioso) {
+      setLoading(true)
+    }
     try {
       const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
       setPerfil(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
-      setLoading(false)
+      if (!silencioso) {
+        setLoading(false)
+      }
     }
   }, [session, anoAtivoId])
 
@@ -137,7 +141,7 @@ export default function HorariosPage() {
     const novasFaltas = temFalta ? 0 : 1
     try {
       await academic_service.atualizarFaltas(session.accessToken, materiaId, data, aulaNum, novasFaltas, anoAtivoId || undefined)
-      buscarPerfil()
+      buscarPerfil(true)
     } catch (error) {
       console.error('Erro ao atualizar faltas:', error)
     }
