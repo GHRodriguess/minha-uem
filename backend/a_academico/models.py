@@ -104,3 +104,36 @@ class Avaliacao(models.Model):
 
     def __str__(self):
         return f"{self.nome} ({self.configuracao.materia.nome})"
+
+
+class ConfiguracaoGeralClassroom(models.Model):
+    profile = models.OneToOneField(PerfilAcademico, on_delete=models.CASCADE, related_name='configuracao_classroom')
+    download_dir = models.CharField(max_length=500, default="Downloads/MinhaUEM")
+    folder_options = models.CharField(max_length=500, default="documentos,exercicios")
+
+    def __str__(self):
+        return f"Config Classroom de {self.profile.user.username}"
+
+
+class VinculoGoogleClassroom(models.Model):
+    subject_config = models.OneToOneField(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='vinculo_classroom')
+    classroom_course_id = models.CharField(max_length=100)
+    classroom_course_name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"Vinculo {self.subject_config.materia.nome} -> {self.classroom_course_name}"
+
+
+class ArquivoMateriaClassroom(models.Model):
+    classroom_connection = models.ForeignKey(VinculoGoogleClassroom, on_delete=models.CASCADE, related_name='arquivos')
+    drive_file_id = models.CharField(max_length=100, unique=True)
+    original_name = models.CharField(max_length=255)
+    custom_name = models.CharField(max_length=255, null=True, blank=True)
+    selected_folder = models.CharField(max_length=100, default="documentos")
+    is_downloaded = models.BooleanField(default=False)
+    local_path = models.CharField(max_length=500, null=True, blank=True)
+    sync_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.custom_name or self.original_name} ({self.classroom_connection.subject_config.materia.nome})"
+
