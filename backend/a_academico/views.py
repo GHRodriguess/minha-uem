@@ -208,6 +208,8 @@ class ListarCursosClassroomView(APIView):
 
         headers = {'Authorization': f'Bearer {google_token}'}
         response = requests.get('https://classroom.googleapis.com/v1/courses', headers=headers)
+        if response.status_code == 401:
+            return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
         if response.status_code != 200:
             return Response({'erro': 'Erro ao buscar turmas do Google Classroom', 'detalhe': response.text}, status=response.status_code)
 
@@ -351,6 +353,8 @@ class ArquivosMateriaClassroomView(APIView):
                 if config_materia:
                     headers = {'Authorization': f'Bearer {google_token}'}
                     courses_res = requests.get('https://classroom.googleapis.com/v1/courses', headers=headers)
+                    if courses_res.status_code == 401:
+                        return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
                     if courses_res.status_code == 200:
                         courses_data = courses_res.json().get('courses', [])
                         nome_materia_normalizado = normalizar_texto(config_materia.materia.nome)
@@ -385,6 +389,10 @@ class ArquivosMateriaClassroomView(APIView):
                     'classroom_course_name': connection.classroom_course_name,
                     'arquivos': serializer.data
                 })
+        except PermissionError as e:
+            if str(e) == 'GOOGLE_TOKEN_EXPIRADO':
+                return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -395,6 +403,9 @@ class ArquivosMateriaClassroomView(APIView):
         materials_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials', headers=headers)
         work_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork', headers=headers)
         announcements_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements', headers=headers)
+
+        if materials_res.status_code == 401 or work_res.status_code == 401 or announcements_res.status_code == 401:
+            raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
 
         drive_files = []
 
@@ -588,6 +599,9 @@ class BaixarArquivoClassroomView(APIView):
                 headers=headers,
                 stream=True
             )
+
+            if drive_res.status_code == 401:
+                return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
 
             if drive_res.status_code != 200:
                 return Response({
