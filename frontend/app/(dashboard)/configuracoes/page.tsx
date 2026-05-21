@@ -246,7 +246,7 @@ export default function ConfiguracoesPage() {
             {caminhoAtual || 'Carregando...'}
           </div>
 
-          <div className="max-h-[350px] overflow-y-auto border border-border rounded-2xl bg-card">
+          <div className="max-h-87.5 overflow-y-auto border border-border rounded-2xl bg-card">
             {loadingPastas ? (
               <div className="p-12 flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 text-primary animate-spin" />

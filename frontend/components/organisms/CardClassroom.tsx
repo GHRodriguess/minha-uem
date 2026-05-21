@@ -276,7 +276,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   {arquivo.custom_name && (
-                    <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide truncate max-w-[120px]">
+                    <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide truncate max-w-30">
                       Original: {arquivo.original_name}
                     </p>
                   )}
@@ -419,10 +419,10 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
             return (
               <div key={status} className="space-y-3">
                 <div className="flex items-center gap-2">
-                   <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
-                     {status}
-                   </span>
-                   <div className="h-px flex-1 bg-border/40" />
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
+                      {status}
+                    </span>
+                    <div className="h-px flex-1 bg-border/40" />
                 </div>
                 {renderizarLista(arqs)}
               </div>
