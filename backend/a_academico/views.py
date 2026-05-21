@@ -418,7 +418,6 @@ class ArquivosMateriaClassroomView(APIView):
                 for item in announcement.get('materials', []):
                     if 'driveFile' in item:
                         drive_files.append(item['driveFile']['driveFile'])
-                        print(f"Buscando anúncios para curso {course_id}...")
                     elif 'link' in item:
                         url = item['link'].get('url', '')
                         title = item['link'].get('title', 'Arquivo do Drive')

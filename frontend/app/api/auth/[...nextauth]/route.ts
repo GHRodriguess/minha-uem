@@ -1,14 +1,15 @@
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
+import { googleTokenExpirado, renovarGoogleAccessToken } from "@/lib/service/renovarGoogleToken"
 
 async function renovarTokenAcesso(token: any) {
   try {
     const urlApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    
+
     const resposta = await fetch(`${urlApi}/api/auth/refresh/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         refresh: token.refreshToken,
@@ -27,7 +28,7 @@ async function renovarTokenAcesso(token: any) {
       accessTokenExpires: Date.now() + 60 * 60 * 1000,
       refreshToken: dados.refresh ?? token.refreshToken,
     }
-  } catch (erro) {
+  } catch {
     return {
       ...token,
       error: "RefreshAccessTokenError",
@@ -45,9 +46,9 @@ const tratador = NextAuth({
           scope: "openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/drive.readonly",
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
-        }
-      }
+          response_type: "code",
+        },
+      },
     }),
   ],
   callbacks: {
@@ -60,21 +61,26 @@ const tratador = NextAuth({
     async jwt({ token, account }) {
       if (account) {
         token.googleAccessToken = account.access_token
+        token.googleRefreshToken = account.refresh_token
+        token.googleAccessTokenExpires = account.expires_at
+          ? account.expires_at * 1000
+          : Date.now() + 60 * 60 * 1000
+
         const urlApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-        
+
         const resposta = await fetch(`${urlApi}/api/auth/google/`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             token: account.id_token,
             google_access_token: account.access_token,
           }),
         })
-        
+
         const dados = await resposta.json()
-        
+
         if (resposta.ok) {
           token.accessToken = dados.access
           token.refreshToken = dados.refresh
@@ -84,10 +90,19 @@ const tratador = NextAuth({
       }
 
       if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
+        if (googleTokenExpirado(token)) {
+          return renovarGoogleAccessToken(token)
+        }
         return token
       }
 
-      return renovarTokenAcesso(token)
+      const tokenRenovado = await renovarTokenAcesso(token)
+
+      if (googleTokenExpirado(tokenRenovado)) {
+        return renovarGoogleAccessToken(tokenRenovado)
+      }
+
+      return tokenRenovado
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken as string
@@ -97,9 +112,8 @@ const tratador = NextAuth({
     },
   },
   pages: {
-    signIn: '/login',
-  }
+    signIn: "/login",
+  },
 })
 
 export { tratador as GET, tratador as POST }
-
