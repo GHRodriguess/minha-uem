@@ -8,7 +8,7 @@ import { BookOpen, AlertTriangle, CheckCircle2, Loader2, CalendarDays, LayoutGri
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 
-type Ordenacao = 'nome' | 'faltas'
+type Ordenacao = 'nome' | 'faltas' | 'andamento'
 type Agrupamento = 'nenhum' | 'departamento'
 
 export default function DisciplinasPage() {
@@ -16,7 +16,7 @@ export default function DisciplinasPage() {
   const { anoAtivoId, versao } = useAcademico()
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>('faltas')
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>('andamento')
   const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
 
   const buscarPerfil = useCallback(async () => {
@@ -60,8 +60,29 @@ export default function DisciplinasPage() {
   const materiasProcessadas = [...perfil.materias].sort((a, b) => {
     if (ordenacao === 'nome') {
       return a.nome.localeCompare(b.nome)
-    } else {
+    } else if (ordenacao === 'faltas') {
       return b.faltas_atuais - a.faltas_atuais
+    } else {
+      // Ordenação 'andamento'
+      const hoje = new Date()
+      hoje.setHours(0, 0, 0, 0)
+
+      const estaEmAndamento = (m: Materia) => {
+        const h = m.horarios?.[0]
+        if (!h) return false
+        const inicio = new Date(h.data_inicio + 'T00:00:00')
+        const fim = new Date(h.data_termino + 'T23:59:59')
+        return hoje >= inicio && hoje <= fim
+      }
+
+      const aEmAndamento = estaEmAndamento(a)
+      const bEmAndamento = estaEmAndamento(b)
+
+      if (aEmAndamento && !bEmAndamento) return -1
+      if (!aEmAndamento && bEmAndamento) return 1
+      
+      // Se ambos estão no mesmo estado (ambos em andamento ou ambos não), ordena por nome
+      return a.nome.localeCompare(b.nome)
     }
   })
 
@@ -179,6 +200,7 @@ export default function DisciplinasPage() {
             onChange={(e) => setOrdenacao(e.target.value as Ordenacao)}
             className="bg-background border border-border rounded-xl px-3 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
+            <option value="andamento">Em Andamento</option>
             <option value="nome">Nome (A-Z)</option>
             <option value="faltas">Mais Faltas</option>
           </select>
