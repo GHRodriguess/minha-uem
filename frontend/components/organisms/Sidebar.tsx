@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle } from 'lucide-react'
+import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle, Settings } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
 import { signOut, useSession } from 'next-auth/react'
@@ -24,6 +24,7 @@ export default function Sidebar() {
     { href: '/disciplinas', icon: BookOpen, label: 'Disciplinas' },
     { href: '/curso', icon: GraduationCap, label: 'Curso' },
     { href: '/horarios', icon: Calendar, label: 'Calendário' },
+    { href: '/configuracoes', icon: Settings, label: 'Configurações' },
   ]
 
   return (

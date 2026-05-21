@@ -1,5 +1,18 @@
 from django.urls import path
-from .views import PerfilAcademicoView, UploadHorarioView, ControleFaltaView, ConfiguracaoMateriaView, AvaliacaoView
+from .views import (
+    PerfilAcademicoView, 
+    UploadHorarioView, 
+    ControleFaltaView, 
+    ConfiguracaoMateriaView, 
+    AvaliacaoView,
+    ConfiguracaoClassroomView,
+    ListarCursosClassroomView,
+    VincularCursoClassroomView,
+    ArquivosMateriaClassroomView,
+    AtualizarArquivoClassroomView,
+    BaixarArquivoClassroomView,
+    ExploradorDiretoriosView
+)
 
 urlpatterns = [
     path('perfil/', PerfilAcademicoView.as_view(), name='perfil'),
@@ -8,5 +21,13 @@ urlpatterns = [
     path('configuracao-notas/', ConfiguracaoMateriaView.as_view(), name='configuracao_notas'),
     path('avaliacoes/', AvaliacaoView.as_view(), name='avaliacoes'),
     path('avaliacoes/<int:pk>/', AvaliacaoView.as_view(), name='avaliacao_detalhe'),
+    path('classroom/config/', ConfiguracaoClassroomView.as_view(), name='classroom_config'),
+    path('classroom/cursos/', ListarCursosClassroomView.as_view(), name='classroom_cursos'),
+    path('classroom/vincular/', VincularCursoClassroomView.as_view(), name='classroom_vincular'),
+    path('classroom/arquivos/', ArquivosMateriaClassroomView.as_view(), name='classroom_arquivos'),
+    path('classroom/arquivos/<str:drive_file_id>/', AtualizarArquivoClassroomView.as_view(), name='classroom_arquivos_detalhe'),
+    path('classroom/arquivos/<str:drive_file_id>/baixar/', BaixarArquivoClassroomView.as_view(), name='classroom_arquivos_baixar'),
+    path('classroom/explorar-diretorios/', ExploradorDiretoriosView.as_view(), name='classroom_explorar_diretorios'),
 ]
+
 

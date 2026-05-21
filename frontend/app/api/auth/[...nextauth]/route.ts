@@ -1,6 +1,40 @@
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 
+async function renovarTokenAcesso(token: any) {
+  try {
+    const urlApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+    
+    const resposta = await fetch(`${urlApi}/api/auth/refresh/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        refresh: token.refreshToken,
+      }),
+    })
+
+    const dados = await resposta.json()
+
+    if (!resposta.ok) {
+      throw dados
+    }
+
+    return {
+      ...token,
+      accessToken: dados.access,
+      accessTokenExpires: Date.now() + 60 * 60 * 1000,
+      refreshToken: dados.refresh ?? token.refreshToken,
+    }
+  } catch (erro) {
+    return {
+      ...token,
+      error: "RefreshAccessTokenError",
+    }
+  }
+}
+
 const tratador = NextAuth({
   providers: [
     GoogleProvider({
@@ -8,7 +42,7 @@ const tratador = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/drive.readonly",
+          scope: "openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/drive.readonly",
           prompt: "consent",
           access_type: "offline",
           response_type: "code"
@@ -44,12 +78,21 @@ const tratador = NextAuth({
         if (resposta.ok) {
           token.accessToken = dados.access
           token.refreshToken = dados.refresh
+          token.accessTokenExpires = Date.now() + 60 * 60 * 1000
         }
+        return token
       }
-      return token
+
+      if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
+        return token
+      }
+
+      return renovarTokenAcesso(token)
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken as string
+      session.googleAccessToken = token.googleAccessToken as string
+      session.error = token.error as string
       return session
     },
   },
@@ -59,3 +102,4 @@ const tratador = NextAuth({
 })
 
 export { tratador as GET, tratador as POST }
+

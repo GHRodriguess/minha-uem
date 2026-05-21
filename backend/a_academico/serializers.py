@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom
 from django.db.models import Sum, F
 
 class CursoSerializer(serializers.ModelSerializer):
@@ -155,3 +155,23 @@ class PerfilAcademicoSerializer(serializers.ModelSerializer):
 
     def get_configurado(self, obj):
         return obj.curso is not None
+
+
+class ConfiguracaoGeralClassroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfiguracaoGeralClassroom
+        fields = ['id', 'download_dir', 'folder_options']
+
+
+class ArquivoMateriaClassroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ArquivoMateriaClassroom
+        fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'is_downloaded', 'local_path', 'sync_at']
+
+
+class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):
+    arquivos = ArquivoMateriaClassroomSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = VinculoGoogleClassroom
+        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'arquivos']

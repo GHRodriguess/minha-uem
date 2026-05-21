@@ -24,6 +24,7 @@ type OpcoesRequisicao = {
   query?: Record<string, QueryValue>;
   signal?: AbortSignal;
   token?: string;
+  headers?: Record<string, string>;
 };
 
 function construirStringConsulta(query?: OpcoesRequisicao["query"]): string {
@@ -53,29 +54,45 @@ export async function requisitar<T>(
   path: string,
   options: OpcoesRequisicao = {},
 ): Promise<T> {
-  const { method = "GET", body, query, signal, token } = options;
+  const { method = "GET", body, query, signal, token, headers: customHeaders } = options;
 
-  const headers: Record<string, string> = {
+  const rawHeaders: Record<string, any> = {
     Accept: "application/json",
+    ...customHeaders,
   };
   
   if (body !== undefined && !(body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
+    rawHeaders["Content-Type"] = "application/json";
   }
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    rawHeaders.Authorization = `Bearer ${token}`;
+  }
+
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawHeaders)) {
+    if (value !== undefined && value !== null) {
+      headers[key] = String(value);
+    }
   }
 
   const url = `${BASE_URL}${path}${construirStringConsulta(query)}`;
 
-  const response = await fetch(url, {
+  const fetchOptions: RequestInit = {
     method,
     headers,
-    body: body !== undefined ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
-    signal,
     cache: "no-store",
-  });
+  };
+
+  if (body !== undefined) {
+    fetchOptions.body = body instanceof FormData ? body : JSON.stringify(body);
+  }
+
+  if (signal !== undefined) {
+    fetchOptions.signal = signal;
+  }
+
+  const response = await fetch(url, fetchOptions);
 
   if (response.status === 401) {
     tratarNaoAutorizado();
@@ -115,17 +132,18 @@ export const api_client = {
     query?: OpcoesRequisicao["query"],
     token?: string,
     signal?: AbortSignal,
-  ) => requisitar<T>(path, { method: "GET", query, token, signal }),
+    headers?: Record<string, string>,
+  ) => requisitar<T>(path, { method: "GET", query, token, signal, headers }),
   
-  postar: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal) =>
-    requisitar<T>(path, { method: "POST", body, token, signal }),
+  postar: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal, headers?: Record<string, string>) =>
+    requisitar<T>(path, { method: "POST", body, token, signal, headers }),
   
-  atualizar: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal) =>
-    requisitar<T>(path, { method: "PUT", body, token, signal }),
+  atualizar: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal, headers?: Record<string, string>) =>
+    requisitar<T>(path, { method: "PUT", body, token, signal, headers }),
   
-  patch: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal) =>
-    requisitar<T>(path, { method: "PATCH", body, token, signal }),
+  patch: <T>(path: string, body?: unknown, token?: string, signal?: AbortSignal, headers?: Record<string, string>) =>
+    requisitar<T>(path, { method: "PATCH", body, token, signal, headers }),
   
-  remover: <T = void>(path: string, token?: string, signal?: AbortSignal) =>
-    requisitar<T>(path, { method: "DELETE", token, signal }),
+  remover: <T = void>(path: string, token?: string, signal?: AbortSignal, headers?: Record<string, string>) =>
+    requisitar<T>(path, { method: "DELETE", token, signal, headers }),
 };
