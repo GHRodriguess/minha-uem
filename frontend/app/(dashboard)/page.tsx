@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
@@ -144,9 +145,13 @@ export default function Home() {
           <h3 className="text-xl font-bold text-foreground mb-6">Suas Disciplinas</h3>
           <div className="space-y-4">
             {profile.materias?.map((materia: Materia) => (
-              <div key={materia.id} className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors">
+              <Link
+                key={materia.id}
+                href={`/disciplinas/${materia.id}`}
+                className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+              >
                 <div>
-                  <p className="font-bold text-foreground">{materia.nome}</p>
+                  <p className="font-bold text-foreground hover:text-primary transition-colors">{materia.nome}</p>
                   <p className="text-xs text-muted-foreground mt-1">{materia.codigo} • Turma {materia.horarios?.[0]?.turma}</p>
                 </div>
                 <div className="text-right">
@@ -154,7 +159,7 @@ export default function Home() {
                     {materia.horarios?.[0]?.departamento}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -164,10 +169,14 @@ export default function Home() {
           <div className="space-y-4">
             {todayClasses.length > 0 ? (
               todayClasses.map((aula, idx) => (
-                <div key={idx} className="p-4 rounded-xl border border-border bg-muted/30">
+                <Link
+                  key={idx}
+                  href={`/disciplinas/${aula.materia.id}`}
+                  className="block p-4 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer"
+                >
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-bold text-foreground">{aula.materia.nome}</p>
+                      <p className="font-bold text-foreground hover:text-primary transition-colors">{aula.materia.nome}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                         <Clock className="w-3 h-3" />
                         {aula.horario.inicio.substring(0, 5)} - {aula.horario.fim.substring(0, 5)}
@@ -180,7 +189,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center">
