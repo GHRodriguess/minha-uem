@@ -345,7 +345,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                               </div>
                             ) : (
                               <div className="flex items-start gap-2 group max-w-xl">
-                                <p className="font-bold text-foreground break-words whitespace-normal leading-relaxed">
+                                <p className="font-bold text-foreground wrap-break-words whitespace-normal leading-relaxed">
                                   {arquivo.custom_name || arquivo.original_name}
                                 </p>
                                 <button
@@ -358,7 +358,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                             )}
 
                             {arquivo.custom_name && (
-                              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider break-words whitespace-normal leading-normal">
+                              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider wrap-break-words whitespace-normal leading-normal">
                                 Original: {arquivo.original_name}
                               </p>
                             )}
