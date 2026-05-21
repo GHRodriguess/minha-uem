@@ -20,6 +20,17 @@ import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { CardGestaoNotas } from '@/components/organisms/CardGestaoNotas'
 import { CardClassroom } from '@/components/organisms/CardClassroom'
 
+function agruparFaltasPorDia(absences: { data: string; aula: number; faltas: number }[]) {
+  const groupedAbsences = absences.reduce((accumulator, item) => {
+    accumulator[item.data] = (accumulator[item.data] || 0) + item.faltas
+    return accumulator
+  }, {} as Record<string, number>)
+
+  return Object.entries(groupedAbsences)
+    .map(([date, total]) => ({ data: date, faltas: total }))
+    .sort((a, b) => b.data.localeCompare(a.data))
+}
+
 interface PaginaDisciplinaProps {
   params: Promise<{ id: string }>
 }
@@ -264,7 +275,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
                   <div className="space-y-3">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Histórico Recente</p>
                     <div className="flex flex-col gap-2">
-                      {materia.detalhes_faltas.slice(0, 3).map((f, i) => (
+                      {agruparFaltasPorDia(materia.detalhes_faltas).slice(0, 3).map((f, i) => (
                         <div key={i} className="flex justify-between items-center text-sm p-3 bg-muted/30 rounded-xl border border-border/50">
                           <span className="font-bold text-foreground">{new Date(f.data + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                           <span className="text-primary font-black text-xs bg-primary/10 px-2 py-0.5 rounded-full">{f.faltas} F</span>
