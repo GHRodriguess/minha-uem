@@ -357,10 +357,10 @@ class ArquivosMateriaClassroomView(APIView):
                         return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
                     if courses_res.status_code == 200:
                         courses_data = courses_res.json().get('courses', [])
-                        nome_materia_normalizado = normalizar_texto(config_materia.materia.nome)
+                        nome_materia_normalizado = config_materia.materia.nome
                         
                         for course in courses_data:
-                            nome_curso_normalizado = normalizar_texto(course.get('name', ''))
+                            nome_curso_normalizado = course.get('name', '')
                             if nome_materia_normalizado in nome_curso_normalizado or nome_curso_normalizado in nome_materia_normalizado:
                                 connection = VinculoGoogleClassroom.objects.create(
                                     subject_config=config_materia,
