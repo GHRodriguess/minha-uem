@@ -1,21 +1,25 @@
 interface AvatarUsuarioProps {
   src?: string | null
   alt?: string | null
+  className?: string
 }
 
-export default function AvatarUsuario({ src, alt }: AvatarUsuarioProps) {
+export default function AvatarUsuario({ src, alt, className }: AvatarUsuarioProps) {
+  const defaultClass = "w-10 h-10 rounded-full border border-border object-cover"
+  const classes = className || defaultClass
+
   if (src) {
     return (
       <img
         src={src}
         alt={alt || 'Avatar'}
-        className="w-10 h-10 rounded-full border border-border object-cover"
+        className={classes}
       />
     )
   }
 
   return (
-    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border">
+    <div className={`${classes} bg-muted flex items-center justify-center border border-border`}>
       <span className="text-muted-foreground font-medium">
         {alt ? alt.charAt(0).toUpperCase() : '?'}
       </span>
