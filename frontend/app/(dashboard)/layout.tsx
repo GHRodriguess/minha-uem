@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Sidebar from '@/components/organisms/Sidebar'
@@ -11,14 +11,16 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { status } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
+    } else if (status === 'authenticated' && !session?.accessToken) {
+      signOut({ callbackUrl: '/login?error=BackendError' })
     }
-  }, [status, router])
+  }, [status, session, router])
 
   if (status === 'loading') {
     return (
@@ -28,7 +30,7 @@ export default function DashboardLayout({
     )
   }
 
-  if (status === 'unauthenticated') {
+  if (status === 'unauthenticated' || (status === 'authenticated' && !session?.accessToken)) {
     return null
   }
 

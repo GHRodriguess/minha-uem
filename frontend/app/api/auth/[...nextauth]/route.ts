@@ -68,23 +68,26 @@ const tratador = NextAuth({
 
         const urlApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-        const resposta = await fetch(`${urlApi}/api/auth/google/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token: account.id_token,
-            google_access_token: account.access_token,
-          }),
-        })
+        try {
+          const resposta = await fetch(`${urlApi}/api/auth/google/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: account.id_token,
+              google_access_token: account.access_token,
+            }),
+          })
 
-        const dados = await resposta.json()
-
-        if (resposta.ok) {
-          token.accessToken = dados.access
-          token.refreshToken = dados.refresh
-          token.accessTokenExpires = Date.now() + 60 * 60 * 1000
+          if (resposta.ok) {
+            const dados = await resposta.json()
+            token.accessToken = dados.access
+            token.refreshToken = dados.refresh
+            token.accessTokenExpires = Date.now() + 60 * 60 * 1000
+          }
+        } catch (error) {
+          console.error("Erro na autenticação com o backend:", error)
         }
         return token
       }
