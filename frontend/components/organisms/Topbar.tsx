@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import BotaoTema from '../atoms/BotaoTema'
+import DropdownNotificacoes from '../molecules/DropdownNotificacoes'
 import InfoUsuario from '../molecules/InfoUsuario'
 import { useAcademico } from '../providers/ProvedorAcademico'
 import { Calendar } from 'lucide-react'
@@ -38,6 +39,7 @@ export default function Topbar() {
           </div>
         )}
         <BotaoTema />
+        <DropdownNotificacoes />
         <div className="w-px h-8 bg-border" />
         <InfoUsuario
           nome={session?.user?.name}

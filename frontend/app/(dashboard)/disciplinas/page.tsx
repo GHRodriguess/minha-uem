@@ -7,6 +7,7 @@ import { Perfil, Materia } from '@/types/academico'
 import { BookOpen, AlertTriangle, CheckCircle2, Loader2, CalendarDays, LayoutGrid, ListFilter, SortAsc, SortDesc } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
+import { useClassroom } from '@/components/providers/ProvedorClassroom'
 
 type Ordenacao = 'nome' | 'faltas' | 'andamento'
 type Agrupamento = 'nenhum' | 'departamento'
@@ -14,6 +15,7 @@ type Agrupamento = 'nenhum' | 'departamento'
 export default function DisciplinasPage() {
   const { data: session } = useSession()
   const { anoAtivoId, versao } = useAcademico()
+  const { unreadNotifications } = useClassroom()
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('andamento')
@@ -60,14 +62,12 @@ export default function DisciplinasPage() {
     )
   }
 
-  // Lógica de Processamento (Ordenação e Agrupamento)
   const materiasProcessadas = [...perfil.materias].sort((a, b) => {
     if (ordenacao === 'nome') {
       return a.nome.localeCompare(b.nome)
     } else if (ordenacao === 'faltas') {
       return b.faltas_atuais - a.faltas_atuais
     } else {
-      // Ordenação 'andamento'
       const hoje = new Date()
       hoje.setHours(0, 0, 0, 0)
 
@@ -85,7 +85,6 @@ export default function DisciplinasPage() {
       if (aEmAndamento && !bEmAndamento) return -1
       if (!aEmAndamento && bEmAndamento) return 1
       
-      // Se ambos estão no mesmo estado (ambos em andamento ou ambos não), ordena por nome
       return a.nome.localeCompare(b.nome)
     }
   })
@@ -101,6 +100,12 @@ export default function DisciplinasPage() {
         const noLimite = porcentagemFaltas >= 80
         const reprovado = materia.faltas_atuais > maxFaltas
 
+        const notificacaoMateria = unreadNotifications?.atualizacoes.find(
+          (upd) => upd.materia_id === materia.id
+        )
+        const temMensagensNaoLidas = notificacaoMateria && notificacaoMateria.mensagens.length > 0
+        const totalNaoLidas = notificacaoMateria ? notificacaoMateria.mensagens.length : 0
+
         return (
           <Link 
             key={materia.id} 
@@ -115,9 +120,16 @@ export default function DisciplinasPage() {
                     {materia.codigo} • Turma {primeiroHorario.turma}
                   </p>
                 </div>
-                <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">
-                  {primeiroHorario.departamento}
-                </span>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">
+                    {primeiroHorario.departamento}
+                  </span>
+                  {temMensagensNaoLidas && (
+                    <span className="bg-destructive text-destructive-foreground text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                      +{totalNaoLidas} novidade{totalNaoLidas > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4 mt-6">

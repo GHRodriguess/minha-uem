@@ -6,9 +6,11 @@ import {
   classroom_service, 
   ConfiguracaoClassroom, 
   ArquivoClassroom, 
-  StatusVinculoClassroom 
+  StatusVinculoClassroom,
+  RespostaNotificacoesClassroom
 } from '@/lib/api/classroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { useAcademico } from './ProvedorAcademico'
 
 interface ContextoClassroomData {
   filesCache: Record<number, StatusVinculoClassroom>
@@ -18,6 +20,8 @@ interface ContextoClassroomData {
   directoryHandle: FileSystemDirectoryHandle | null
   hasFolderPermission: boolean
   isFileSystemSupported: boolean
+  unreadNotifications: RespostaNotificacoesClassroom | null
+  notificationsCount: number
   solicitarAcessoPasta: () => Promise<void>
   desvincularPasta: () => Promise<void>
   escanearPastaLocal: (materiaId: number, anoId: number) => Promise<void>
@@ -30,16 +34,65 @@ interface ContextoClassroomData {
   abrirItemLocal: (materiaId: number, identificador: number | string) => Promise<void>
   alternarOcultarArquivo: (materiaId: number, anoId: number, driveFileId: string, originalName: string, ocultar: boolean) => Promise<void>
   enviarArquivoLocal: (materiaId: number, anoId: number, folderCategory: string, file: File) => Promise<void>
+  obterNotificacoesGerais: (anoId: number, forcar?: boolean) => Promise<void>
+  marcarMateriaLidaLocal: (materiaId: number) => void
 }
 
 const ContextoClassroom = createContext<ContextoClassroomData>({} as ContextoClassroomData)
 
 export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
+  const { anoAtivoId } = useAcademico()
   const [filesCache, setFilesCache] = useState<Record<number, StatusVinculoClassroom>>({})
   const [classroomConfig, setClassroomConfig] = useState<ConfiguracaoClassroom | null>(null)
   const [loadingStates, setLoadingStates] = useState<Record<number, boolean>>({})
   const [syncingStates, setSyncingStates] = useState<Record<number, boolean>>({})
+  const [unreadNotifications, setUnreadNotifications] = useState<RespostaNotificacoesClassroom | null>(null)
+  const [notificationsCount, setNotificationsCount] = useState<number>(0)
+
+  const obterNotificacoesGerais = useCallback(async (anoId: number) => {
+    if (!session?.accessToken) return
+    try {
+      const googleToken = session.googleAccessToken || null
+      const data = await classroom_service.obterNotificacoes(session.accessToken, googleToken, anoId)
+      setUnreadNotifications(data)
+      setNotificationsCount(data.total_nao_lidos)
+    } catch (error) {
+      console.error(error)
+    }
+  }, [session])
+
+  const marcarMateriaLidaLocal = useCallback((materiaId: number) => {
+    setUnreadNotifications(prev => {
+      if (!prev) return null
+      const found = prev.atualizacoes.find(upd => upd.materia_id === materiaId)
+      if (!found) return prev
+      const countToSubtract = found.novidades_count
+      const updatedUpdates = prev.atualizacoes.filter(upd => upd.materia_id !== materiaId)
+      return {
+        total_nao_lidos: Math.max(0, prev.total_nao_lidos - countToSubtract),
+        atualizacoes: updatedUpdates
+      }
+    })
+  }, [])
+
+  React.useEffect(() => {
+    if (unreadNotifications) {
+      setNotificationsCount(unreadNotifications.total_nao_lidos)
+    } else {
+      setNotificationsCount(0)
+    }
+  }, [unreadNotifications])
+
+  React.useEffect(() => {
+    if (session?.accessToken && anoAtivoId) {
+      obterNotificacoesGerais(anoAtivoId)
+      const interval = setInterval(() => {
+        obterNotificacoesGerais(anoAtivoId)
+      }, 300000)
+      return () => clearInterval(interval)
+    }
+  }, [session, anoAtivoId, obterNotificacoesGerais])
   
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null)
   const [hasFolderPermission, setHasFolderPermission] = useState<boolean>(false)
@@ -529,6 +582,8 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       directoryHandle,
       hasFolderPermission,
       isFileSystemSupported,
+      unreadNotifications,
+      notificationsCount,
       solicitarAcessoPasta,
       desvincularPasta,
       escanearPastaLocal,
@@ -540,7 +595,9 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       salvarPastaDestino,
       abrirItemLocal,
       alternarOcultarArquivo,
-      enviarArquivoLocal
+      enviarArquivoLocal,
+      obterNotificacoesGerais,
+      marcarMateriaLidaLocal
     }}>
       {children}
     </ContextoClassroom.Provider>

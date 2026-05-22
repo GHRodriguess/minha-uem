@@ -782,3 +782,366 @@ class SincronizarArquivosLocaisView(APIView):
             return Response(serializer.data)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+from django.utils import timezone
+import json
+import base64
+from concurrent.futures import ThreadPoolExecutor
+
+class MuralClassroomView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def obter_dados_mural(self, connection, google_token, page_tokens, is_first_page):
+        headers = {'Authorization': f'Bearer {google_token}'}
+        course_id = connection.classroom_course_id
+
+        ann_token = page_tokens.get('announcements')
+        cw_token = page_tokens.get('courseWork')
+        cwm_token = page_tokens.get('courseWorkMaterials')
+
+        ann_url = None
+        if is_first_page or ann_token:
+            ann_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements?pageSize=5'
+            if ann_token:
+                ann_url += f'&pageToken={ann_token}'
+
+        cw_url = None
+        if is_first_page or cw_token:
+            cw_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork?pageSize=5'
+            if cw_token:
+                cw_url += f'&pageToken={cw_token}'
+
+        cwm_url = None
+        if is_first_page or cwm_token:
+            cwm_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials?pageSize=5'
+            if cwm_token:
+                cwm_url += f'&pageToken={cwm_token}'
+
+        def realizar_requisicao(url):
+            if not url:
+                return {}
+            try:
+                res = requests.get(url, headers=headers)
+                if res.status_code == 401:
+                    raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
+                if res.status_code == 200:
+                    return res.json()
+            except Exception:
+                pass
+            return {}
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(realizar_requisicao, ann_url),
+                executor.submit(realizar_requisicao, cw_url),
+                executor.submit(realizar_requisicao, cwm_url)
+            ]
+            results = [f.result() for f in futures]
+
+        return results[0], results[1], results[2]
+
+    def processar_anexos(self, materials_list):
+        attachments = []
+        if not materials_list:
+            return attachments
+        for item in materials_list:
+            if 'driveFile' in item:
+                file_info = item['driveFile']['driveFile']
+                attachments.append({
+                    'tipo': 'drive',
+                    'id': file_info.get('id'),
+                    'titulo': file_info.get('title'),
+                    'url': file_info.get('alternateLink'),
+                    'thumbnail': file_info.get('thumbnailUrl')
+                })
+            elif 'youtubeVideo' in item:
+                video_info = item['youtubeVideo']
+                attachments.append({
+                    'tipo': 'youtube',
+                    'id': video_info.get('id'),
+                    'titulo': video_info.get('title'),
+                    'url': video_info.get('alternateLink'),
+                    'thumbnail': video_info.get('thumbnailUrl')
+                })
+            elif 'link' in item:
+                link_info = item['link']
+                attachments.append({
+                    'tipo': 'link',
+                    'titulo': link_info.get('title') or link_info.get('url'),
+                    'url': link_info.get('url'),
+                    'thumbnail': link_info.get('thumbnailUrl')
+                })
+            elif 'form' in item:
+                form_info = item['form']
+                attachments.append({
+                    'tipo': 'form',
+                    'titulo': form_info.get('title') or 'Formulário do Google',
+                    'url': form_info.get('formUrl'),
+                    'thumbnail': form_info.get('thumbnailUrl')
+                })
+        return attachments
+
+    def get(self, request):
+        materia_id = request.query_params.get('materia_id')
+        ano_id = request.query_params.get('ano_id')
+        google_token = request.headers.get('X-Google-Access-Token')
+        page_token_raw = request.query_params.get('pageToken')
+
+        if not materia_id or not ano_id:
+            return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not google_token:
+            return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile = PerfilAcademico.objects.get(user=request.user)
+            connection = VinculoGoogleClassroom.objects.filter(
+                subject_config__perfil=profile,
+                subject_config__materia_id=materia_id,
+                subject_config__ano_letivo_id=ano_id
+            ).first()
+
+            if not connection:
+                return Response({'vinculado': False, 'mural': [], 'nextPageToken': None})
+
+            page_tokens = {}
+            if page_token_raw:
+                try:
+                    page_tokens = json.loads(base64.b64decode(page_token_raw).decode('utf-8'))
+                except Exception:
+                    pass
+
+            ultimo_acesso = connection.ultimo_acesso_mural
+
+            ann_data, cw_data, cwm_data = self.obter_dados_mural(connection, google_token, page_tokens, not page_token_raw)
+
+            posts = []
+
+            for item in ann_data.get('announcements', []):
+                posts.append({
+                    'id': item.get('id'),
+                    'tipo': 'aviso',
+                    'titulo': (item.get('text', '')[:60] + '...') if len(item.get('text', '')) > 60 else item.get('text', 'Aviso'),
+                    'texto': item.get('text'),
+                    'data_criacao': item.get('creationTime'),
+                    'data_atualizacao': item.get('updateTime'),
+                    'link': item.get('alternateLink'),
+                    'materiais': self.processar_anexos(item.get('materials'))
+                })
+
+            for item in cw_data.get('courseWork', []):
+                due_date_info = item.get('dueDate')
+                due_time_info = item.get('dueTime')
+                due_date_iso = None
+                if due_date_info:
+                    year = due_date_info.get('year')
+                    month = due_date_info.get('month')
+                    day = due_date_info.get('day')
+                    hour = due_time_info.get('hours', 23) if due_time_info else 23
+                    minute = due_time_info.get('minutes', 59) if due_time_info else 59
+                    due_date_iso = f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00Z"
+
+                posts.append({
+                    'id': item.get('id'),
+                    'tipo': 'tarefa',
+                    'titulo': item.get('title'),
+                    'texto': item.get('description'),
+                    'data_criacao': item.get('creationTime'),
+                    'data_atualizacao': item.get('updateTime'),
+                    'link': item.get('alternateLink'),
+                    'data_entrega': due_date_iso,
+                    'materiais': self.processar_anexos(item.get('materials'))
+                })
+
+            for item in cwm_data.get('courseWorkMaterial', []):
+                posts.append({
+                    'id': item.get('id'),
+                    'tipo': 'material',
+                    'titulo': item.get('title'),
+                    'texto': item.get('description'),
+                    'data_criacao': item.get('creationTime'),
+                    'data_atualizacao': item.get('updateTime'),
+                    'link': item.get('alternateLink'),
+                    'materiais': self.processar_anexos(item.get('materials'))
+                })
+
+            posts.sort(key=lambda x: x.get('data_criacao', ''), reverse=True)
+
+            for post in posts:
+                creation_time_str = post.get('data_criacao')
+                if creation_time_str:
+                    try:
+                        from django.utils.dateparse import parse_datetime
+                        post_time = parse_datetime(creation_time_str)
+                        if ultimo_acesso and post_time:
+                            post['nao_lido'] = post_time > ultimo_acesso
+                        else:
+                            post['nao_lido'] = True
+                    except Exception:
+                        post['nao_lido'] = True
+                else:
+                    post['nao_lido'] = False
+
+            connection.ultimo_acesso_mural = timezone.now()
+            connection.save()
+
+            next_tokens = {
+                'announcements': ann_data.get('nextPageToken'),
+                'courseWork': cw_data.get('nextPageToken'),
+                'courseWorkMaterials': cwm_data.get('nextPageToken')
+            }
+
+            has_next = any(next_tokens.values())
+            next_token_b64 = None
+            if has_next:
+                next_token_b64 = base64.b64encode(json.dumps(next_tokens).encode('utf-8')).decode('utf-8')
+
+            return Response({
+                'vinculado': True,
+                'mural': posts,
+                'nextPageToken': next_token_b64,
+                'ultimo_acesso_mural': ultimo_acesso.isoformat() if ultimo_acesso else None
+            })
+
+        except PermissionError as e:
+            if str(e) == 'GOOGLE_TOKEN_EXPIRADO':
+                return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarcarMuralLidoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        materia_id = request.data.get('materia_id')
+        ano_id = request.data.get('ano_id')
+
+        if not materia_id or not ano_id:
+            return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile = PerfilAcademico.objects.get(user=request.user)
+            connection = VinculoGoogleClassroom.objects.filter(
+                subject_config__perfil=profile,
+                subject_config__materia_id=materia_id,
+                subject_config__ano_letivo_id=ano_id
+            ).first()
+
+            if connection:
+                connection.ultimo_acesso_mural = timezone.now()
+                connection.save()
+                return Response({'sucesso': True})
+            return Response({'erro': 'Vínculo do Classroom não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class NotificacoesClassroomView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        ano_id = request.query_params.get('ano_id')
+        google_token = request.headers.get('X-Google-Access-Token')
+
+        if not ano_id:
+            return Response({'erro': 'ano_id é obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not google_token:
+            return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile = PerfilAcademico.objects.get(user=request.user)
+            connections = VinculoGoogleClassroom.objects.filter(
+                subject_config__perfil=profile,
+                subject_config__ano_letivo_id=ano_id
+            )
+
+            headers = {'Authorization': f'Bearer {google_token}'}
+            global_unread_count = 0
+            subject_updates = []
+
+            def buscar_novidades_turma(conn):
+                course_id = conn.classroom_course_id
+                ann_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements?pageSize=3'
+                cw_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork?pageSize=3'
+
+                def realizar_requisicao(url):
+                    try:
+                        res = requests.get(url, headers=headers)
+                        if res.status_code == 401:
+                            raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
+                        if res.status_code == 200:
+                            return res.json()
+                    except Exception:
+                        pass
+                    return {}
+
+                with ThreadPoolExecutor(max_workers=2) as exec_local:
+                    fut_local = [
+                        exec_local.submit(realizar_requisicao, ann_url),
+                        exec_local.submit(realizar_requisicao, cw_url)
+                    ]
+                    res_local = [f.result() for f in fut_local]
+
+                return res_local[0], res_local[1]
+
+            for conn in connections:
+                try:
+                    ann_data, cw_data = buscar_novidades_turma(conn)
+                except PermissionError:
+                    return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
+
+                items = []
+
+                for item in ann_data.get('announcements', []):
+                    items.append({
+                        'id': item.get('id'),
+                        'tipo': 'aviso',
+                        'titulo': (item.get('text', '')[:40] + '...') if len(item.get('text', '')) > 40 else item.get('text', 'Aviso'),
+                        'data_criacao': item.get('creationTime')
+                    })
+
+                for item in cw_data.get('courseWork', []):
+                    items.append({
+                        'id': item.get('id'),
+                        'tipo': 'tarefa',
+                        'titulo': item.get('title'),
+                        'data_criacao': item.get('creationTime')
+                    })
+
+                unread_items = []
+                ultimo_acesso = conn.ultimo_acesso_mural
+
+                for item in items:
+                    creation_time_str = item.get('data_criacao')
+                    if creation_time_str:
+                        try:
+                            from django.utils.dateparse import parse_datetime
+                            post_time = parse_datetime(creation_time_str)
+                            if ultimo_acesso and post_time:
+                                if post_time > ultimo_acesso:
+                                    unread_items.append(item)
+                            else:
+                                unread_items.append(item)
+                        except Exception:
+                            pass
+
+                if unread_items:
+                    global_unread_count += len(unread_items)
+                    subject_updates.append({
+                        'materia_id': conn.subject_config.materia.id,
+                        'materia_nome': conn.subject_config.materia.nome,
+                        'novidades_count': len(unread_items),
+                        'mensagens': unread_items
+                    })
+
+            return Response({
+                'total_nao_lidos': global_unread_count,
+                'atualizacoes': subject_updates
+            })
+
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)

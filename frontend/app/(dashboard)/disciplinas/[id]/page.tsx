@@ -19,6 +19,7 @@ import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { CardGestaoNotas } from '@/components/organisms/CardGestaoNotas'
 import { CardClassroom } from '@/components/organisms/CardClassroom'
+import MuralClassroom from '@/components/organisms/MuralClassroom'
 
 function agruparFaltasPorDia(absences: { data: string; aula: number; faltas: number }[]) {
   const groupedAbsences = absences.reduce((accumulator, item) => {
@@ -99,7 +100,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const maxFaltas = primeiroHorario?.maximo_faltas || 0
   const porcentagemFaltas = (materia.faltas_atuais / maxFaltas) * 100
 
-  // Lógica para próximos compromissos
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
@@ -127,7 +127,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
-      {/* Cabeçalho */}
       <section className="flex flex-col gap-4">
         <Link 
           href="/disciplinas" 
@@ -153,10 +152,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
       </section>
 
       <div className="space-y-8">
-        {/* Seção Superior: Notas (Esquerda) e Widgets (Direita) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Coluna Principal: Notas */}
           <div className="lg:col-span-2 flex flex-col gap-8">
             <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex-1">
               <div className="flex items-center gap-3 mb-8">
@@ -209,10 +205,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
             )}
           </div>
 
-          {/* Coluna Lateral: Status e Alertas */}
           <div className="space-y-8">
-            
-            {/* Card de Próximos Compromissos (Vertical) */}
             {proximasAvaliacoes.length > 0 && (
               <div className="bg-primary border border-primary/20 rounded-3xl p-8 shadow-lg shadow-primary/10 text-primary-foreground">
                 <div className="flex items-center gap-3 mb-6">
@@ -243,7 +236,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
               </div>
             )}
 
-            {/* Card de Faltas */}
             <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
                 <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -290,7 +282,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
               </div>
             </div>
 
-            {/* Card de Horários */}
             <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
                 <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -323,6 +314,8 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
             </div>
           </div>
         </div>
+
+        <MuralClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
       </div>
     </div>
   )

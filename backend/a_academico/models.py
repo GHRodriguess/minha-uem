@@ -119,6 +119,7 @@ class VinculoGoogleClassroom(models.Model):
     subject_config = models.OneToOneField(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='vinculo_classroom')
     classroom_course_id = models.CharField(max_length=100)
     classroom_course_name = models.CharField(max_length=255)
+    ultimo_acesso_mural = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Vinculo {self.subject_config.materia.nome} -> {self.classroom_course_name}"

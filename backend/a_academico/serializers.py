@@ -174,4 +174,4 @@ class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VinculoGoogleClassroom
-        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'arquivos']
+        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'arquivos']

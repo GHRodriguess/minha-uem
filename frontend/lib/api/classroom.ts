@@ -97,6 +97,53 @@ export interface ResultadoExploracao {
     itens: ItemDiretorio[];
 }
 
+export interface AnexoClassroom {
+    tipo: "drive" | "youtube" | "link" | "form";
+    id?: string;
+    titulo: string;
+    url: string;
+    thumbnail?: string;
+}
+
+export interface PostMuralClassroom {
+    id: string;
+    tipo: "aviso" | "tarefa" | "material";
+    titulo: string;
+    texto?: string;
+    data_criacao: string;
+    data_atualizacao: string;
+    link: string;
+    data_entrega?: string;
+    materiais: AnexoClassroom[];
+    nao_lido: boolean;
+}
+
+export interface StatusMuralClassroom {
+    vinculado: boolean;
+    mural: PostMuralClassroom[];
+    nextPageToken: string | null;
+    ultimo_acesso_mural: string | null;
+}
+
+export interface MensagemNotificacaoClassroom {
+    id: string;
+    tipo: "aviso" | "tarefa";
+    titulo: string;
+    data_criacao: string;
+}
+
+export interface AtualizacaoMateriaClassroom {
+    materia_id: number;
+    materia_nome: string;
+    novidades_count: number;
+    mensagens: MensagemNotificacaoClassroom[];
+}
+
+export interface RespostaNotificacoesClassroom {
+    total_nao_lidos: number;
+    atualizacoes: AtualizacaoMateriaClassroom[];
+}
+
 export const classroom_service = {
     explorarDiretorios(token: string, path?: string, signal?: AbortSignal) {
         return api_client.obter<ResultadoExploracao>(
@@ -326,7 +373,75 @@ export const classroom_service = {
                 arquivos,
             },
             token,
+        );
+    },
+
+    obterMural(
+        token: string,
+        googleToken: string | null,
+        materiaId: number,
+        anoId: number,
+        pageToken?: string | null,
+        signal?: AbortSignal,
+    ) {
+        return executarComRenovacaoGoogle(
+            (tokenGoogleUsar) => {
+                const headers: Record<string, string> = {
+                    "X-Google-Access-Token": tokenGoogleUsar,
+                };
+                const params: Record<string, any> = {
+                    materia_id: materiaId,
+                    ano_id: anoId,
+                };
+                if (pageToken) {
+                    params.pageToken = pageToken;
+                }
+                return api_client.obter<StatusMuralClassroom>(
+                    `${base_path}/mural/`,
+                    params,
+                    token,
+                    signal,
+                    headers,
+                );
+            },
+            googleToken,
+        );
+    },
+
+    marcarMuralLido(
+        token: string,
+        materiaId: number,
+        anoId: number,
+        signal?: AbortSignal,
+    ) {
+        return api_client.postar<{ sucesso: boolean }>(
+            `${base_path}/mural/marcar-lido/`,
+            { materia_id: materiaId, ano_id: anoId },
+            token,
             signal,
+        );
+    },
+
+    obterNotificacoes(
+        token: string,
+        googleToken: string | null,
+        anoId: number,
+        signal?: AbortSignal,
+    ) {
+        return executarComRenovacaoGoogle(
+            (tokenGoogleUsar) => {
+                const headers: Record<string, string> = {
+                    "X-Google-Access-Token": tokenGoogleUsar,
+                };
+                return api_client.obter<RespostaNotificacoesClassroom>(
+                    `${base_path}/notificacoes/`,
+                    { ano_id: anoId },
+                    token,
+                    signal,
+                    headers,
+                );
+            },
+            googleToken,
         );
     },
 };
