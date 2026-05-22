@@ -39,5 +39,7 @@ class LoginGoogle(APIView):
                 'access': str(refresh.access_token),
             })
             
-        except Exception:
-            return Response({'erro': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({'erro': 'Token inválido', 'detalhe': str(e)}, status=status.HTTP_400_BAD_REQUEST)

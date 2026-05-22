@@ -9,6 +9,7 @@ interface PropriedadesCardLogin {
 
 export default function CardLogin({ erro }: PropriedadesCardLogin) {
   const isAcessoNegado = erro === 'AccessDenied'
+  const isErroServidor = erro === 'BackendError'
 
   return (
     <div className="p-10 bg-background shadow-2xl rounded-3xl max-w-md w-full border border-border flex flex-col items-center">
@@ -19,6 +20,10 @@ export default function CardLogin({ erro }: PropriedadesCardLogin) {
       
       {isAcessoNegado && (
         <AlertaErroDominio mensagem="Você deve utilizar um e-mail institucional @uem.br para acessar esta plataforma." />
+      )}
+
+      {isErroServidor && (
+        <AlertaErroDominio mensagem="Não foi possível estabelecer uma conexão com o servidor. Por favor, verifique se a API do backend está ativa e configurada corretamente em produção." />
       )}
       
       <div className="w-full">
