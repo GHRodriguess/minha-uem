@@ -31,7 +31,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="w-64 h-screen bg-card border-r border-border flex flex-col p-6 sticky top-0">
+    <aside className="w-64 h-screen bg-card border-r border-border flex flex-col p-6 sticky top-0 z-30">
       <div className="mb-10">
         <Logo />
       </div>

@@ -48,7 +48,7 @@ export default function DropdownNotificacoes() {
 
     try {
       const promises = unreadNotifications.atualizacoes.map(upd => 
-        classroom_service.marcarMuralLido(session.accessToken, upd.materia_id, anoAtivoId || 0)
+        classroom_service.marcarMuralLido(session.accessToken!, upd.materia_id, anoAtivoId || 0)
       )
       await Promise.all(promises)
       
@@ -87,7 +87,7 @@ export default function DropdownNotificacoes() {
             )}
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
+          <div className="max-h-90 overflow-y-auto divide-y divide-border">
             {notificationsCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-6 text-center select-none">
                 <div className="bg-primary/5 p-4 rounded-full mb-4 text-primary opacity-60">
@@ -101,7 +101,7 @@ export default function DropdownNotificacoes() {
                 <div key={atualizacao.materia_id} className="p-4 flex flex-col gap-2.5">
                   <div className="flex items-center gap-1.5">
                     <BookOpen className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-[10px] font-black uppercase text-primary tracking-wider truncate max-w-[280px]">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-wider truncate max-w-70">
                       {atualizacao.materia_nome}
                     </span>
                   </div>

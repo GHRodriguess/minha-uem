@@ -185,7 +185,7 @@ export default function HorariosPage() {
               <span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span>
             </div>
 
-            <div className="grid grid-cols-7 z-10 gap-1">
+            <div className="grid grid-cols-7 gap-1">
               {getDiasDoMes().map((dia, idx) => {
                 if (!dia) return <div key={`empty-${idx}`} className="h-10" />
                 
@@ -199,7 +199,7 @@ export default function HorariosPage() {
                   <button
                     key={dia.toISOString()}
                     onClick={() => setDataSelecionada(dia)}
-                    className={`h-10 rounded-lg flex flex-col z-10 items-center justify-center transition-all relative ${
+                    className={`h-10 rounded-lg flex flex-col items-center justify-center transition-all relative ${
                       isSelecionado 
                         ? 'bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20' 
                         : 'hover:bg-muted text-foreground'
