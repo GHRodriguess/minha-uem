@@ -1264,8 +1264,8 @@ class FeedAgendaView(APIView):
             end_str = next_date.strftime('%Y%m%d')
 
             subject_name = avaliacao.configuracao.materia.nome
-            tipo_label = "Prova" if avaliacao.tipo == 'PROVA' else "Trabalho" if avaliacao.tipo == 'TRABALHO' else "Exame" if avaliacao.tipo == 'EXAME' else "Avaliacao"
-            event_title = f"{avaliacao.nome} - {subject_name}"
+            tipo_label = "Prova" if avaliacao.tipo == 'PROVA' else "Trabalho" if avaliacao.tipo == 'TRABALHO' else "Exame" if avaliacao.tipo == 'EXAME' else "Tarefa" if avaliacao.tipo == 'TAREFA' else "Pesquisa" if avaliacao.tipo == 'PESQUISA' else "Outro" if avaliacao.tipo == 'OUTRO' else "Avaliacao"
+            event_title = f"[{tipo_label}] {avaliacao.nome} - {subject_name}"
 
             desc_lines = []
             desc_lines.append(f"Materia: {subject_name}")

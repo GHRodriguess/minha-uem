@@ -5,9 +5,68 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, Loader2, UserX, GraduationCap, Trophy } from 'lucide-react'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, Loader2, UserX, GraduationCap, Trophy, BookOpen, CheckSquare, Search, Award, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
+
+function obterConfiguracaoTipo(type: string) {
+  switch (type) {
+    case 'PROVA':
+      return {
+        bg: 'bg-yellow-500/5',
+        border: 'border-yellow-500/20 hover:border-yellow-500/50',
+        text: 'text-yellow-500',
+        badge: 'bg-yellow-500 text-white',
+        icon: Trophy,
+        label: 'Prova'
+      }
+    case 'TRABALHO':
+      return {
+        bg: 'bg-green-500/5',
+        border: 'border-green-500/20 hover:border-green-500/50',
+        text: 'text-green-500',
+        badge: 'bg-green-500 text-white',
+        icon: BookOpen,
+        label: 'Trabalho'
+      }
+    case 'TAREFA':
+      return {
+        bg: 'bg-purple-500/5',
+        border: 'border-purple-500/20 hover:border-purple-500/50',
+        text: 'text-purple-500',
+        badge: 'bg-purple-500 text-white',
+        icon: CheckSquare,
+        label: 'Tarefa'
+      }
+    case 'PESQUISA':
+      return {
+        bg: 'bg-blue-500/5',
+        border: 'border-blue-500/20 hover:border-blue-500/50',
+        text: 'text-blue-500',
+        badge: 'bg-blue-500 text-white',
+        icon: Search,
+        label: 'Pesquisa'
+      }
+    case 'EXAME':
+      return {
+        bg: 'bg-orange-500/5',
+        border: 'border-orange-500/20 hover:border-orange-500/50',
+        text: 'text-orange-500',
+        badge: 'bg-orange-500 text-white',
+        icon: Award,
+        label: 'Exame'
+      }
+    default:
+      return {
+        bg: 'bg-slate-500/5',
+        border: 'border-slate-500/20 hover:border-slate-500/50',
+        text: 'text-slate-500',
+        badge: 'bg-slate-500 text-white',
+        icon: HelpCircle,
+        label: 'Outro'
+      }
+  }
+}
 
 export default function HorariosPage() {
   const { data: session } = useSession()
@@ -262,32 +321,33 @@ export default function HorariosPage() {
           </div>
 
           <div className="space-y-4">
-            {/* Renderizar Avaliações Primeiro */}
-            {filtros.avaliacoes && eventosHoje.avaliacoes.map((item, idx) => (
-              <div key={`av-${idx}`} className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-5 shadow-sm hover:border-yellow-500/50 transition-colors flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="bg-yellow-500/10 w-16 h-16 rounded-xl flex flex-col items-center justify-center border border-yellow-500/20">
-                    <Trophy className="w-8 h-8 text-yellow-500" />
+            {filtros.avaliacoes && eventosHoje.avaliacoes.map((item, idx) => {
+              const config = obterConfiguracaoTipo(item.avaliacao.tipo)
+              const Icone = config.icon
+              return (
+                <div key={`av-${idx}`} className={`${config.bg} ${config.border} border rounded-2xl p-5 shadow-sm transition-colors flex items-center justify-between gap-4`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`${config.bg} w-16 h-16 rounded-xl flex flex-col items-center justify-center border ${config.border}`}>
+                      <Icone className={`w-8 h-8 ${config.text}`} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-foreground leading-tight">{item.avaliacao.nome}</h4>
+                      <p className="text-sm text-muted-foreground mt-1 font-medium">
+                        <Link href={`/disciplinas/${item.materia.id}`} className="hover:underline hover:text-primary transition-colors">
+                          {item.materia.nome}
+                        </Link>
+                        {' '}• {config.label}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-lg text-foreground leading-tight">{item.avaliacao.nome}</h4>
-                    <p className="text-sm text-muted-foreground mt-1 font-medium">
-                      <Link href={`/disciplinas/${item.materia.id}`} className="hover:underline hover:text-primary transition-colors">
-                        {item.materia.nome}
-                      </Link>
-                      {' '}• {item.avaliacao.tipo}
-                    </p>
+                  <div className="text-right">
+                    <span className={`text-[10px] font-black ${config.badge} px-3 py-1 rounded-full uppercase`}>
+                      Peso {item.avaliacao.peso}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-black bg-yellow-500 text-white px-3 py-1 rounded-full uppercase">
-                    Peso {item.avaliacao.peso}
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {/* Renderizar Aulas */}
+              )
+            })}
             {filtros.aulas && eventosHoje.aulas.length > 0 ? (
               eventosHoje.aulas.map((aula, idx) => {
                 const ano = dataSelecionada.getFullYear();
