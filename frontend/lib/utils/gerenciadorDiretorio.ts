@@ -76,9 +76,18 @@ export class GerenciadorDiretorio {
     return handle;
   }
 
+  static normalizarCaminho(pathParts: string[]): string[] {
+    const uemIndex = pathParts.findIndex(p => p.toLowerCase() === "uem");
+    if (uemIndex !== -1) {
+      return pathParts.slice(uemIndex);
+    }
+    return pathParts;
+  }
+
   static async obterSubdiretorio(root: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle> {
     let currentHandle = root;
-    for (const part of pathParts) {
+    const parts = this.normalizarCaminho(pathParts);
+    for (const part of parts) {
       if (!part) continue;
       currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
     }
@@ -87,7 +96,8 @@ export class GerenciadorDiretorio {
 
   static async obterSubdiretorioSemCriar(root: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle | null> {
     let currentHandle = root;
-    for (const part of pathParts) {
+    const parts = this.normalizarCaminho(pathParts);
+    for (const part of parts) {
       if (!part) continue;
       try {
         currentHandle = await currentHandle.getDirectoryHandle(part, { create: false });
@@ -156,14 +166,15 @@ export class GerenciadorDiretorio {
     const escanear = async (handle: FileSystemDirectoryHandle, currentPath: string[]) => {
       for await (const entry of (handle as any).values()) {
         if (entry.kind === "file") {
-          const pathString = [...currentPath, entry.name].join("/");
-          if (currentPath.length >= 7 && currentPath[1].toLowerCase() === "uem" && currentPath[2].toLowerCase() === "cursos") {
+          const uemIndex = currentPath.findIndex(p => p.toLowerCase() === "uem");
+          if (uemIndex !== -1 && currentPath.length - uemIndex >= 6 && currentPath[uemIndex + 1].toLowerCase() === "cursos") {
             const folderCategory = currentPath[currentPath.length - 1];
+            const pathPartsFromUem = [...currentPath.slice(uemIndex), entry.name];
             results.push({
               drive_file_id: null,
               original_name: entry.name,
               selected_folder: folderCategory,
-              local_path: pathString
+              local_path: pathPartsFromUem.join("/")
             });
           }
         } else if (entry.kind === "directory") {
