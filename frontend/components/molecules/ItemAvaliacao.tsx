@@ -13,9 +13,10 @@ interface ItemAvaliacaoProps {
   avaliacao: Avaliacao
   onUpdate: (id: number, data: Partial<Avaliacao>) => void
   onDelete: (id: number) => void
+  groupType: 'PROVA' | 'ENTREGA'
 }
 
-export function ItemAvaliacao({ avaliacao, onUpdate, onDelete }: ItemAvaliacaoProps) {
+export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: ItemAvaliacaoProps) {
   const [nomeLocal, setNomeLocal] = useState(avaliacao.nome)
   const [dataLocal, setDataLocal] = useState(avaliacao.data || "")
 
@@ -55,7 +56,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete }: ItemAvaliacaoPr
       </div>
       
       <div className="flex-1 grid grid-cols-12 gap-2 items-center">
-        <div className="col-span-4">
+        <div className={groupType === 'PROVA' ? 'col-span-5' : 'col-span-3'}>
           <Input
             value={nomeLocal}
             onChange={(e) => setNomeLocal(e.target.value)}
@@ -65,12 +66,28 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete }: ItemAvaliacaoPr
             className="bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary h-8 font-bold p-0 text-foreground"
           />
         </div>
+
+        {groupType === 'ENTREGA' && (
+          <div className="col-span-2 flex items-center">
+            <select
+              value={avaliacao.tipo}
+              onChange={(e) => onUpdate(avaliacao.id, { tipo: e.target.value as any })}
+              className="h-8 text-[10px] font-black uppercase p-1 bg-muted/30 rounded-xl border-none focus-visible:ring-1 focus-visible:ring-primary w-full cursor-pointer text-foreground outline-none"
+            >
+              <option value="TRABALHO" className="bg-card text-foreground">Trabalho</option>
+              <option value="TAREFA" className="bg-card text-foreground">Tarefa</option>
+              <option value="PESQUISA" className="bg-card text-foreground">Pesquisa</option>
+              <option value="EXAME" className="bg-card text-foreground">Exame</option>
+              <option value="OUTRO" className="bg-card text-foreground">Outro</option>
+            </select>
+          </div>
+        )}
         
         <div className="col-span-2 flex items-center">
           <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted rounded">Peso</span>
           <InputNota
             value={avaliacao.peso}
-            onChange={(val) => onUpdate(avaliacao.id, { peso: val || 1 })}
+            onChange={(val) => onUpdate(avaliacao.id, { peso: val || 0 })}
             className="h-8 w-16 text-xs font-black min-w-auto"
           />
         </div>
@@ -85,7 +102,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete }: ItemAvaliacaoPr
           />
         </div>
 
-        <div className="col-span-4 flex items-center">
+        <div className="col-span-3 flex items-center">
           <Input
             type="date"
             value={dataLocal}

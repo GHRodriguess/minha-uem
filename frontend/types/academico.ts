@@ -16,7 +16,7 @@ export interface Horario {
 export interface Avaliacao {
   id: number;
   nome: string;
-  tipo: 'PROVA' | 'TRABALHO' | 'EXAME' | 'OUTRO';
+  tipo: 'PROVA' | 'TRABALHO' | 'EXAME' | 'TAREFA' | 'PESQUISA' | 'OUTRO';
   peso: number;
   nota: number | null;
   data: string | null;

@@ -90,6 +90,8 @@ class Avaliacao(models.Model):
         ('PROVA', 'Prova'),
         ('TRABALHO', 'Trabalho'),
         ('EXAME', 'Exame'),
+        ('TAREFA', 'Tarefa'),
+        ('PESQUISA', 'Pesquisa'),
         ('OUTRO', 'Outro'),
     ]
 

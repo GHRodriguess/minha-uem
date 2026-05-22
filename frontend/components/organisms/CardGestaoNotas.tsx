@@ -6,7 +6,7 @@ import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
 import { academic_service } from '@/lib/api/academico'
 import { ItemAvaliacao } from '../molecules/ItemAvaliacao'
 import { Button } from '../ui/button'
-import { Plus, Calculator, Target, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, Calculator, Target, AlertCircle, Loader2, Info } from 'lucide-react'
 import { InputNota } from '../atoms/InputNota'
 import { 
   DndContext, 
@@ -86,13 +86,17 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
     }
   }
 
-  async function adicionarAvaliacao() {
+  async function adicionarAvaliacao(tipo: 'PROVA' | 'TAREFA' = 'PROVA') {
     if (!session?.accessToken || !config) return
     try {
+      const nomePadrao = tipo === 'PROVA' 
+        ? `Avaliação ${config.avaliacoes.filter(a => ['PROVA', 'EXAME', 'OUTRO'].includes(a.tipo)).length + 1}`
+        : `Tarefa ${config.avaliacoes.filter(a => ['TRABALHO', 'TAREFA', 'PESQUISA'].includes(a.tipo)).length + 1}`
+
       const nova = await academic_service.criarAvaliacao(session.accessToken, config.id, {
-        nome: `Avaliação ${config.avaliacoes.length + 1}`,
+        nome: nomePadrao,
         peso: 1,
-        tipo: 'PROVA',
+        tipo: tipo,
         ordem: config.avaliacoes.length
       })
       setConfig({
@@ -114,8 +118,6 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
         return { ...prev, avaliacoes: novasAvaliacoes }
       })
       
-      // Recalcular médias localmente sem dar fetch em tudo se possível, 
-      // mas para garantir precisão do backend (que tem a lógica central):
       const configAtualizada = await academic_service.obterConfiguracaoNotas(session.accessToken, materia.id, anoId)
       setConfig(configAtualizada)
     } catch (error) {
@@ -158,10 +160,11 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
 
   const todasNotas = config.avaliacoes.every(a => a.nota !== null) && config.avaliacoes.length > 0
   const aprovado = config.media_atual >= config.media_minima
+  const avaliacoesFiltradas = config.avaliacoes.filter(a => ['PROVA', 'EXAME', 'OUTRO'].includes(a.tipo))
+  const entregasFiltradas = config.avaliacoes.filter(a => ['TRABALHO', 'TAREFA', 'PESQUISA'].includes(a.tipo))
 
   return (
     <div className="space-y-6">
-      {/* Resumo de Médias */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center gap-4">
           <div className="bg-primary/10 p-3 rounded-xl">
@@ -206,14 +209,13 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
         </div>
       </div>
 
-      {/* Lista de Avaliações */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">Avaliações e Pesos</h4>
+          <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">Avaliações e Provas</h4>
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={adicionarAvaliacao}
+            onClick={() => adicionarAvaliacao('PROVA')}
             className="h-8 gap-2 font-bold text-xs border-dashed"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -222,17 +224,10 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
         </div>
 
         <div className="space-y-2">
-          {config.avaliacoes.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-border rounded-2xl">
-              <AlertCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-20" />
-              <p className="text-sm text-muted-foreground">Nenhuma avaliação cadastrada.</p>
-              <Button 
-                variant="link" 
-                onClick={adicionarAvaliacao}
-                className="text-primary font-bold text-xs"
-              >
-                Clique aqui para começar
-              </Button>
+          {avaliacoesFiltradas.length === 0 ? (
+            <div className="text-center py-6 border-2 border-dashed border-border rounded-2xl">
+              <AlertCircle className="w-6 h-6 mx-auto mb-2 text-muted-foreground opacity-20" />
+              <p className="text-xs text-muted-foreground font-semibold">Nenhuma avaliação cadastrada.</p>
             </div>
           ) : (
             <DndContext 
@@ -241,16 +236,17 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
               onDragEnd={handleDragEnd}
             >
               <SortableContext 
-                items={config.avaliacoes.map(a => a.id)}
+                items={avaliacoesFiltradas.map(a => a.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  {config.avaliacoes.map(avaliacao => (
+                  {avaliacoesFiltradas.map(avaliacao => (
                     <ItemAvaliacao
                       key={avaliacao.id}
                       avaliacao={avaliacao}
                       onUpdate={atualizarAvaliacao}
                       onDelete={excluirAvaliacao}
+                      groupType="PROVA"
                     />
                   ))}
                 </div>
@@ -260,7 +256,57 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
         </div>
       </div>
 
-      {/* Configuração Extra */}
+      <div className="space-y-3 pt-6 border-t border-border/50">
+        <div className="flex justify-between items-center">
+          <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">Trabalhos, Tarefas e Pesquisas</h4>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => adicionarAvaliacao('TAREFA')}
+            className="h-8 gap-2 font-bold text-xs border-dashed"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {entregasFiltradas.length === 0 ? (
+            <div className="text-center py-6 border-2 border-dashed border-border rounded-2xl">
+              <AlertCircle className="w-6 h-6 mx-auto mb-2 text-muted-foreground opacity-20" />
+              <p className="text-xs text-muted-foreground font-semibold">Nenhum trabalho ou tarefa cadastrado.</p>
+            </div>
+          ) : (
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={entregasFiltradas.map(a => a.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {entregasFiltradas.map(avaliacao => (
+                    <ItemAvaliacao
+                      key={avaliacao.id}
+                      avaliacao={avaliacao}
+                      onUpdate={atualizarAvaliacao}
+                      onDelete={excluirAvaliacao}
+                      groupType="ENTREGA"
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
+
+        <div className="flex items-start gap-2 text-xs text-muted-foreground mt-2 bg-muted/20 p-3 rounded-xl border border-border/50">
+          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <span>Peso 0 significa que a tarefa não vale nota.</span>
+        </div>
+      </div>
       <div className="pt-4 border-t border-border flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
           Média mínima para aprovação:
