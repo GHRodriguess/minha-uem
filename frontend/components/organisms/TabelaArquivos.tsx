@@ -25,7 +25,8 @@ import {
   FolderOpen,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Laptop
 } from 'lucide-react'
 import { ArquivoClassroom, StatusVinculoClassroom } from '@/lib/api/classroom'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
@@ -410,9 +411,9 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
               <button
                 onClick={() => gerenciarAberturaLocal(arquivo)}
                 className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                title="Abrir no explorador de arquivos"
+                title="Abrir arquivo localmente"
               >
-                <FolderOpen className="w-3.5 h-3.5" />
+                <Laptop className="w-3.5 h-3.5" />
               </button>
             )}
 
