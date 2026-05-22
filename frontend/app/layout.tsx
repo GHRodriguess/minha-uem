@@ -6,6 +6,8 @@ import { ProvedorTema } from "@/components/providers/ProvedorTema";
 import { ProvedorAcademico } from "@/components/providers/ProvedorAcademico";
 import { ProvedorClassroom } from "@/components/providers/ProvedorClassroom";
 import { cn } from "@/lib/utils";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -46,6 +48,8 @@ export default function RootLayout({
             <ProvedorAcademico>
               <ProvedorClassroom>
                 {children}
+                <SpeedInsights />
+                <Analytics />
               </ProvedorClassroom>
             </ProvedorAcademico>
           </ProvedorSessao>
@@ -54,3 +58,4 @@ export default function RootLayout({
     </html>
   );
 }
+
