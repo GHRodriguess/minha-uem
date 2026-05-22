@@ -39,5 +39,13 @@ export const academic_service = {
 
   excluirAvaliacao(token: string, avaliacao_id: number, signal?: AbortSignal) {
     return api_client.remover(`${base_path}/avaliacoes/${avaliacao_id}/`, token, signal);
+  },
+
+  obterLinkAgenda(token: string, signal?: AbortSignal) {
+    return api_client.obter<{ feed_url: string }>(`${base_path}/agenda/info/`, {}, token, signal);
+  },
+
+  regenerarLinkAgenda(token: string, signal?: AbortSignal) {
+    return api_client.postar<{ feed_url: string }>(`${base_path}/agenda/regenerar/`, {}, token, signal);
   }
 };

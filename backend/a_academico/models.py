@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid
 
 class Curso(models.Model):
     codigo = models.CharField(max_length=20, unique=True)
@@ -41,6 +42,7 @@ class PerfilAcademico(models.Model):
     curso = models.ForeignKey(Curso, on_delete=models.SET_NULL, null=True, blank=True)
     materias = models.ManyToManyField(Materia, blank=True)
     horarios = models.ManyToManyField(Horario, blank=True)
+    calendar_token = models.UUIDField(default=uuid.uuid4, null=True, blank=True)
 
     def __str__(self):
         return f"Perfil de {self.user.username}"
