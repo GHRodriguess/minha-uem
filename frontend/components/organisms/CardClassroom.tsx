@@ -3,28 +3,24 @@
 import { useSession } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
-  classroom_service,
-  ConfiguracaoClassroom,
-  ArquivoClassroom,
-  StatusVinculoClassroom
+  ArquivoClassroom
 } from '@/lib/api/classroom'
 import {
-  School,
   RefreshCw,
   Download,
   Edit2,
   Check,
   X,
   Folder,
-  Settings,
   AlertCircle,
   CheckCircle2,
   Loader2,
   FileText,
-  Filter,
   ArrowUpDown,
   Layers
 } from 'lucide-react'
+import { useClassroom } from '@/components/providers/ProvedorClassroom'
+import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 
 interface CardClassroomProps {
   materiaId: number
@@ -37,141 +33,123 @@ type AgrupamentoArquivo = 'nenhum' | 'tipo' | 'status'
 export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
   const { data: session } = useSession()
 
-  const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
-
-  const [statusVinculo, setStatusVinculo] = useState<StatusVinculoClassroom>({
-    vinculado: false,
-    arquivos: []
-  })
-
-  const [configClassroom, setConfigClassroom] = useState<ConfiguracaoClassroom>({
-    download_dir: 'Downloads/MinhaUEM',
-    folder_options: 'documentos,exercicios'
-  })
+  const {
+    filesCache,
+    classroomConfig,
+    loadingStates,
+    syncingStates,
+    directoryHandle,
+    hasFolderPermission,
+    isFileSystemSupported,
+    solicitarAcessoPasta,
+    desvincularPasta,
+    obterArquivos,
+    baixarItem,
+    salvarNomePersonalizado,
+    salvarPastaDestino,
+    abrirItemLocal
+  } = useClassroom()
 
   const [ordenacao, setOrdenacao] = useState<OrdenacaoArquivo>('nome')
   const [agrupamento, setAgrupamento] = useState<AgrupamentoArquivo>('nenhum')
 
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [customNameInput, setCustomNameInput] = useState('')
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const loading = loadingStates[materiaId] || (!filesCache[materiaId])
+  const syncing = syncingStates[materiaId] || false
+  const statusVinculo = filesCache[materiaId] || { vinculado: false, arquivos: [] }
+  const configClassroom = classroomConfig || { download_dir: 'Downloads/MinhaUEM', folder_options: 'documentos,exercicios' }
 
   const obterDados = useCallback(async (exibirSyncLoader: boolean = false) => {
     if (!session?.accessToken) return
-
-    if (exibirSyncLoader) {
-      setSyncing(true)
-    } else {
-      setLoading(true)
-    }
-
     try {
-      const googleToken = session.googleAccessToken || null
-      const vinculo = await classroom_service.obterArquivos(
-        session.accessToken,
-        googleToken,
-        materiaId,
-        anoId
-      )
-      setStatusVinculo(vinculo)
-
-      const config = await classroom_service.obterConfiguracao(session.accessToken)
-      setConfigClassroom(config)
+      await obterArquivos(materiaId, anoId, exibirSyncLoader)
     } catch (error) {
       console.error(error)
-    } finally {
-      setLoading(false)
-      setSyncing(false)
     }
-  }, [session, materiaId, anoId])
+  }, [session, materiaId, anoId, obterArquivos])
 
   useEffect(() => {
-    obterDados()
+    obterDados(false)
   }, [obterDados])
+
+  const [missingFiles, setMissingFiles] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!directoryHandle || !hasFolderPermission || !statusVinculo?.arquivos) return
+
+    let isMounted = true
+    const verificarPresencaFisica = async () => {
+      const missing: Record<string, boolean> = {}
+      const courseName = statusVinculo.curso_nome || "Sem_Curso"
+      const year = statusVinculo.ano_letivo || ""
+      const subjectName = statusVinculo.materia_nome || ""
+
+      for (const arq of statusVinculo.arquivos) {
+        const folder = arq.selected_folder || "docs"
+        const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
+        const fileName = arq.custom_name || arq.original_name
+        
+        try {
+          const exists = await GerenciadorDiretorio.verificarArquivoExiste(directoryHandle, parts, fileName)
+          if (exists) {
+            localStorage.setItem('baixado_' + arq.drive_file_id, 'true')
+          } else {
+            localStorage.removeItem('baixado_' + arq.drive_file_id)
+            missing[arq.drive_file_id] = true
+          }
+        } catch {
+          localStorage.removeItem('baixado_' + arq.drive_file_id)
+          missing[arq.drive_file_id] = true
+        }
+      }
+      if (isMounted) {
+        setMissingFiles(missing)
+      }
+    }
+
+    verificarPresencaFisica()
+    return () => {
+      isMounted = false
+    }
+  }, [statusVinculo?.arquivos, statusVinculo?.curso_nome, statusVinculo?.ano_letivo, statusVinculo?.materia_nome, directoryHandle, hasFolderPermission])
 
   const iniciarEdicaoNome = (arquivo: ArquivoClassroom) => {
     setEditingFileId(arquivo.drive_file_id)
     setCustomNameInput(arquivo.custom_name || arquivo.original_name)
   }
 
-  const salvarNomePersonalizado = async (driveFileId: string, originalName: string) => {
-    if (!session?.accessToken) return
+  const confirmarEdicaoNome = async (arquivo: ArquivoClassroom) => {
+    if (!customNameInput.trim()) return
     try {
-      const atualizado = await classroom_service.atualizarArquivo(
-        session.accessToken,
-        driveFileId,
-        materiaId,
-        anoId,
-        originalName,
-        { custom_name: customNameInput.trim() || null }
-      )
-
-      setStatusVinculo(prev => ({
-        ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
-          ...a,
-          id: atualizado.id,
-          custom_name: atualizado.custom_name
-        } : a)
-      }))
-
+      await salvarNomePersonalizado(materiaId, anoId, arquivo.drive_file_id, arquivo.original_name, customNameInput.trim())
       setEditingFileId(null)
     } catch (error) {
       console.error(error)
     }
   }
 
-  const salvarPastaDestino = async (driveFileId: string, originalName: string, pasta: string) => {
-    if (!session?.accessToken) return
+  const alterarPastaDestino = async (arquivo: ArquivoClassroom, novaPasta: string) => {
     try {
-      const atualizado = await classroom_service.atualizarArquivo(
-        session.accessToken,
-        driveFileId,
-        materiaId,
-        anoId,
-        originalName,
-        { selected_folder: pasta }
-      )
-
-      setStatusVinculo(prev => ({
-        ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
-          ...a,
-          id: atualizado.id,
-          selected_folder: atualizado.selected_folder
-        } : a)
-      }))
+      await salvarPastaDestino(materiaId, anoId, arquivo.drive_file_id, arquivo.original_name, novaPasta)
     } catch (error) {
       console.error(error)
     }
   }
 
-  const baixarItem = async (driveFileId: string, originalName: string) => {
-    if (!session?.accessToken || !session.googleAccessToken) return
+  const lidarComDownload = async (driveFileId: string, originalName: string) => {
+    if (!directoryHandle || !hasFolderPermission) {
+      alert('Vincule a pasta de estudos e conceda permissão antes de baixar arquivos.')
+      return
+    }
     setDownloadingId(driveFileId)
     try {
-      const baixado = await classroom_service.baixarArquivo(
-        session.accessToken,
-        session.googleAccessToken,
-        driveFileId,
-        materiaId,
-        anoId,
-        originalName
-      )
-
-      setStatusVinculo(prev => ({
-        ...prev,
-        arquivos: prev.arquivos.map(a => a.drive_file_id === driveFileId ? {
-          ...a,
-          id: baixado.id,
-          is_downloaded: baixado.is_downloaded,
-          local_path: baixado.local_path
-        } : a)
-      }))
+      await baixarItem(materiaId, anoId, driveFileId, originalName)
     } catch (error) {
       console.error(error)
-      alert('Ocorreu um erro ao baixar o arquivo do Google Drive. Verifique suas credenciais.')
+      alert('Ocorreu um erro ao baixar o arquivo. Verifique se a pasta de estudos ainda está acessível.')
     } finally {
       setDownloadingId(null)
     }
@@ -208,7 +186,6 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     return tipo.charAt(0).toUpperCase() + tipo.slice(1)
   }
 
-  // Lógica de Processamento de Arquivos
   const arquivosProcessados = [...statusVinculo.arquivos].sort((a, b) => {
     if (ordenacao === 'nome') {
       const nameA = a.custom_name || a.original_name
@@ -226,14 +203,17 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
       {arquivos.map((arquivo) => {
         const estaEditando = editingFileId === arquivo.drive_file_id
         const estaBaixando = downloadingId === arquivo.drive_file_id
+        const isReallyDownloaded = hasFolderPermission
+          ? !missingFiles[arquivo.drive_file_id]
+          : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
 
         return (
           <div
             key={arquivo.drive_file_id}
-            className={`flex flex-col gap-3 p-4 border border-border rounded-2xl bg-card transition-all duration-200 ${arquivo.is_downloaded ? 'opacity-70 grayscale-[0.5]' : 'hover:border-primary/30 shadow-sm'}`}
+            className={`flex flex-col gap-3 p-4 border border-border rounded-2xl bg-card transition-all duration-200 ${isReallyDownloaded ? 'opacity-70 grayscale-[0.5]' : 'hover:border-primary/30 shadow-sm'}`}
           >
             <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-lg shrink-0 ${arquivo.is_downloaded ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+              <div className={`p-2 rounded-lg shrink-0 ${isReallyDownloaded ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
                 <FileText className="w-4 h-4" />
               </div>
 
@@ -242,13 +222,13 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                   <div className="flex items-center gap-1">
                     <input
                       type="text"
-                      className="h-7 px-2 border border-border rounded-md bg-background text-[11px] font-bold w-full focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-7 px-2 border border-border rounded-md bg-background text-[11px] font-bold w-full focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
                       value={customNameInput}
                       onChange={(e) => setCustomNameInput(e.target.value)}
                       autoFocus
                     />
                     <button
-                      onClick={() => salvarNomePersonalizado(arquivo.drive_file_id, arquivo.original_name)}
+                      onClick={() => confirmarEdicaoNome(arquivo)}
                       className="p-1 rounded bg-emerald-500 text-white hover:opacity-90"
                     >
                       <Check className="w-3 h-3" />
@@ -281,7 +261,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                     </p>
                   )}
 
-                  {arquivo.is_downloaded && (
+                  {isReallyDownloaded && (
                     <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-3 h-3 shrink-0" />
                       <span className="text-[9px] font-black uppercase tracking-widest">Baixado</span>
@@ -293,9 +273,9 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
             <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/40">
               <select
-                className="h-8 px-2 border border-border rounded-lg bg-background text-[10px] font-bold focus:outline-none w-28"
+                className="h-8 px-2 border border-border rounded-lg bg-background text-[10px] font-bold focus:outline-none w-28 text-foreground"
                 value={arquivo.selected_folder}
-                onChange={(e) => salvarPastaDestino(arquivo.drive_file_id, arquivo.original_name, e.target.value)}
+                onChange={(e) => alterarPastaDestino(arquivo, e.target.value)}
               >
                 {listaCategorias.map((cat) => (
                   <option key={cat} value={cat}>
@@ -304,18 +284,32 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                 ))}
               </select>
 
-              <button
-                onClick={() => baixarItem(arquivo.drive_file_id, arquivo.original_name)}
-                disabled={estaBaixando}
-                className={`flex items-center justify-center gap-2 h-8 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${arquivo.is_downloaded ? 'border border-border bg-muted/50 text-muted-foreground hover:bg-muted' : 'bg-primary text-primary-foreground hover:opacity-90 shadow-sm'} disabled:opacity-50`}
-              >
-                {estaBaixando ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Download className="w-3 h-3" />
+              <div className="flex items-center gap-1.5">
+                {isReallyDownloaded && (
+                  <button
+                    onClick={() => abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)}
+                    className="flex items-center justify-center p-2 h-8 w-8 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    title="Visualizar arquivo local"
+                  >
+                    <Folder className="w-3.5 h-3.5" />
+                  </button>
                 )}
-                {arquivo.is_downloaded ? 'Re-baixar' : 'Baixar'}
-              </button>
+
+                {!isReallyDownloaded && (
+                  <button
+                    onClick={() => lidarComDownload(arquivo.drive_file_id, arquivo.original_name)}
+                    disabled={estaBaixando}
+                    className="flex items-center justify-center gap-2 h-8 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
+                  >
+                    {estaBaixando ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                    Baixar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )
@@ -336,8 +330,8 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           </p>
         </div>
         <button
-          onClick={() => obterDados()}
-          className="flex items-center gap-2 mx-auto h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors text-xs font-bold text-muted-foreground"
+          onClick={() => obterDados(true)}
+          className="flex items-center gap-2 mx-auto h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors text-xs font-bold text-muted-foreground animate-pulse"
         >
           <RefreshCw className="w-3 h-3" />
           Sincronizar
@@ -348,6 +342,26 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
   return (
     <div className="space-y-6">
+      {isFileSystemSupported && !directoryHandle ? (
+        <div className="bg-muted/30 border border-border rounded-2xl p-4 flex items-center justify-between gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Modo offline desativado. Vincule uma pasta de estudos nas <a href="/configuracoes" className="text-primary hover:underline font-bold">Configurações Gerais</a> para salvar e acessar arquivos offline.
+          </p>
+        </div>
+      ) : isFileSystemSupported && directoryHandle && !hasFolderPermission ? (
+        <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Acesso à pasta local <span className="font-bold text-primary">{directoryHandle.name}</span> suspenso pelo navegador nesta sessão.
+          </p>
+          <button
+            onClick={solicitarAcessoPasta}
+            className="h-8 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-lg text-[10px] shadow-sm transition-opacity uppercase tracking-wider shrink-0"
+          >
+            Reautorizar Acesso
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -357,7 +371,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           <select
             value={agrupamento}
             onChange={(e) => setAgrupamento(e.target.value as AgrupamentoArquivo)}
-            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
+            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none text-foreground"
           >
             <option value="nenhum">Nenhum</option>
             <option value="tipo">Por Tipo</option>
@@ -373,7 +387,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           <select
             value={ordenacao}
             onChange={(e) => setOrdenacao(e.target.value as OrdenacaoArquivo)}
-            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none"
+            className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none text-foreground"
           >
             <option value="nome">Nome (A-Z)</option>
             <option value="recentes">Mais Recentes</option>
@@ -414,7 +428,12 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           })
         ) : agrupamento === 'status' ? (
           ['Baixados', 'Pendentes'].map(status => {
-            const arqs = arquivosProcessados.filter(a => status === 'Baixados' ? a.is_downloaded : !a.is_downloaded)
+            const arqs = arquivosProcessados.filter(a => {
+              const isDownloaded = hasFolderPermission
+                ? !missingFiles[a.drive_file_id]
+                : localStorage.getItem('baixado_' + a.drive_file_id) === 'true'
+              return status === 'Baixados' ? isDownloaded : !isDownloaded
+            })
             if (arqs.length === 0) return null
             return (
               <div key={status} className="space-y-3">

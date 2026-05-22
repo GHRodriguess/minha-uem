@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   FileText, 
   Search, 
@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { ArquivoClassroom, StatusVinculoClassroom } from '@/lib/api/classroom'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
+import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 
 interface TabelaArquivosProps {
   materiaId: number
@@ -44,7 +45,12 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     salvarPastaDestino,
     abrirItemLocal,
     alternarOcultarArquivo,
-    enviarArquivoLocal
+    enviarArquivoLocal,
+    directoryHandle,
+    hasFolderPermission,
+    isFileSystemSupported,
+    solicitarAcessoPasta,
+    desvincularPasta
   } = useClassroom()
 
   const [searchText, setSearchText] = useState('')
@@ -62,6 +68,46 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   const [uploadCategory, setUploadCategory] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [missingFiles, setMissingFiles] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!directoryHandle || !hasFolderPermission || !dadosVinculo?.arquivos) return
+
+    let isMounted = true
+    const verificarPresencaFisica = async () => {
+      const missing: Record<string, boolean> = {}
+      const courseName = dadosVinculo.curso_nome || "Sem_Curso"
+      const year = dadosVinculo.ano_letivo || ""
+      const subjectName = dadosVinculo.materia_nome || ""
+
+      for (const arq of dadosVinculo.arquivos) {
+        const folder = arq.selected_folder || "docs"
+        const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
+        const fileName = arq.custom_name || arq.original_name
+        
+        try {
+          const exists = await GerenciadorDiretorio.verificarArquivoExiste(directoryHandle, parts, fileName)
+          if (exists) {
+            localStorage.setItem('baixado_' + arq.drive_file_id, 'true')
+          } else {
+            localStorage.removeItem('baixado_' + arq.drive_file_id)
+            missing[arq.drive_file_id] = true
+          }
+        } catch {
+          localStorage.removeItem('baixado_' + arq.drive_file_id)
+          missing[arq.drive_file_id] = true
+        }
+      }
+      if (isMounted) {
+        setMissingFiles(missing)
+      }
+    }
+
+    verificarPresencaFisica()
+    return () => {
+      isMounted = false
+    }
+  }, [dadosVinculo?.arquivos, dadosVinculo?.curso_nome, dadosVinculo?.ano_letivo, dadosVinculo?.materia_nome, directoryHandle, hasFolderPermission])
 
   const alterarOrdenacao = (campo: 'nome' | 'sincronizacao') => {
     if (sortField === campo) {
@@ -138,11 +184,16 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   }
 
   const gerenciarDownload = async (arquivo: ArquivoClassroom) => {
+    if (!directoryHandle || !hasFolderPermission) {
+      alert('Vincule sua pasta de estudos e conceda permissão de acesso nas Configurações Gerais para baixar arquivos offline.')
+      return
+    }
     setDownloadingId(arquivo.drive_file_id)
     try {
       await baixarItem(materiaId, anoId, arquivo.drive_file_id, arquivo.original_name)
     } catch (error) {
       console.error(error)
+      alert('Ocorreu um erro ao baixar o arquivo. Verifique se a pasta de estudos ainda está acessível.')
     } finally {
       setDownloadingId(null)
     }
@@ -165,9 +216,8 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   }
 
   const gerenciarAberturaLocal = async (arquivo: ArquivoClassroom) => {
-    if (!arquivo.id) return
     try {
-      await abrirItemLocal(materiaId, arquivo.id)
+      await abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)
     } catch (error) {
       console.error(error)
     }
@@ -213,9 +263,13 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     const extGrupo = categorizarExtensao(arquivo.original_name)
     const matchesExtension = selectedExtension === 'todos' || extGrupo === selectedExtension
     
+    const isReallyDownloaded = hasFolderPermission
+      ? !missingFiles[arquivo.drive_file_id]
+      : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
+
     const matchesStatus = selectedStatus === 'todos' || 
-      (selectedStatus === 'baixados' && arquivo.is_downloaded) ||
-      (selectedStatus === 'pendentes' && !arquivo.is_downloaded)
+      (selectedStatus === 'baixados' && isReallyDownloaded) ||
+      (selectedStatus === 'pendentes' && !isReallyDownloaded)
 
     const matchesOcultados = mostrarOcultados ? true : !arquivo.is_ignored
 
@@ -239,6 +293,26 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
   return (
     <div className="space-y-6">
+      {isFileSystemSupported && !directoryHandle ? (
+        <div className="bg-muted/30 border border-border rounded-2xl p-4 flex items-center justify-between gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Modo offline desativado. Vincule uma pasta de estudos nas <a href="/configuracoes" className="text-primary hover:underline font-bold">Configurações Gerais</a> para salvar e acessar arquivos offline.
+          </p>
+        </div>
+      ) : isFileSystemSupported && directoryHandle && !hasFolderPermission ? (
+        <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Acesso à pasta local <span className="font-bold text-primary">{directoryHandle.name}</span> suspenso pelo navegador nesta sessão.
+          </p>
+          <button
+            onClick={solicitarAcessoPasta}
+            className="h-8 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-lg text-[10px] shadow-sm transition-opacity uppercase tracking-wider shrink-0"
+          >
+            Reautorizar Acesso
+          </button>
+        </div>
+      ) : null}
+
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
         <div className="flex justify-between items-center text-foreground font-bold text-sm">
           <div className="flex items-center gap-2">
@@ -247,10 +321,15 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
           </div>
           <button
             onClick={() => {
+              if (!directoryHandle || !hasFolderPermission) {
+                alert('Vincule a pasta de estudos e conceda permissão antes de adicionar arquivos locais.')
+                return
+              }
               setUploadCategory(listaCategorias[0] || 'documentos')
               setUploadModalAberto(true)
             }}
-            className="flex items-center gap-1.5 h-9 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity"
+            disabled={!directoryHandle || !hasFolderPermission}
+            className="flex items-center gap-1.5 h-9 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
             <span>Adicionar Arquivo</span>
@@ -383,6 +462,9 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                 arquivosOrdenados.map((arquivo) => {
                   const estaEditando = editingFileId === arquivo.drive_file_id
                   const estaBaixando = downloadingId === arquivo.drive_file_id
+                  const isReallyDownloaded = hasFolderPermission
+                    ? !missingFiles[arquivo.drive_file_id]
+                    : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
 
                   return (
                     <tr 
@@ -443,7 +525,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                       
                       <td className="py-4 px-6">
                         <select
-                          value={arquivo.selected_folder}
+                           value={arquivo.selected_folder}
                           onChange={(e) => alterarPastaDestino(arquivo, e.target.value)}
                           className="h-8 px-2 border border-border rounded-lg bg-background text-[10px] font-black uppercase tracking-wider focus:outline-none w-full text-foreground"
                         >
@@ -460,7 +542,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                       </td>
 
                       <td className="py-4 px-6">
-                        {arquivo.is_downloaded ? (
+                        {isReallyDownloaded ? (
                           <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-500/15">
                             <CheckCircle2 className="w-3 h-3" />
                             Baixado
@@ -475,7 +557,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
                       <td className="py-4 px-6 text-left">
                         <div className="flex items-center justify-start gap-1.5">
-                          {arquivo.is_downloaded && (
+                          {isReallyDownloaded && (
                             <button
                               onClick={() => gerenciarAberturaLocal(arquivo)}
                               className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
@@ -513,18 +595,20 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </a>
 
-                              <button
-                                onClick={() => gerenciarDownload(arquivo)}
-                                disabled={estaBaixando}
-                                className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${arquivo.is_downloaded ? 'border-border bg-background text-muted-foreground hover:bg-muted' : 'border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm'} disabled:opacity-50`}
-                              >
-                                {estaBaixando ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Download className="w-3 h-3" />
-                                )}
-                                {arquivo.is_downloaded ? 'Re-baixar' : 'Baixar'}
-                              </button>
+                              {!isReallyDownloaded && (
+                                <button
+                                  onClick={() => gerenciarDownload(arquivo)}
+                                  disabled={estaBaixando}
+                                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
+                                >
+                                  {estaBaixando ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Download className="w-3 h-3" />
+                                  )}
+                                  Baixar
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

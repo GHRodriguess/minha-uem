@@ -164,15 +164,9 @@ class ConfiguracaoGeralClassroomSerializer(serializers.ModelSerializer):
 
 
 class ArquivoMateriaClassroomSerializer(serializers.ModelSerializer):
-    is_downloaded = serializers.SerializerMethodField(method_name='obter_esta_baixado')
-
     class Meta:
         model = ArquivoMateriaClassroom
-        fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'is_downloaded', 'local_path', 'sync_at', 'is_ignored']
-
-    def obter_esta_baixado(self, obj):
-        import os
-        return bool(obj.local_path and os.path.exists(obj.local_path))
+        fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'local_path', 'sync_at', 'is_ignored']
 
 
 class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):

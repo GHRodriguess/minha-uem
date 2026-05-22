@@ -129,7 +129,7 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
 
   const isVinculado = dadosVinculo?.vinculado
   const totalArquivos = dadosVinculo?.arquivos?.length || 0
-  const totalBaixados = dadosVinculo?.arquivos?.filter(a => a.is_downloaded)?.length || 0
+  const totalBaixados = dadosVinculo?.arquivos?.filter(a => localStorage.getItem('baixado_' + a.drive_file_id) === 'true')?.length || 0
   const totalPendentes = totalArquivos - totalBaixados
 
   return (

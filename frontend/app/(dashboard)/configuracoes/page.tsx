@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
-import { classroom_service, ConfiguracaoClassroom, ItemDiretorio } from '@/lib/api/classroom'
+import { classroom_service, ConfiguracaoClassroom } from '@/lib/api/classroom'
 import { 
   Settings, 
   User, 
@@ -10,34 +10,30 @@ import {
   Loader2, 
   CheckCircle2, 
   AlertCircle,
-  Save,
-  HardDrive,
-  Folder,
-  ChevronRight,
+  AlertTriangle,
+  FolderSync,
   FolderOpen
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import AvatarUsuario from '@/components/atoms/AvatarUsuario'
-import Modal from '@/components/shared/Modal'
+import { useClassroom } from '@/components/providers/ProvedorClassroom'
 
 export default function ConfiguracoesPage() {
   const { data: session } = useSession()
   
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro', texto: string } | null>(null)
-  
   const [config, setConfig] = useState<ConfiguracaoClassroom>({
     download_dir: '',
     folder_options: ''
   })
 
-  // Estados do Seletor de Pastas
-  const [modalSeletorAberto, setModalSeletorAberto] = useState(false)
-  const [caminhoAtual, setAtualPath] = useState('')
-  const [itensDiretorio, setItens] = useState<ItemDiretorio[]>([])
-  const [loadingPastas, setLoadingPastas] = useState(false)
+  const {
+    directoryHandle,
+    hasFolderPermission,
+    isFileSystemSupported,
+    solicitarAcessoPasta,
+    desvincularPasta
+  } = useClassroom()
 
   const carregarConfig = useCallback(async () => {
     if (!session?.accessToken) return
@@ -45,7 +41,7 @@ export default function ConfiguracoesPage() {
       const data = await classroom_service.obterConfiguracao(session.accessToken)
       setConfig(data)
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error)
+      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -54,48 +50,6 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     carregarConfig()
   }, [carregarConfig])
-
-  const explorarCaminho = async (path?: string) => {
-    if (!session?.accessToken) return
-    setLoadingPastas(true)
-    try {
-      const res = await classroom_service.explorarDiretorios(session.accessToken, path)
-      setAtualPath(res.atual)
-      setItens(res.itens)
-    } catch (error) {
-      console.error('Erro ao explorar diretórios:', error)
-    } finally {
-      setLoadingPastas(false)
-    }
-  }
-
-  const abrirSeletor = () => {
-    setModalSeletorAberto(true)
-    // Tenta carregar o caminho atual, mas o backend agora está protegido para falhas
-    explorarCaminho(config.download_dir || undefined)
-  }
-
-  const selecionarPasta = (path: string) => {
-    setConfig(prev => ({ ...prev, download_dir: path }))
-    setModalSeletorAberto(false)
-  }
-
-  const handleSalvar = async () => {
-    if (!session?.accessToken) return
-    setSaving(true)
-    setMensagem(null)
-    try {
-      await classroom_service.atualizarConfiguracao(session.accessToken, {
-        download_dir: config.download_dir
-      })
-      setMensagem({ tipo: 'sucesso', texto: 'Configurações salvas com sucesso!' })
-    } catch (error) {
-      setMensagem({ tipo: 'erro', texto: 'Erro ao salvar configurações.' })
-      console.error(error)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -119,7 +73,6 @@ export default function ConfiguracoesPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-8">
-        {/* Seção de Perfil */}
         <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -167,143 +120,111 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
 
-        {/* Seção de Downloads */}
         <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-primary/10 p-2.5 rounded-xl">
               <Download className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-foreground">Preferências de Download</h2>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Configurações de salvamento local</p>
+              <h2 className="text-xl font-bold text-foreground">Sincronização Local (Modo Offline)</h2>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Configurações de salvamento local e visualização offline</p>
             </div>
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-3">
-              <label htmlFor="download-dir" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                Diretório de Salvamento Raiz
-              </label>
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    <HardDrive className="w-4 h-4" />
-                  </div>
-                  <Input
-                    id="download-dir"
-                    className="h-12 pl-11 rounded-xl bg-background border-border font-bold focus-visible:ring-primary/20"
-                    value={config.download_dir}
-                    onChange={(e) => setConfig({ ...config, download_dir: e.target.value })}
-                    placeholder="Ex: /Users/usuario/Downloads"
-                  />
+            {!isFileSystemSupported ? (
+              <div className="bg-destructive/5 border border-destructive/10 rounded-2xl p-6 flex items-start gap-4">
+                <AlertTriangle className="w-6 h-6 text-destructive shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-foreground">Navegador Não Suportado</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                    Seu navegador atual não suporta a API de Acesso ao Sistema de Arquivos (File System Access API). 
+                    Para habilitar a sincronização inteligente de arquivos e o download offline direto, 
+                    utilize um navegador baseado em Chromium (como Google Chrome, Microsoft Edge ou Brave) no Desktop.
+                  </p>
+                </div>
+              </div>
+            ) : !directoryHandle ? (
+              <div className="bg-muted/30 border border-border rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-foreground">Status: Desativado</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                    Vincule uma pasta local do seu computador para salvar seus materiais e acessá-los offline instantaneamente.
+                  </p>
                 </div>
                 <Button 
-                  onClick={abrirSeletor}
-                  variant="outline"
-                  className="h-12 px-6 rounded-xl font-bold border-dashed border-2 gap-2 hover:bg-primary/5 transition-colors"
+                  onClick={solicitarAcessoPasta}
+                  className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-xs gap-2 shrink-0 w-full md:w-auto"
                 >
                   <FolderOpen className="w-4 h-4" />
-                  Procurar
+                  Vincular Pasta
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
-                Os arquivos serão organizados automaticamente seguindo o padrão:<br/>
-                <span className="font-bold text-primary">{config.download_dir || 'Downloads/MinhaUEM'}/UEM/{"{Curso}"}/Materias/{"{Ano}"}/{"{Materia}"}/[documentos|exercicios]</span>
-              </p>
-            </div>
-
-            <div className="pt-4 border-t border-border flex items-center justify-between gap-4">
-              <div className="flex-1">
-                {mensagem && (
-                  <div className={`flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-left-2 ${mensagem.tipo === 'sucesso' ? 'text-green-500' : 'text-destructive'}`}>
-                    {mensagem.tipo === 'sucesso' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                    {mensagem.texto}
+            ) : !hasFolderPermission ? (
+              <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-6 flex flex-col gap-6">
+                <div className="flex items-start gap-4">
+                  <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-foreground">Permissão Temporária Expirada</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                      A pasta <span className="font-bold text-primary">{directoryHandle.name}</span> está vinculada, mas o navegador requer que você conceda permissão de leitura/escrita para esta sessão.
+                    </p>
                   </div>
-                )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-border/50">
+                  <Button 
+                    onClick={solicitarAcessoPasta}
+                    className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-xs gap-2 flex-1"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Conceder Acesso
+                  </Button>
+                  <Button 
+                    onClick={desvincularPasta}
+                    variant="outline"
+                    className="h-12 px-6 rounded-xl font-bold text-xs gap-2 flex-1 border-dashed"
+                  >
+                    Desvincular Pasta
+                  </Button>
+                </div>
               </div>
-              <Button 
-                onClick={handleSalvar}
-                disabled={saving}
-                className="h-12 px-8 rounded-xl font-black uppercase tracking-widest text-xs gap-2"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? 'Salvando...' : 'Salvar Alterações'}
-              </Button>
+            ) : (
+              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6 flex flex-col gap-6">
+                <div className="flex items-start gap-4">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-foreground">Status: Ativo e Sincronizado</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                      Os materiais serão salvos e organizados automaticamente no diretório:<br/>
+                      <span className="font-mono text-primary font-bold">{directoryHandle.name}/UEM/Cursos/{"{Curso}"}/{"{ano}"}/{"{materia}"}/...</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-2">
+                    <FolderSync className="w-4 h-4 text-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Pronto para uso offline</span>
+                  </div>
+                  <Button 
+                    onClick={desvincularPasta}
+                    variant="outline"
+                    className="h-11 px-6 rounded-xl font-bold text-xs gap-2 border-dashed w-full sm:w-auto"
+                  >
+                    Desvincular Pasta
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-muted/20 border border-border/50 rounded-2xl">
+              <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+                A pasta vinculada é gerida de forma 100% segura através do seu próprio navegador usando a API padrão da Web (sem envios para servidores externos). 
+                Isso garante acesso rápido e offline instantâneo a todos os seus documentos de estudo da UEM.
+              </p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Modal do Seletor de Pastas */}
-      <Modal
-        isOpen={modalSeletorAberto}
-        onClose={() => setModalSeletorAberto(false)}
-        title="Selecionar Diretório"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-xl border border-border text-[11px] font-bold text-muted-foreground break-all">
-            <Folder className="w-3.5 h-3.5 shrink-0" />
-            {caminhoAtual || 'Carregando...'}
-          </div>
-
-          <div className="max-h-87.5 overflow-y-auto border border-border rounded-2xl bg-card">
-            {loadingPastas ? (
-              <div className="p-12 flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Acessando sistema...</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {itensDiretorio.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => explorarCaminho(item.path)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors group text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${item.nome === '..' ? 'bg-muted' : 'bg-primary/10'}`}>
-                        <Folder className={`w-4 h-4 ${item.nome === '..' ? 'text-muted-foreground' : 'text-primary'}`} />
-                      </div>
-                      <span className={`text-sm font-bold ${item.nome === '..' ? 'text-muted-foreground' : 'text-foreground'}`}>
-                        {item.nome}
-                      </span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ))}
-                {itensDiretorio.length === 0 && !loadingPastas && (
-                  <div className="p-12 text-center">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nenhuma pasta encontrada neste nível</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border">
-            <div className="flex-1 min-w-0">
-               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
-                Pasta Selecionada: <span className="text-primary">{caminhoAtual || '/'}</span>
-              </p>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-               <Button 
-                variant="ghost" 
-                onClick={() => setModalSeletorAberto(false)}
-                className="flex-1 sm:flex-initial h-10 px-6 text-xs font-bold"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => selecionarPasta(caminhoAtual)}
-                className="flex-1 sm:flex-initial h-10 px-8 rounded-xl text-xs font-black uppercase tracking-widest"
-              >
-                Confirmar Local
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }
