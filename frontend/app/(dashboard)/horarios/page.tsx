@@ -359,6 +359,25 @@ export default function HorariosPage() {
           </div>
         </div>
       </div>
+
+      <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="flex gap-4">
+          <div className="bg-primary/10 p-3 rounded-xl shrink-0 h-fit self-center">
+            <CalendarIcon className="w-6 h-6 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-foreground">Sincronize com sua Agenda Pessoal</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+              Adicione suas aulas, provas e trabalhos automaticamente no Google Agenda, Apple Calendar ou Notion Calendar de forma simples e segura!
+            </p>
+          </div>
+        </div>
+        <Link href="/configuracoes" className="shrink-0 w-full md:w-auto">
+          <Button className="h-11 px-5 rounded-xl font-black uppercase tracking-widest text-xs gap-2 w-full md:w-auto">
+            Configurar
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 }

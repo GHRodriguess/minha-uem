@@ -18,7 +18,10 @@ from .views import (
     SincronizarArquivosLocaisView,
     MuralClassroomView,
     MarcarMuralLidoView,
-    NotificacoesClassroomView
+    NotificacoesClassroomView,
+    ObterInfoAgendaView,
+    RegenerarTokenAgendaView,
+    FeedAgendaView
 )
 
 urlpatterns = [
@@ -42,6 +45,9 @@ urlpatterns = [
     path('classroom/mural/', MuralClassroomView.as_view(), name='classroom_mural'),
     path('classroom/mural/marcar-lido/', MarcarMuralLidoView.as_view(), name='classroom_mural_marcar_lido'),
     path('classroom/notificacoes/', NotificacoesClassroomView.as_view(), name='classroom_notificacoes'),
+    path('agenda/info/', ObterInfoAgendaView.as_view(), name='agenda_info'),
+    path('agenda/regenerar/', RegenerarTokenAgendaView.as_view(), name='agenda_regenerar'),
+    path('agenda/feed/<uuid:token>/', FeedAgendaView.as_view(), name='agenda_feed'),
 ]
 
 
