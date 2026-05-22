@@ -298,7 +298,7 @@ export default function MuralClassroom({ materiaId, anoId }: MuralClassroomProps
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[300px] gap-4">
+      <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center min-h-75 gap-4">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
         <p className="text-sm font-bold text-muted-foreground">Carregando publicações do Classroom...</p>
       </div>
@@ -349,7 +349,7 @@ export default function MuralClassroom({ materiaId, anoId }: MuralClassroomProps
           </div>
 
           {nextPageToken && (
-            <div ref={loaderRef} className="flex justify-center pt-6 pb-2 min-h-[48px]">
+            <div ref={loaderRef} className="flex justify-center pt-6 pb-2 min-h-12">
               {loadingMore && (
                 <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />
