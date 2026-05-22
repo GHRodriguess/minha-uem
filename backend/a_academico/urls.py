@@ -15,7 +15,10 @@ from .views import (
     AbrirArquivoLocalView,
     AdicionarArquivoLocalView,
     ObterConteudoArquivoDriveView,
-    SincronizarArquivosLocaisView
+    SincronizarArquivosLocaisView,
+    MuralClassroomView,
+    MarcarMuralLidoView,
+    NotificacoesClassroomView
 )
 
 urlpatterns = [
@@ -36,6 +39,9 @@ urlpatterns = [
     path('classroom/arquivos/<str:drive_file_id>/conteudo/', ObterConteudoArquivoDriveView.as_view(), name='classroom_arquivos_conteudo'),
     path('classroom/arquivos/<str:drive_file_id>/baixar/', BaixarArquivoClassroomView.as_view(), name='classroom_arquivos_baixar'),
     path('classroom/explorar-diretorios/', ExploradorDiretoriosView.as_view(), name='classroom_explorar_diretorios'),
+    path('classroom/mural/', MuralClassroomView.as_view(), name='classroom_mural'),
+    path('classroom/mural/marcar-lido/', MarcarMuralLidoView.as_view(), name='classroom_mural_marcar_lido'),
+    path('classroom/notificacoes/', NotificacoesClassroomView.as_view(), name='classroom_notificacoes'),
 ]
 
 

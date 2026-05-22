@@ -9,11 +9,14 @@ import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import Modal from '../shared/Modal'
 import CardUploadPDF from './CardUploadPDF'
+import { useClassroom } from '../providers/ProvedorClassroom'
+import { clsx } from 'clsx'
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [modalAberto, setModalAberto] = useState(false)
+  const { notificationsCount } = useClassroom()
 
   const handleSair = () => {
     signOut({ callbackUrl: '/login' })
@@ -34,13 +37,26 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-2">
-        {links.map((link) => (
-          <ItemNavegacao
-            key={link.href}
-            {...link}
-            active={pathname === link.href}
-          />
-        ))}
+        {links.map((link) => {
+          const isDisciplinas = link.href === '/disciplinas'
+          return (
+            <ItemNavegacao
+              key={link.href}
+              {...link}
+              active={pathname === link.href}
+              badge={isDisciplinas && notificationsCount > 0 ? (
+                <span className={clsx(
+                  "flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full text-[10px] font-black leading-none",
+                  pathname === link.href 
+                    ? "bg-primary-foreground text-primary" 
+                    : "bg-destructive text-destructive-foreground animate-pulse"
+                )}>
+                  {notificationsCount}
+                </span>
+              ) : undefined}
+            />
+          )
+        })}
       </nav>
     
       <div className="">
