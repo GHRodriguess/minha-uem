@@ -119,13 +119,49 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
         filesToSync
       )
 
-      setFilesCache(prev => ({
-        ...prev,
-        [materiaId]: {
-          ...prev[materiaId],
-          arquivos: updatedFiles
-        }
+      const normalizedFiles = updatedFiles.map(fileItem => ({
+        ...fileItem,
+        selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
       }))
+
+      setFilesCache(prev => {
+        const existing = prev[materiaId]
+        if (!existing) return prev
+
+        const mergedFiles = [...existing.arquivos]
+
+        normalizedFiles.forEach(upd => {
+          const idx = mergedFiles.findIndex(f => f.drive_file_id === upd.drive_file_id)
+          if (idx !== -1) {
+            mergedFiles[idx] = { ...mergedFiles[idx], ...upd }
+          } else {
+            mergedFiles.push(upd)
+          }
+        })
+
+        const updatedIds = new Set(normalizedFiles.map(u => u.drive_file_id))
+        const finalFiles = mergedFiles.map(f => {
+          if (!f.drive_file_id.startsWith('local_')) {
+            if (!updatedIds.has(f.drive_file_id)) {
+              return { ...f, local_path: null }
+            }
+          }
+          return f
+        }).filter(f => {
+          if (f.drive_file_id.startsWith('local_')) {
+            return updatedIds.has(f.drive_file_id)
+          }
+          return true
+        })
+
+        return {
+          ...prev,
+          [materiaId]: {
+            ...existing,
+            arquivos: finalFiles
+          }
+        }
+      })
     } catch (error) {
       console.error(error)
     } finally {
@@ -161,6 +197,13 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
         materiaId, 
         anoId
       )
+
+      if (connectionData && connectionData.arquivos) {
+        connectionData.arquivos = connectionData.arquivos.map(fileItem => ({
+          ...fileItem,
+          selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
+        }))
+      }
 
       setFilesCache(prev => ({ ...prev, [materiaId]: connectionData }))
 
@@ -284,7 +327,7 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
           const courseName = cache.curso_nome || "Sem_Curso"
           const year = cache.ano_letivo || String(anoId)
           const subjectName = cache.materia_nome || "Materia"
-          const folder = fileItem.selected_folder || "docs"
+          const folder = fileItem.selected_folder || "documentos"
           const pathParts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
           const oldName = fileItem.custom_name || fileItem.original_name
           const newName = novoNome.trim() || fileItem.original_name

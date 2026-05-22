@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   ArquivoClassroom
 } from '@/lib/api/classroom'
@@ -28,7 +28,7 @@ interface CardClassroomProps {
 }
 
 type OrdenacaoArquivo = 'nome' | 'recentes'
-type AgrupamentoArquivo = 'nenhum' | 'tipo' | 'status'
+type AgrupamentoArquivo = 'nenhum' | 'categoria' | 'status'
 
 export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
   const { data: session } = useSession()
@@ -51,7 +51,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
   } = useClassroom()
 
   const [ordenacao, setOrdenacao] = useState<OrdenacaoArquivo>('nome')
-  const [agrupamento, setAgrupamento] = useState<AgrupamentoArquivo>('nenhum')
+  const [agrupamento, setAgrupamento] = useState<AgrupamentoArquivo>('categoria')
 
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [customNameInput, setCustomNameInput] = useState('')
@@ -77,6 +77,11 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
   const [missingFiles, setMissingFiles] = useState<Record<string, boolean>>({})
 
+  const filesHash = useMemo(() => {
+    if (!statusVinculo?.arquivos) return ''
+    return JSON.stringify(statusVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder]))
+  }, [statusVinculo?.arquivos])
+
   useEffect(() => {
     if (!directoryHandle || !hasFolderPermission || !statusVinculo?.arquivos) return
 
@@ -88,7 +93,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
       const subjectName = statusVinculo.materia_nome || ""
 
       for (const arq of statusVinculo.arquivos) {
-        const folder = arq.selected_folder || "docs"
+        const folder = arq.selected_folder || "documentos"
         const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
         const fileName = arq.custom_name || arq.original_name
         
@@ -106,7 +111,11 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
         }
       }
       if (isMounted) {
-        setMissingFiles(missing)
+        setMissingFiles(prev => {
+          const hasChanged = Object.keys(missing).length !== Object.keys(prev).length ||
+            Object.keys(missing).some(k => missing[k] !== prev[k])
+          return hasChanged ? missing : prev
+        })
       }
     }
 
@@ -114,7 +123,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     return () => {
       isMounted = false
     }
-  }, [statusVinculo?.arquivos, statusVinculo?.curso_nome, statusVinculo?.ano_letivo, statusVinculo?.materia_nome, directoryHandle, hasFolderPermission])
+  }, [filesHash, statusVinculo?.curso_nome, statusVinculo?.ano_letivo, statusVinculo?.materia_nome, directoryHandle, hasFolderPermission])
 
   const iniciarEdicaoNome = (arquivo: ArquivoClassroom) => {
     setEditingFileId(arquivo.drive_file_id)
@@ -178,7 +187,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     )
   }
 
-  const listaCategorias = configClassroom.folder_options.split(',').map(c => c.trim()).filter(Boolean)
+  const listaCategorias = configClassroom.folder_options.split(',').map(c => c.trim()).filter(Boolean).map(c => c === 'docs' ? 'documentos' : c)
 
   const formatarNomeTipo = (tipo: string) => {
     if (tipo === 'documentos') return 'Documento'
@@ -374,7 +383,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
             className="bg-background border border-border rounded-lg px-2 h-7 text-[10px] font-bold focus:outline-none text-foreground"
           >
             <option value="nenhum">Nenhum</option>
-            <option value="tipo">Por Tipo</option>
+            <option value="categoria">Por Categoria</option>
             <option value="status">Por Status</option>
           </select>
         </div>
@@ -410,19 +419,24 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
             <FileText className="w-8 h-8 mx-auto text-muted-foreground/30" />
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Vazio</p>
           </div>
-        ) : agrupamento === 'tipo' ? (
-          listaCategorias.map(cat => {
-            const arqs = arquivosProcessados.filter(a => a.selected_folder === cat)
-            if (arqs.length === 0) return null
+        ) : agrupamento === 'categoria' ? (
+          [...listaCategorias, 'outros'].map(categoryItem => {
+            const categoryFiles = arquivosProcessados.filter(fileItem => {
+              if (categoryItem === 'outros') {
+                return !fileItem.selected_folder || !listaCategorias.includes(fileItem.selected_folder)
+              }
+              return fileItem.selected_folder === categoryItem
+            })
+            if (categoryFiles.length === 0) return null
             return (
-              <div key={cat} className="space-y-3">
+              <div key={categoryItem} className="space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
-                    {formatarNomeTipo(cat)}
+                    {categoryItem === 'outros' ? 'Sem Categoria' : formatarNomeTipo(categoryItem)}
                   </span>
                   <div className="h-px flex-1 bg-border/40" />
                 </div>
-                {renderizarLista(arqs)}
+                {renderizarLista(categoryFiles)}
               </div>
             )
           })

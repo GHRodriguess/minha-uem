@@ -510,7 +510,7 @@ class ArquivosMateriaClassroomView(APIView):
                     'drive_file_id': file_id,
                     'original_name': title,
                     'custom_name': None,
-                    'selected_folder': 'docs',
+                    'selected_folder': 'documentos',
                     'local_path': None,
                     'is_ignored': False,
                     'sync_at': None
@@ -560,7 +560,7 @@ class AtualizarArquivoClassroomView(APIView):
                 defaults={
                     'classroom_connection': connection,
                     'original_name': original_name,
-                    'selected_folder': 'docs'
+                    'selected_folder': 'documentos'
                 }
             )
 
