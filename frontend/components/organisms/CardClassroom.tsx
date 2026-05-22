@@ -42,6 +42,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     directoryHandle,
     hasFolderPermission,
     isFileSystemSupported,
+    isSelectingFolder,
     solicitarAcessoPasta,
     desvincularPasta,
     obterArquivos,
@@ -371,9 +372,10 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           </p>
           <button
             onClick={solicitarAcessoPasta}
-            className="h-8 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-lg text-[10px] shadow-sm transition-opacity uppercase tracking-wider shrink-0"
+            disabled={isSelectingFolder}
+            className="h-8 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-lg text-[10px] shadow-sm transition-opacity uppercase tracking-wider shrink-0 disabled:opacity-50"
           >
-            Reautorizar Acesso
+            {isSelectingFolder ? 'Autorizando...' : 'Reautorizar Acesso'}
           </button>
         </div>
       ) : null}

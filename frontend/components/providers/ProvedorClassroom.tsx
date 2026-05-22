@@ -22,6 +22,7 @@ interface ContextoClassroomData {
   isFileSystemSupported: boolean
   unreadNotifications: RespostaNotificacoesClassroom | null
   notificationsCount: number
+  isSelectingFolder: boolean
   solicitarAcessoPasta: () => Promise<void>
   desvincularPasta: () => Promise<void>
   escanearPastaLocal: (materiaId: number, anoId: number) => Promise<void>
@@ -97,6 +98,8 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null)
   const [hasFolderPermission, setHasFolderPermission] = useState<boolean>(false)
   const [isFileSystemSupported, setIsFileSystemSupported] = useState<boolean>(false)
+  const [isSelectingFolder, setIsSelectingFolder] = useState<boolean>(false)
+  const isSelectingFolderRef = React.useRef(false)
 
   const filesCacheRef = React.useRef(filesCache)
 
@@ -125,14 +128,22 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   }, [])
 
   const solicitarAcessoPasta = useCallback(async () => {
+    if (isSelectingFolderRef.current) return
+    isSelectingFolderRef.current = true
+    setIsSelectingFolder(true)
     try {
       const handle = await GerenciadorDiretorio.obterDiretorioHandle()
       setDirectoryHandle(handle)
       const temPermissao = await GerenciadorDiretorio.verificarPermissao(handle, true)
       setHasFolderPermission(temPermissao)
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      throw error
+      if (error.name !== 'AbortError') {
+        throw error
+      }
+    } finally {
+      isSelectingFolderRef.current = false
+      setIsSelectingFolder(false)
     }
   }, [])
 
@@ -584,6 +595,7 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       isFileSystemSupported,
       unreadNotifications,
       notificationsCount,
+      isSelectingFolder,
       solicitarAcessoPasta,
       desvincularPasta,
       escanearPastaLocal,

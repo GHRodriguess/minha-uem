@@ -42,6 +42,7 @@ export default function ConfiguracoesPage() {
     directoryHandle,
     hasFolderPermission,
     isFileSystemSupported,
+    isSelectingFolder,
     solicitarAcessoPasta,
     desvincularPasta
   } = useClassroom()
@@ -199,10 +200,20 @@ export default function ConfiguracoesPage() {
                 </div>
                 <Button 
                   onClick={solicitarAcessoPasta}
+                  disabled={isSelectingFolder}
                   className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-xs gap-2 shrink-0 w-full md:w-auto"
                 >
-                  <FolderOpen className="w-4 h-4" />
-                  Vincular Pasta
+                  {isSelectingFolder ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Selecionando...
+                    </>
+                  ) : (
+                    <>
+                      <FolderOpen className="w-4 h-4" />
+                      Vincular Pasta
+                    </>
+                  )}
                 </Button>
               </div>
             ) : !hasFolderPermission ? (
@@ -219,10 +230,20 @@ export default function ConfiguracoesPage() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-border/50">
                   <Button 
                     onClick={solicitarAcessoPasta}
+                    disabled={isSelectingFolder}
                     className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-xs gap-2 flex-1"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    Conceder Acesso
+                    {isSelectingFolder ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Concedendo...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Conceder Acesso
+                      </>
+                    )}
                   </Button>
                   <Button 
                     onClick={desvincularPasta}
