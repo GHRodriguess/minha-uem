@@ -11,7 +11,9 @@ from .views import (
     ArquivosMateriaClassroomView,
     AtualizarArquivoClassroomView,
     BaixarArquivoClassroomView,
-    ExploradorDiretoriosView
+    ExploradorDiretoriosView,
+    AbrirArquivoLocalView,
+    AdicionarArquivoLocalView
 )
 
 urlpatterns = [
@@ -25,6 +27,8 @@ urlpatterns = [
     path('classroom/cursos/', ListarCursosClassroomView.as_view(), name='classroom_cursos'),
     path('classroom/vincular/', VincularCursoClassroomView.as_view(), name='classroom_vincular'),
     path('classroom/arquivos/', ArquivosMateriaClassroomView.as_view(), name='classroom_arquivos'),
+    path('classroom/arquivos/abrir/', AbrirArquivoLocalView.as_view(), name='classroom_abrir_arquivo'),
+    path('classroom/arquivos/upload-local/', AdicionarArquivoLocalView.as_view(), name='classroom_upload_local'),
     path('classroom/arquivos/<str:drive_file_id>/', AtualizarArquivoClassroomView.as_view(), name='classroom_arquivos_detalhe'),
     path('classroom/arquivos/<str:drive_file_id>/baixar/', BaixarArquivoClassroomView.as_view(), name='classroom_arquivos_baixar'),
     path('classroom/explorar-diretorios/', ExploradorDiretoriosView.as_view(), name='classroom_explorar_diretorios'),

@@ -20,6 +20,9 @@ interface ContextoClassroomData {
   baixarItem: (materiaId: number, anoId: number, driveFileId: string, originalName: string) => Promise<void>
   salvarNomePersonalizado: (materiaId: number, anoId: number, driveFileId: string, originalName: string, novoNome: string) => Promise<void>
   salvarPastaDestino: (materiaId: number, anoId: number, driveFileId: string, originalName: string, novaPasta: string) => Promise<void>
+  abrirItemLocal: (materiaId: number, id: number) => Promise<void>
+  alternarOcultarArquivo: (materiaId: number, anoId: number, driveFileId: string, originalName: string, ocultar: boolean) => Promise<void>
+  enviarArquivoLocal: (materiaId: number, anoId: number, folderCategory: string, file: File) => Promise<void>
 }
 
 const ContextoClassroom = createContext<ContextoClassroomData>({} as ContextoClassroomData)
@@ -198,6 +201,76 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     }
   }, [session, atualizarArquivoLocal])
 
+  const abrirItemLocal = useCallback(async (materiaId: number, id: number) => {
+    if (!session?.accessToken) return
+    try {
+      await classroom_service.abrirArquivoLocal(session.accessToken, id)
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }, [session])
+
+  const alternarOcultarArquivo = useCallback(async (
+    materiaId: number, 
+    anoId: number, 
+    driveFileId: string, 
+    originalName: string, 
+    ocultar: boolean
+  ) => {
+    if (!session?.accessToken) return
+    try {
+      const updatedItem = await classroom_service.atualizarArquivo(
+        session.accessToken,
+        driveFileId,
+        materiaId,
+        anoId,
+        originalName,
+        { is_ignored: ocultar }
+      )
+      atualizarArquivoLocal(materiaId, driveFileId, {
+        id: updatedItem.id,
+        is_ignored: updatedItem.is_ignored
+      })
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }, [session, atualizarArquivoLocal])
+
+  const enviarArquivoLocal = useCallback(async (
+    materiaId: number, 
+    anoId: number, 
+    folderCategory: string, 
+    file: File
+  ) => {
+    if (!session?.accessToken) return
+    try {
+      const uploadedItem = await classroom_service.adicionarArquivoLocal(
+        session.accessToken,
+        materiaId,
+        anoId,
+        folderCategory,
+        file
+      )
+      
+      setFilesCache(prev => {
+        const existing = prev[materiaId]
+        if (!existing) return prev
+        return {
+          ...prev,
+          [materiaId]: {
+            ...existing,
+            arquivos: [uploadedItem, ...existing.arquivos]
+          }
+        }
+      })
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }, [session])
+
   return (
     <ContextoClassroom.Provider value={{
       filesCache,
@@ -209,7 +282,10 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       atualizarArquivoLocal,
       baixarItem,
       salvarNomePersonalizado,
-      salvarPastaDestino
+      salvarPastaDestino,
+      abrirItemLocal,
+      alternarOcultarArquivo,
+      enviarArquivoLocal
     }}>
       {children}
     </ContextoClassroom.Provider>

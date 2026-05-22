@@ -397,6 +397,8 @@ class ArquivosMateriaClassroomView(APIView):
             if not connection:
                 return Response({'vinculado': False, 'arquivos': []})
 
+            self.escanear_arquivos_locais(profile, connection)
+
             if google_token:
                 arquivos_mesclados = self._obter_arquivos_classroom_em_tempo_real(connection, google_token)
                 return Response({
@@ -420,6 +422,48 @@ class ArquivosMateriaClassroomView(APIView):
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def escanear_arquivos_locais(self, profile, connection):
+        import os
+        import uuid
+        from pathlib import Path
+        
+        config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
+        
+        def limpar_nome_pasta(nome):
+            return re.sub(r'[\/\\:\*\?"<>\|]', '', nome).strip()
+
+        course_name = profile.curso.nome if profile.curso else "Sem_Curso"
+        course_name = limpar_nome_pasta(course_name)
+        
+        year = str(connection.subject_config.ano_letivo.ano)
+        
+        subject_name = connection.subject_config.materia.nome
+        subject_name = limpar_nome_pasta(subject_name)
+        
+        categories = [cat.strip() for cat in config.folder_options.split(',') if cat.strip()]
+        if not categories:
+            categories = ['documentos', 'exercicios']
+            
+        download_root = config.download_dir
+        if not os.path.isabs(download_root):
+            download_root = os.path.join(str(Path.home()), download_root)
+
+        for folder_category in categories:
+            target_dir = os.path.join(download_root, 'UEM', course_name, 'Materias', year, subject_name, folder_category)
+            if os.path.exists(target_dir):
+                for item in os.listdir(target_dir):
+                    item_path = os.path.join(target_dir, item)
+                    if os.path.isfile(item_path):
+                        if not ArquivoMateriaClassroom.objects.filter(classroom_connection=connection, local_path=item_path).exists():
+                            drive_file_id = f"local_{uuid.uuid4()}"
+                            ArquivoMateriaClassroom.objects.create(
+                                classroom_connection=connection,
+                                drive_file_id=drive_file_id,
+                                original_name=item,
+                                selected_folder=folder_category,
+                                local_path=item_path
+                            )
 
     def _obter_arquivos_classroom_em_tempo_real(self, connection, token):
         headers = {'Authorization': f'Bearer {token}'}
@@ -468,6 +512,7 @@ class ArquivosMateriaClassroomView(APIView):
                                 'title': title
                             })
 
+        import os
         arquivos_locais = {arq.drive_file_id: arq for arq in connection.arquivos.all()}
 
         resultado = []
@@ -485,8 +530,9 @@ class ArquivosMateriaClassroomView(APIView):
                     'original_name': arq.original_name,
                     'custom_name': arq.custom_name,
                     'selected_folder': arq.selected_folder,
-                    'is_downloaded': arq.is_downloaded,
+                    'is_downloaded': bool(arq.local_path and os.path.exists(arq.local_path)),
                     'local_path': arq.local_path,
+                    'is_ignored': arq.is_ignored,
                     'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
                 })
             else:
@@ -498,7 +544,22 @@ class ArquivosMateriaClassroomView(APIView):
                     'selected_folder': 'docs',
                     'is_downloaded': False,
                     'local_path': None,
+                    'is_ignored': False,
                     'sync_at': None
+                })
+
+        for local_id, arq in arquivos_locais.items():
+            if local_id.startswith('local_'):
+                resultado.append({
+                    'id': arq.id,
+                    'drive_file_id': arq.drive_file_id,
+                    'original_name': arq.original_name,
+                    'custom_name': arq.custom_name,
+                    'selected_folder': arq.selected_folder,
+                    'is_downloaded': bool(arq.local_path and os.path.exists(arq.local_path)),
+                    'local_path': arq.local_path,
+                    'is_ignored': arq.is_ignored,
+                    'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
                 })
 
         return resultado
@@ -639,11 +700,136 @@ class BaixarArquivoClassroomView(APIView):
                     if chunk:
                         local_file.write(chunk)
 
-            file_obj.is_downloaded = True
             file_obj.local_path = target_path
             file_obj.save()
 
             serializer = ArquivoMateriaClassroomSerializer(file_obj)
             return Response(serializer.data)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AbrirArquivoLocalView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        file_id = request.data.get('id')
+        if not file_id:
+            return Response({'erro': 'O id do arquivo é obrigatório'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            profile = PerfilAcademico.objects.get(user=request.user)
+            file_obj = ArquivoMateriaClassroom.objects.get(
+                id=file_id, 
+                classroom_connection__subject_config__perfil=profile
+            )
+            
+            import os
+            import subprocess
+            import platform
+
+            if not file_obj.local_path or not os.path.exists(file_obj.local_path):
+                return Response({'erro': 'Arquivo não encontrado localmente'}, status=status.HTTP_404_NOT_FOUND)
+
+            system_name = platform.system()
+            if system_name == 'Darwin':
+                subprocess.run(['open', file_obj.local_path], check=True)
+            elif system_name == 'Windows':
+                os.startfile(file_obj.local_path)
+            else:
+                subprocess.run(['xdg-open', file_obj.local_path], check=True)
+
+            return Response({'sucesso': True})
+        except PerfilAcademico.DoesNotExist:
+            return Response({'erro': 'Perfil não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except ArquivoMateriaClassroom.DoesNotExist:
+            return Response({'erro': 'Arquivo não cadastrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdicionarArquivoLocalView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if 'file' not in request.FILES:
+            return Response({'erro': 'Nenhum arquivo enviado'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        materia_id = request.data.get('materia_id')
+        ano_id = request.data.get('ano_id')
+        selected_folder = request.data.get('selected_folder', 'documentos')
+        uploaded_file = request.FILES['file']
+        
+        if not materia_id or not ano_id:
+            return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            profile = PerfilAcademico.objects.get(user=request.user)
+            
+            connection = VinculoGoogleClassroom.objects.filter(
+                subject_config__perfil=profile,
+                subject_config__materia_id=materia_id,
+                subject_config__ano_letivo_id=ano_id
+            ).first()
+            
+            if not connection:
+                config_materia = ConfiguracaoMateria.objects.filter(
+                    perfil=profile,
+                    materia_id=materia_id,
+                    ano_letivo_id=ano_id
+                ).first()
+                
+                if not config_materia:
+                    return Response({'erro': 'Matéria não encontrada no perfil do usuário'}, status=status.HTTP_404_NOT_FOUND)
+                
+                connection = VinculoGoogleClassroom.objects.create(
+                    subject_config=config_materia,
+                    classroom_course_id='local',
+                    classroom_course_name='Arquivos Locais'
+                )
+                
+            config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
+            
+            def limpar_nome_pasta(nome):
+                return re.sub(r'[\/\\:\*\?"<>\|]', '', nome).strip()
+
+            course_name = profile.curso.nome if profile.curso else "Sem_Curso"
+            course_name = limpar_nome_pasta(course_name)
+            
+            year = str(connection.subject_config.ano_letivo.ano)
+            
+            subject_name = connection.subject_config.materia.nome
+            subject_name = limpar_nome_pasta(subject_name)
+            
+            import os
+            from pathlib import Path
+            import uuid
+            
+            download_root = config.download_dir
+            if not os.path.isabs(download_root):
+                download_root = os.path.join(str(Path.home()), download_root)
+
+            target_dir = os.path.join(download_root, 'UEM', course_name, 'Materias', year, subject_name, selected_folder)
+            os.makedirs(target_dir, exist_ok=True)
+            
+            file_name = limpar_nome_pasta(uploaded_file.name)
+            target_path = os.path.join(target_dir, file_name)
+            
+            with open(target_path, 'wb') as local_file:
+                for chunk in uploaded_file.chunks():
+                    local_file.write(chunk)
+                    
+            drive_file_id = f"local_{uuid.uuid4()}"
+            
+            file_obj = ArquivoMateriaClassroom.objects.create(
+                classroom_connection=connection,
+                drive_file_id=drive_file_id,
+                original_name=uploaded_file.name,
+                selected_folder=selected_folder,
+                local_path=target_path
+            )
+            
+            serializer = ArquivoMateriaClassroomSerializer(file_obj)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)

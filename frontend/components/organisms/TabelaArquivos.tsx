@@ -10,6 +10,9 @@ import {
   Check, 
   X, 
   Eye, 
+  EyeOff,
+  Plus,
+  Upload,
   ExternalLink,
   CheckCircle2,
   AlertCircle,
@@ -38,7 +41,10 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     classroomConfig,
     baixarItem,
     salvarNomePersonalizado,
-    salvarPastaDestino
+    salvarPastaDestino,
+    abrirItemLocal,
+    alternarOcultarArquivo,
+    enviarArquivoLocal
   } = useClassroom()
 
   const [searchText, setSearchText] = useState('')
@@ -51,6 +57,11 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   const [previewFile, setPreviewFile] = useState<ArquivoClassroom | null>(null)
   const [sortField, setSortField] = useState<'nome' | 'sincronizacao'>('nome')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [mostrarOcultados, setMostrarOcultados] = useState(false)
+  const [uploadModalAberto, setUploadModalAberto] = useState(false)
+  const [uploadCategory, setUploadCategory] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
 
   const alterarOrdenacao = (campo: 'nome' | 'sincronizacao') => {
     if (sortField === campo) {
@@ -150,6 +161,46 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     setSelectedCategory('todos')
     setSelectedExtension('todos')
     setSelectedStatus('todos')
+    setMostrarOcultados(false)
+  }
+
+  const gerenciarAberturaLocal = async (arquivo: ArquivoClassroom) => {
+    if (!arquivo.id) return
+    try {
+      await abrirItemLocal(materiaId, arquivo.id)
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const gerenciarOcultar = async (arquivo: ArquivoClassroom) => {
+    try {
+      await alternarOcultarArquivo(
+        materiaId,
+        anoId,
+        arquivo.drive_file_id,
+        arquivo.original_name,
+        !arquivo.is_ignored
+      )
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const gerenciarUploadLocal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!uploadFile) return
+    setEnviando(true)
+    try {
+      const category = uploadCategory || listaCategorias[0] || 'documentos'
+      await enviarArquivoLocal(materiaId, anoId, category, uploadFile)
+      setUploadModalAberto(false)
+      setUploadFile(null)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const arquivosFiltrados = dadosVinculo.arquivos.filter(arquivo => {
@@ -166,7 +217,9 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
       (selectedStatus === 'baixados' && arquivo.is_downloaded) ||
       (selectedStatus === 'pendentes' && !arquivo.is_downloaded)
 
-    return matchesSearch && matchesCategory && matchesExtension && matchesStatus
+    const matchesOcultados = mostrarOcultados ? true : !arquivo.is_ignored
+
+    return matchesSearch && matchesCategory && matchesExtension && matchesStatus && matchesOcultados
   })
 
   const arquivosOrdenados = [...arquivosFiltrados].sort((a, b) => {
@@ -187,9 +240,21 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   return (
     <div className="space-y-6">
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-          <Filter className="w-4 h-4 text-primary" />
-          <span>Filtros de Busca</span>
+        <div className="flex justify-between items-center text-foreground font-bold text-sm">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-primary" />
+            <span>Filtros de Busca</span>
+          </div>
+          <button
+            onClick={() => {
+              setUploadCategory(listaCategorias[0] || 'documentos')
+              setUploadModalAberto(true)
+            }}
+            className="flex items-center gap-1.5 h-9 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Adicionar Arquivo</span>
+          </button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -245,16 +310,26 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
           </div>
         </div>
 
-        {(searchText || selectedCategory !== 'todos' || selectedExtension !== 'todos' || selectedStatus !== 'todos') && (
-          <div className="flex justify-end">
+        <div className="flex justify-between items-center pt-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-muted-foreground font-bold">
+            <input
+              type="checkbox"
+              checked={mostrarOcultados}
+              onChange={(e) => setMostrarOcultados(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 accent-primary"
+            />
+            <span>Mostrar arquivos ocultados</span>
+          </label>
+
+          {(searchText || selectedCategory !== 'todos' || selectedExtension !== 'todos' || selectedStatus !== 'todos' || mostrarOcultados) && (
             <button
               onClick={limparFiltros}
               className="h-8 px-4 border border-border bg-background hover:bg-muted text-[10px] font-black uppercase tracking-wider rounded-lg text-muted-foreground transition-colors"
             >
               Limpar Filtros
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
@@ -290,7 +365,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                   </div>
                 </th>
                 <th className="py-4 px-6 w-28">Status</th>
-                <th className="py-4 px-6 w-44 text-right">Ações</th>
+                <th className="py-4 px-6 w-44 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -312,7 +387,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                   return (
                     <tr 
                       key={arquivo.drive_file_id} 
-                      className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium ${arquivo.is_downloaded ? 'opacity-95' : ''}`}
+                      className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium ${arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''}`}
                     >
                       <td className="py-4 px-6">
                         <div className="flex items-start gap-3">
@@ -398,38 +473,60 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                         )}
                       </td>
 
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => setPreviewFile(arquivo)}
-                            className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                            title="Pré-visualizar"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-
-                          <a
-                            href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                            title="Ver no Google Drive"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
+                      <td className="py-4 px-6 text-left">
+                        <div className="flex items-center justify-start gap-1.5">
+                          {arquivo.is_downloaded && (
+                            <button
+                              onClick={() => gerenciarAberturaLocal(arquivo)}
+                              className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                              title="Abrir no explorador de arquivos"
+                            >
+                              <FolderOpen className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
                           <button
-                            onClick={() => gerenciarDownload(arquivo)}
-                            disabled={estaBaixando}
-                            className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${arquivo.is_downloaded ? 'border-border bg-background text-muted-foreground hover:bg-muted' : 'border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm'} disabled:opacity-50`}
+                            onClick={() => gerenciarOcultar(arquivo)}
+                            className={`p-2 border border-border rounded-xl transition-colors ${arquivo.is_ignored ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+                            title={arquivo.is_ignored ? "Mostrar arquivo" : "Ocultar arquivo"}
                           >
-                            {estaBaixando ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Download className="w-3 h-3" />
-                            )}
-                            {arquivo.is_downloaded ? 'Re-baixar' : 'Baixar'}
+                            {arquivo.is_ignored ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                           </button>
+
+                          {!arquivo.drive_file_id.startsWith('local_') && (
+                            <>
+                              <button
+                                onClick={() => setPreviewFile(arquivo)}
+                                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                                title="Pré-visualizar"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+
+                              <a
+                                href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                                title="Ver no Google Drive"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+
+                              <button
+                                onClick={() => gerenciarDownload(arquivo)}
+                                disabled={estaBaixando}
+                                className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${arquivo.is_downloaded ? 'border-border bg-background text-muted-foreground hover:bg-muted' : 'border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm'} disabled:opacity-50`}
+                              >
+                                {estaBaixando ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Download className="w-3 h-3" />
+                                )}
+                                {arquivo.is_downloaded ? 'Re-baixar' : 'Baixar'}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -503,6 +600,134 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {uploadModalAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card border border-border w-full max-w-lg flex flex-col rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-muted/20">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-background border border-border rounded-xl">
+                  <Upload className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Adicionar Arquivo Local
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                    Salvar arquivo diretamente na pasta da matéria
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setUploadModalAberto(false)
+                  setUploadFile(null)
+                }}
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={gerenciarUploadLocal} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-foreground">
+                  Categoria de Destino
+                </label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value)}
+                  className="w-full h-10 px-3 border border-border bg-background rounded-xl text-xs font-bold focus:outline-none text-foreground"
+                  required
+                >
+                  {listaCategorias.map(cat => (
+                    <option key={cat} value={cat}>
+                      {formatarNomeTipo(cat)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-foreground">
+                  Selecionar Arquivo
+                </label>
+                <div 
+                  className={`border-2 border-dashed border-border rounded-2xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors bg-muted/5 ${uploadFile ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
+                  onClick={() => document.getElementById('local-file-input')?.click()}
+                >
+                  <input
+                    id="local-file-input"
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setUploadFile(e.target.files[0])
+                      }
+                    }}
+                  />
+                  
+                  {uploadFile ? (
+                    <div className="space-y-2">
+                      <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-full w-fit mx-auto">
+                        <Check className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-foreground text-center truncate px-2">
+                        {uploadFile.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">
+                        {(uploadFile.size / 1024).toFixed(1)} KB • Clique para trocar
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="p-2 bg-muted rounded-full w-fit mx-auto text-muted-foreground">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-foreground">
+                        Clique para selecionar um arquivo
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">
+                        O arquivo será salvo na pasta correspondente no disco
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadModalAberto(false)
+                    setUploadFile(null)
+                  }}
+                  className="flex items-center justify-center h-10 px-4 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={enviando || !uploadFile}
+                  className="flex items-center justify-center gap-1.5 h-10 px-5 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity disabled:opacity-50"
+                >
+                  {enviando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Adicionar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

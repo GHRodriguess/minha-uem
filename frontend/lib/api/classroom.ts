@@ -73,6 +73,7 @@ export interface ArquivoClassroom {
     is_downloaded: boolean;
     local_path: string | null;
     sync_at: string | null;
+    is_ignored: boolean;
 }
 
 export interface StatusVinculoClassroom {
@@ -246,6 +247,37 @@ export const classroom_service = {
                     { "X-Google-Access-Token": tokenGoogleUsar },
                 ),
             googleToken,
+        );
+    },
+
+    abrirArquivoLocal(token: string, id: number, signal?: AbortSignal) {
+        return api_client.postar<{ sucesso: boolean }>(
+            `${base_path}/arquivos/abrir/`,
+            { id },
+            token,
+            signal,
+        );
+    },
+
+    adicionarArquivoLocal(
+        token: string,
+        materiaId: number,
+        anoId: number,
+        folderCategory: string,
+        file: File,
+        signal?: AbortSignal,
+    ) {
+        const formData = new FormData();
+        formData.append("materia_id", String(materiaId));
+        formData.append("ano_id", String(anoId));
+        formData.append("selected_folder", folderCategory);
+        formData.append("file", file);
+
+        return api_client.postar<ArquivoClassroom>(
+            `${base_path}/arquivos/upload-local/`,
+            formData,
+            token,
+            signal,
         );
     },
 };
