@@ -73,7 +73,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
   const filesHash = useMemo(() => {
     if (!dadosVinculo?.arquivos) return ''
-    return JSON.stringify(dadosVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder]))
+    return JSON.stringify(dadosVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder, a.local_path]))
   }, [dadosVinculo?.arquivos])
 
   useEffect(() => {
@@ -201,6 +201,12 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     setDownloadingId(arquivo.drive_file_id)
     try {
       await baixarItem(materiaId, anoId, arquivo.drive_file_id, arquivo.original_name)
+      localStorage.setItem('baixado_' + arquivo.drive_file_id, 'true')
+      setMissingFiles(prev => {
+        const next = { ...prev }
+        delete next[arquivo.drive_file_id]
+        return next
+      })
     } catch (error) {
       console.error(error)
       alert('Ocorreu um erro ao baixar o arquivo. Verifique se a pasta de estudos ainda está acessível.')

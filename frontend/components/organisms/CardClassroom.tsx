@@ -79,7 +79,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
   const filesHash = useMemo(() => {
     if (!statusVinculo?.arquivos) return ''
-    return JSON.stringify(statusVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder]))
+    return JSON.stringify(statusVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder, a.local_path]))
   }, [statusVinculo?.arquivos])
 
   useEffect(() => {
@@ -156,6 +156,12 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     setDownloadingId(driveFileId)
     try {
       await baixarItem(materiaId, anoId, driveFileId, originalName)
+      localStorage.setItem('baixado_' + driveFileId, 'true')
+      setMissingFiles(prev => {
+        const next = { ...prev }
+        delete next[driveFileId]
+        return next
+      })
     } catch (error) {
       console.error(error)
       alert('Ocorreu um erro ao baixar o arquivo. Verifique se a pasta de estudos ainda está acessível.')
