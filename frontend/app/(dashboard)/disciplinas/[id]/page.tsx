@@ -66,10 +66,13 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
   useEffect(() => {
     buscarDados()
+  }, [buscarDados])
+
+  useEffect(() => {
     if (anoAtivoId) {
       preCarregarArquivos(parseInt(id), anoAtivoId)
     }
-  }, [buscarDados, id, anoAtivoId, preCarregarArquivos])
+  }, [id, anoAtivoId, preCarregarArquivos])
 
   if (loading) {
     return (

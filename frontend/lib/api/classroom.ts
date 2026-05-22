@@ -73,12 +73,16 @@ export interface ArquivoClassroom {
     is_downloaded: boolean;
     local_path: string | null;
     sync_at: string | null;
+    is_ignored: boolean;
 }
 
 export interface StatusVinculoClassroom {
     vinculado: boolean;
     classroom_course_id?: string;
     classroom_course_name?: string;
+    curso_nome?: string;
+    ano_letivo?: string;
+    materia_nome?: string;
     arquivos: ArquivoClassroom[];
 }
 
@@ -225,27 +229,104 @@ export const classroom_service = {
 
     baixarArquivo(
         token: string,
-        googleToken: string,
         driveFileId: string,
         materiaId: number,
         anoId: number,
         originalName: string,
+        localPath: string,
+        selectedFolder: string,
+        signal?: AbortSignal,
+    ) {
+        return api_client.postar<ArquivoClassroom>(
+            `${base_path}/arquivos/${driveFileId}/baixar/`,
+            {
+                materia_id: materiaId,
+                ano_id: anoId,
+                original_name: originalName,
+                local_path: localPath,
+                selected_folder: selectedFolder
+            },
+            token,
+            signal,
+        );
+    },
+
+    obterConteudoArquivo(
+        token: string,
+        googleToken: string,
+        driveFileId: string,
         signal?: AbortSignal,
     ) {
         return executarComRenovacaoGoogle(
             (tokenGoogleUsar) =>
-                api_client.postar<ArquivoClassroom>(
-                    `${base_path}/arquivos/${driveFileId}/baixar/`,
-                    {
-                        materia_id: materiaId,
-                        ano_id: anoId,
-                        original_name: originalName,
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}${base_path}/arquivos/${driveFileId}/conteudo/`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "X-Google-Access-Token": tokenGoogleUsar,
                     },
-                    token,
                     signal,
-                    { "X-Google-Access-Token": tokenGoogleUsar },
-                ),
+                }).then((res) => {
+                    if (!res.ok) throw new Error("Erro ao obter conteúdo do arquivo no Drive");
+                    return res.blob();
+                }),
             googleToken,
+        );
+    },
+
+    abrirArquivoLocal(token: string, id: number, signal?: AbortSignal) {
+        return api_client.postar<{ sucesso: boolean }>(
+            `${base_path}/arquivos/abrir/`,
+            { id },
+            token,
+            signal,
+        );
+    },
+
+    adicionarArquivoLocal(
+        token: string,
+        materiaId: number,
+        anoId: number,
+        folderCategory: string,
+        originalName: string,
+        localPath: string,
+        signal?: AbortSignal,
+    ) {
+        return api_client.postar<ArquivoClassroom>(
+            `${base_path}/arquivos/upload-local/`,
+            {
+                materia_id: materiaId,
+                ano_id: anoId,
+                selected_folder: folderCategory,
+                original_name: originalName,
+                local_path: localPath,
+            },
+            token,
+            signal,
+        );
+    },
+
+    sincronizarArquivosLocais(
+        token: string,
+        materiaId: number,
+        anoId: number,
+        arquivos: Array<{
+            drive_file_id: string | null;
+            original_name: string;
+            selected_folder: string;
+            local_path: string;
+        }>,
+        signal?: AbortSignal,
+    ) {
+        return api_client.postar<ArquivoClassroom[]>(
+            `${base_path}/arquivos/sincronizar/`,
+            {
+                materia_id: materiaId,
+                ano_id: anoId,
+                arquivos,
+            },
+            token,
+            signal,
         );
     },
 };

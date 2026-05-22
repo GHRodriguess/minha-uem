@@ -41,30 +41,26 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
   const [materia, setMateria] = useState<Materia | null>(null)
   const [loadingMateria, setLoadingMateria] = useState(true)
 
-  const buscarDadosMateria = useCallback(async (silencioso = false) => {
+  const buscarDadosMateria = useCallback(async () => {
     if (!session?.accessToken || !anoAtivoId) return
     
-    if (!silencioso) {
-      setLoadingMateria(true)
-    }
+    setLoadingMateria(true)
     try {
-      const perfil = await academic_service.obterPerfil(session.accessToken, anoAtivoId)
-      const encontrada = perfil.materias?.find(m => m.id === materiaId)
-      if (encontrada) {
-        setMateria(encontrada)
+      const profile = await academic_service.obterPerfil(session.accessToken, anoAtivoId)
+      const foundSubject = profile.materias?.find(m => m.id === materiaId)
+      if (foundSubject) {
+        setMateria(foundSubject)
       }
     } catch (error) {
       console.error(error)
     } finally {
-      if (!silencioso) {
-        setLoadingMateria(false)
-      }
+      setLoadingMateria(false)
     }
   }, [session, anoAtivoId, materiaId])
 
   useEffect(() => {
-    buscarDadosMateria(materia !== null)
-  }, [anoAtivoId, materiaId, buscarDadosMateria, materia])
+    buscarDadosMateria()
+  }, [anoAtivoId, materiaId, buscarDadosMateria])
 
   useEffect(() => {
     if (anoAtivoId) {
@@ -133,7 +129,7 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
 
   const isVinculado = dadosVinculo?.vinculado
   const totalArquivos = dadosVinculo?.arquivos?.length || 0
-  const totalBaixados = dadosVinculo?.arquivos?.filter(a => a.is_downloaded)?.length || 0
+  const totalBaixados = dadosVinculo?.arquivos?.filter(a => localStorage.getItem('baixado_' + a.drive_file_id) === 'true')?.length || 0
   const totalPendentes = totalArquivos - totalBaixados
 
   return (

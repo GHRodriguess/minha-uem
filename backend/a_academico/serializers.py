@@ -166,7 +166,7 @@ class ConfiguracaoGeralClassroomSerializer(serializers.ModelSerializer):
 class ArquivoMateriaClassroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = ArquivoMateriaClassroom
-        fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'is_downloaded', 'local_path', 'sync_at']
+        fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'local_path', 'sync_at', 'is_ignored']
 
 
 class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):

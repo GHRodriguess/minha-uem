@@ -130,7 +130,7 @@ class ArquivoMateriaClassroom(models.Model):
     original_name = models.CharField(max_length=255)
     custom_name = models.CharField(max_length=255, null=True, blank=True)
     selected_folder = models.CharField(max_length=100, default="documentos")
-    is_downloaded = models.BooleanField(default=False)
+    is_ignored = models.BooleanField(default=False)
     local_path = models.CharField(max_length=500, null=True, blank=True)
     sync_at = models.DateTimeField(auto_now=True)
 

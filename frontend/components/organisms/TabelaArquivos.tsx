@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { 
   FileText, 
   Search, 
@@ -10,6 +10,9 @@ import {
   Check, 
   X, 
   Eye, 
+  EyeOff,
+  Plus,
+  Upload,
   ExternalLink,
   CheckCircle2,
   AlertCircle,
@@ -26,6 +29,7 @@ import {
 } from 'lucide-react'
 import { ArquivoClassroom, StatusVinculoClassroom } from '@/lib/api/classroom'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
+import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 
 interface TabelaArquivosProps {
   materiaId: number
@@ -38,7 +42,15 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     classroomConfig,
     baixarItem,
     salvarNomePersonalizado,
-    salvarPastaDestino
+    salvarPastaDestino,
+    abrirItemLocal,
+    alternarOcultarArquivo,
+    enviarArquivoLocal,
+    directoryHandle,
+    hasFolderPermission,
+    isFileSystemSupported,
+    solicitarAcessoPasta,
+    desvincularPasta
   } = useClassroom()
 
   const [searchText, setSearchText] = useState('')
@@ -51,6 +63,61 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   const [previewFile, setPreviewFile] = useState<ArquivoClassroom | null>(null)
   const [sortField, setSortField] = useState<'nome' | 'sincronizacao'>('nome')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [mostrarOcultados, setMostrarOcultados] = useState(false)
+  const [uploadModalAberto, setUploadModalAberto] = useState(false)
+  const [uploadCategory, setUploadCategory] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [missingFiles, setMissingFiles] = useState<Record<string, boolean>>({})
+  const [groupBy, setGroupBy] = useState<'none' | 'category' | 'status'>('category')
+
+  const filesHash = useMemo(() => {
+    if (!dadosVinculo?.arquivos) return ''
+    return JSON.stringify(dadosVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder]))
+  }, [dadosVinculo?.arquivos])
+
+  useEffect(() => {
+    if (!directoryHandle || !hasFolderPermission || !dadosVinculo?.arquivos) return
+
+    let isMounted = true
+    const verificarPresencaFisica = async () => {
+      const missing: Record<string, boolean> = {}
+      const courseName = dadosVinculo.curso_nome || "Sem_Curso"
+      const year = dadosVinculo.ano_letivo || ""
+      const subjectName = dadosVinculo.materia_nome || ""
+
+      for (const arq of dadosVinculo.arquivos) {
+        const folder = arq.selected_folder || "documentos"
+        const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
+        const fileName = arq.custom_name || arq.original_name
+        
+        try {
+          const exists = await GerenciadorDiretorio.verificarArquivoExiste(directoryHandle, parts, fileName)
+          if (exists) {
+            localStorage.setItem('baixado_' + arq.drive_file_id, 'true')
+          } else {
+            localStorage.removeItem('baixado_' + arq.drive_file_id)
+            missing[arq.drive_file_id] = true
+          }
+        } catch {
+          localStorage.removeItem('baixado_' + arq.drive_file_id)
+          missing[arq.drive_file_id] = true
+        }
+      }
+      if (isMounted) {
+        setMissingFiles(prev => {
+          const hasChanged = Object.keys(missing).length !== Object.keys(prev).length ||
+            Object.keys(missing).some(k => missing[k] !== prev[k])
+          return hasChanged ? missing : prev
+        })
+      }
+    }
+
+    verificarPresencaFisica()
+    return () => {
+      isMounted = false
+    }
+  }, [filesHash, dadosVinculo?.curso_nome, dadosVinculo?.ano_letivo, dadosVinculo?.materia_nome, directoryHandle, hasFolderPermission])
 
   const alterarOrdenacao = (campo: 'nome' | 'sincronizacao') => {
     if (sortField === campo) {
@@ -61,9 +128,9 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     }
   }
 
-  const listaCategorias = classroomConfig?.folder_options
+  const listaCategorias = (classroomConfig?.folder_options
     ? classroomConfig.folder_options.split(',').map(c => c.trim()).filter(Boolean)
-    : ['documentos', 'exercicios']
+    : ['documentos', 'exercicios']).map(c => c === 'docs' ? 'documentos' : c)
 
   const obterExtensao = (filename: string) => {
     return filename.split('.').pop()?.toLowerCase() || ''
@@ -127,11 +194,16 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   }
 
   const gerenciarDownload = async (arquivo: ArquivoClassroom) => {
+    if (!directoryHandle || !hasFolderPermission) {
+      alert('Vincule sua pasta de estudos e conceda permissão de acesso nas Configurações Gerais para baixar arquivos offline.')
+      return
+    }
     setDownloadingId(arquivo.drive_file_id)
     try {
       await baixarItem(materiaId, anoId, arquivo.drive_file_id, arquivo.original_name)
     } catch (error) {
       console.error(error)
+      alert('Ocorreu um erro ao baixar o arquivo. Verifique se a pasta de estudos ainda está acessível.')
     } finally {
       setDownloadingId(null)
     }
@@ -150,6 +222,46 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     setSelectedCategory('todos')
     setSelectedExtension('todos')
     setSelectedStatus('todos')
+    setMostrarOcultados(false)
+    setGroupBy('category')
+  }
+
+  const gerenciarAberturaLocal = async (arquivo: ArquivoClassroom) => {
+    try {
+      await abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const gerenciarOcultar = async (arquivo: ArquivoClassroom) => {
+    try {
+      await alternarOcultarArquivo(
+        materiaId,
+        anoId,
+        arquivo.drive_file_id,
+        arquivo.original_name,
+        !arquivo.is_ignored
+      )
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const gerenciarUploadLocal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!uploadFile) return
+    setEnviando(true)
+    try {
+      const category = uploadCategory || listaCategorias[0] || 'documentos'
+      await enviarArquivoLocal(materiaId, anoId, category, uploadFile)
+      setUploadModalAberto(false)
+      setUploadFile(null)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const arquivosFiltrados = dadosVinculo.arquivos.filter(arquivo => {
@@ -162,11 +274,17 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     const extGrupo = categorizarExtensao(arquivo.original_name)
     const matchesExtension = selectedExtension === 'todos' || extGrupo === selectedExtension
     
-    const matchesStatus = selectedStatus === 'todos' || 
-      (selectedStatus === 'baixados' && arquivo.is_downloaded) ||
-      (selectedStatus === 'pendentes' && !arquivo.is_downloaded)
+    const isReallyDownloaded = hasFolderPermission
+      ? !missingFiles[arquivo.drive_file_id]
+      : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
 
-    return matchesSearch && matchesCategory && matchesExtension && matchesStatus
+    const matchesStatus = selectedStatus === 'todos' || 
+      (selectedStatus === 'baixados' && isReallyDownloaded) ||
+      (selectedStatus === 'pendentes' && !isReallyDownloaded)
+
+    const matchesOcultados = mostrarOcultados ? true : !arquivo.is_ignored
+
+    return matchesSearch && matchesCategory && matchesExtension && matchesStatus && matchesOcultados
   })
 
   const arquivosOrdenados = [...arquivosFiltrados].sort((a, b) => {
@@ -184,15 +302,210 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     return 0
   })
 
+  const renderizarLinhaArquivo = (arquivo: ArquivoClassroom) => {
+    const estaEditando = editingFileId === arquivo.drive_file_id
+    const estaBaixando = downloadingId === arquivo.drive_file_id
+    const isReallyDownloaded = hasFolderPermission
+      ? !missingFiles[arquivo.drive_file_id]
+      : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
+
+    return (
+      <tr 
+        key={arquivo.drive_file_id} 
+        className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium ${arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''}`}
+      >
+        <td className="py-4 px-6">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-background border border-border rounded-xl shrink-0">
+              {determinarIcone(arquivo.original_name)}
+            </div>
+            
+            <div className="space-y-0.5 min-w-0 flex-1">
+              {estaEditando ? (
+                <div className="flex items-center gap-1.5 max-w-lg">
+                  <input
+                    type="text"
+                    value={customNameInput}
+                    onChange={(e) => setCustomNameInput(e.target.value)}
+                    className="h-8 px-2.5 border border-border rounded-lg bg-background text-xs font-bold w-full focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => confirmarEdicaoNome(arquivo)}
+                    className="p-1.5 rounded-lg bg-emerald-500 text-white hover:opacity-90 transition-opacity"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setEditingFileId(null)}
+                    className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 group max-w-xl">
+                  <p className="font-bold text-foreground wrap-break-words whitespace-normal leading-relaxed">
+                    {arquivo.custom_name || arquivo.original_name}
+                  </p>
+                  <button
+                    onClick={() => iniciarEdicaoNome(arquivo)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted shrink-0 mt-0.5"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {arquivo.custom_name && (
+                <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider wrap-break-words whitespace-normal leading-normal">
+                  Original: {arquivo.original_name}
+                </p>
+              )}
+            </div>
+          </div>
+        </td>
+        
+        <td className="py-4 px-6">
+          <select
+             value={arquivo.selected_folder}
+            onChange={(e) => alterarPastaDestino(arquivo, e.target.value)}
+            className="h-8 px-2 border border-border rounded-lg bg-background text-[10px] font-black uppercase tracking-wider focus:outline-none w-full text-foreground"
+          >
+            {listaCategorias.map(cat => (
+              <option key={cat} value={cat}>
+                {formatarNomeTipo(cat)}
+              </option>
+            ))}
+          </select>
+        </td>
+
+        <td className="py-4 px-6 font-bold text-muted-foreground text-[10px]">
+          {formatarData(arquivo.sync_at)}
+        </td>
+
+        <td className="py-4 px-6">
+          {isReallyDownloaded ? (
+            <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-500/15">
+              <CheckCircle2 className="w-3 h-3" />
+              Baixado
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-primary/15">
+              <AlertCircle className="w-3 h-3" />
+              No Drive
+            </span>
+          )}
+        </td>
+
+        <td className="py-4 px-6 text-left">
+          <div className="flex items-center justify-start gap-1.5">
+            {isReallyDownloaded && (
+              <button
+                onClick={() => gerenciarAberturaLocal(arquivo)}
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                title="Abrir no explorador de arquivos"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <button
+              onClick={() => gerenciarOcultar(arquivo)}
+              className={`p-2 border border-border rounded-xl transition-colors ${arquivo.is_ignored ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+              title={arquivo.is_ignored ? "Mostrar arquivo" : "Ocultar arquivo"}
+            >
+              {arquivo.is_ignored ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+
+            {!arquivo.drive_file_id.startsWith('local_') && (
+              <>
+                <button
+                  onClick={() => setPreviewFile(arquivo)}
+                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                  title="Pré-visualizar"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+
+                <a
+                  href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                  title="Ver no Google Drive"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                {!isReallyDownloaded && (
+                  <button
+                    onClick={() => gerenciarDownload(arquivo)}
+                    disabled={estaBaixando}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
+                  >
+                    {estaBaixando ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                    Baixar
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {isFileSystemSupported && !directoryHandle ? (
+        <div className="bg-muted/30 border border-border rounded-2xl p-4 flex items-center justify-between gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Modo offline desativado. Vincule uma pasta de estudos nas <a href="/configuracoes" className="text-primary hover:underline font-bold">Configurações Gerais</a> para salvar e acessar arquivos offline.
+          </p>
+        </div>
+      ) : isFileSystemSupported && directoryHandle && !hasFolderPermission ? (
+        <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
+            Acesso à pasta local <span className="font-bold text-primary">{directoryHandle.name}</span> suspenso pelo navegador nesta sessão.
+          </p>
+          <button
+            onClick={solicitarAcessoPasta}
+            className="h-8 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-lg text-[10px] shadow-sm transition-opacity uppercase tracking-wider shrink-0"
+          >
+            Reautorizar Acesso
+          </button>
+        </div>
+      ) : null}
+
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-          <Filter className="w-4 h-4 text-primary" />
-          <span>Filtros de Busca</span>
+        <div className="flex justify-between items-center text-foreground font-bold text-sm">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-primary" />
+            <span>Filtros de Busca</span>
+          </div>
+          <button
+            onClick={() => {
+              if (!directoryHandle || !hasFolderPermission) {
+                alert('Vincule a pasta de estudos e conceda permissão antes de adicionar arquivos locais.')
+                return
+              }
+              setUploadCategory(listaCategorias[0] || 'documentos')
+              setUploadModalAberto(true)
+            }}
+            disabled={!directoryHandle || !hasFolderPermission}
+            className="flex items-center gap-1.5 h-9 px-4 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Adicionar Arquivo</span>
+          </button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <input
@@ -243,18 +556,40 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
               <option value="pendentes">Disponíveis no Drive</option>
             </select>
           </div>
+
+          <div>
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'status')}
+              className="w-full h-10 px-3 border border-border bg-background rounded-xl text-xs font-bold focus:outline-none text-foreground"
+            >
+              <option value="none">Sem Agrupamento</option>
+              <option value="category">Agrupar: Categoria</option>
+              <option value="status">Agrupar: Status</option>
+            </select>
+          </div>
         </div>
 
-        {(searchText || selectedCategory !== 'todos' || selectedExtension !== 'todos' || selectedStatus !== 'todos') && (
-          <div className="flex justify-end">
+        <div className="flex justify-between items-center pt-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-muted-foreground font-bold">
+            <input
+              type="checkbox"
+              checked={mostrarOcultados}
+              onChange={(e) => setMostrarOcultados(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 accent-primary"
+            />
+            <span>Mostrar arquivos ocultados</span>
+          </label>
+
+          {(searchText || selectedCategory !== 'todos' || selectedExtension !== 'todos' || selectedStatus !== 'todos' || mostrarOcultados) && (
             <button
               onClick={limparFiltros}
               className="h-8 px-4 border border-border bg-background hover:bg-muted text-[10px] font-black uppercase tracking-wider rounded-lg text-muted-foreground transition-colors"
             >
               Limpar Filtros
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
@@ -290,7 +625,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                   </div>
                 </th>
                 <th className="py-4 px-6 w-28">Status</th>
-                <th className="py-4 px-6 w-44 text-right">Ações</th>
+                <th className="py-4 px-6 w-44 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -304,137 +639,48 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                     </div>
                   </td>
                 </tr>
-              ) : (
-                arquivosOrdenados.map((arquivo) => {
-                  const estaEditando = editingFileId === arquivo.drive_file_id
-                  const estaBaixando = downloadingId === arquivo.drive_file_id
-
+              ) : groupBy === 'category' ? (
+                [...listaCategorias, 'outros'].map(categoryItem => {
+                  const categoryFiles = arquivosOrdenados.filter(fileItem => {
+                    if (categoryItem === 'outros') {
+                      return !fileItem.selected_folder || !listaCategorias.includes(fileItem.selected_folder)
+                    }
+                    return fileItem.selected_folder === categoryItem
+                  })
+                  if (categoryFiles.length === 0) return null
                   return (
-                    <tr 
-                      key={arquivo.drive_file_id} 
-                      className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium ${arquivo.is_downloaded ? 'opacity-95' : ''}`}
-                    >
-                      <td className="py-4 px-6">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-background border border-border rounded-xl shrink-0">
-                            {determinarIcone(arquivo.original_name)}
-                          </div>
-                          
-                          <div className="space-y-0.5 min-w-0 flex-1">
-                            {estaEditando ? (
-                              <div className="flex items-center gap-1.5 max-w-lg">
-                                <input
-                                  type="text"
-                                  value={customNameInput}
-                                  onChange={(e) => setCustomNameInput(e.target.value)}
-                                  className="h-8 px-2.5 border border-border rounded-lg bg-background text-xs font-bold w-full focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => confirmarEdicaoNome(arquivo)}
-                                  className="p-1.5 rounded-lg bg-emerald-500 text-white hover:opacity-90 transition-opacity"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setEditingFileId(null)}
-                                  className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-start gap-2 group max-w-xl">
-                                <p className="font-bold text-foreground wrap-break-words whitespace-normal leading-relaxed">
-                                  {arquivo.custom_name || arquivo.original_name}
-                                </p>
-                                <button
-                                  onClick={() => iniciarEdicaoNome(arquivo)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted shrink-0 mt-0.5"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
-
-                            {arquivo.custom_name && (
-                              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider wrap-break-words whitespace-normal leading-normal">
-                                Original: {arquivo.original_name}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      
-                      <td className="py-4 px-6">
-                        <select
-                          value={arquivo.selected_folder}
-                          onChange={(e) => alterarPastaDestino(arquivo, e.target.value)}
-                          className="h-8 px-2 border border-border rounded-lg bg-background text-[10px] font-black uppercase tracking-wider focus:outline-none w-full text-foreground"
-                        >
-                          {listaCategorias.map(cat => (
-                            <option key={cat} value={cat}>
-                              {formatarNomeTipo(cat)}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      <td className="py-4 px-6 font-bold text-muted-foreground text-[10px]">
-                        {formatarData(arquivo.sync_at)}
-                      </td>
-
-                      <td className="py-4 px-6">
-                        {arquivo.is_downloaded ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-500/15">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Baixado
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-primary/15">
-                            <AlertCircle className="w-3 h-3" />
-                            No Drive
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => setPreviewFile(arquivo)}
-                            className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                            title="Pré-visualizar"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-
-                          <a
-                            href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                            title="Ver no Google Drive"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-
-                          <button
-                            onClick={() => gerenciarDownload(arquivo)}
-                            disabled={estaBaixando}
-                            className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${arquivo.is_downloaded ? 'border-border bg-background text-muted-foreground hover:bg-muted' : 'border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm'} disabled:opacity-50`}
-                          >
-                            {estaBaixando ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Download className="w-3 h-3" />
-                            )}
-                            {arquivo.is_downloaded ? 'Re-baixar' : 'Baixar'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <React.Fragment key={categoryItem}>
+                      <tr className="bg-muted/5 font-bold">
+                        <td colSpan={5} className="py-3 px-6 text-primary text-[10px] font-black uppercase tracking-widest border-b border-border/40">
+                          {categoryItem === 'outros' ? 'Sem Categoria' : formatarNomeTipo(categoryItem)} ({categoryFiles.length})
+                        </td>
+                      </tr>
+                      {categoryFiles.map(renderizarLinhaArquivo)}
+                    </React.Fragment>
                   )
                 })
+              ) : groupBy === 'status' ? (
+                ['Baixados', 'Pendentes'].map(statusGroup => {
+                  const arqs = arquivosOrdenados.filter(a => {
+                    const isDownloaded = hasFolderPermission
+                      ? !missingFiles[a.drive_file_id]
+                      : localStorage.getItem('baixado_' + a.drive_file_id) === 'true'
+                    return statusGroup === 'Baixados' ? isDownloaded : !isDownloaded
+                  })
+                  if (arqs.length === 0) return null
+                  return (
+                    <React.Fragment key={statusGroup}>
+                      <tr className="bg-muted/5 font-bold">
+                        <td colSpan={5} className="py-3 px-6 text-primary text-[10px] font-black uppercase tracking-widest border-b border-border/40">
+                          {statusGroup === 'Baixados' ? 'Baixados' : 'Disponíveis no Drive'} ({arqs.length})
+                        </td>
+                      </tr>
+                      {arqs.map(renderizarLinhaArquivo)}
+                    </React.Fragment>
+                  )
+                })
+              ) : (
+                arquivosOrdenados.map(renderizarLinhaArquivo)
               )}
             </tbody>
           </table>
@@ -503,6 +749,134 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {uploadModalAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card border border-border w-full max-w-lg flex flex-col rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-muted/20">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-background border border-border rounded-xl">
+                  <Upload className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Adicionar Arquivo Local
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                    Salvar arquivo diretamente na pasta da matéria
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setUploadModalAberto(false)
+                  setUploadFile(null)
+                }}
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={gerenciarUploadLocal} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-foreground">
+                  Categoria de Destino
+                </label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value)}
+                  className="w-full h-10 px-3 border border-border bg-background rounded-xl text-xs font-bold focus:outline-none text-foreground"
+                  required
+                >
+                  {listaCategorias.map(cat => (
+                    <option key={cat} value={cat}>
+                      {formatarNomeTipo(cat)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-foreground">
+                  Selecionar Arquivo
+                </label>
+                <div 
+                  className={`border-2 border-dashed border-border rounded-2xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors bg-muted/5 ${uploadFile ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
+                  onClick={() => document.getElementById('local-file-input')?.click()}
+                >
+                  <input
+                    id="local-file-input"
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setUploadFile(e.target.files[0])
+                      }
+                    }}
+                  />
+                  
+                  {uploadFile ? (
+                    <div className="space-y-2">
+                      <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-full w-fit mx-auto">
+                        <Check className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-foreground text-center truncate px-2">
+                        {uploadFile.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">
+                        {(uploadFile.size / 1024).toFixed(1)} KB • Clique para trocar
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="p-2 bg-muted rounded-full w-fit mx-auto text-muted-foreground">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-foreground">
+                        Clique para selecionar um arquivo
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">
+                        O arquivo será salvo na pasta correspondente no disco
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadModalAberto(false)
+                    setUploadFile(null)
+                  }}
+                  className="flex items-center justify-center h-10 px-4 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={enviando || !uploadFile}
+                  className="flex items-center justify-center gap-1.5 h-10 px-5 bg-primary text-primary-foreground font-bold hover:opacity-90 rounded-xl text-xs shadow-sm transition-opacity disabled:opacity-50"
+                >
+                  {enviando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Adicionar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
