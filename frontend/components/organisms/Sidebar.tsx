@@ -25,7 +25,6 @@ export default function Sidebar() {
   const links = [
     { href: '/', icon: LayoutDashboard, label: 'Início' },
     { href: '/disciplinas', icon: BookOpen, label: 'Disciplinas' },
-    { href: '/curso', icon: GraduationCap, label: 'Curso' },
     { href: '/horarios', icon: Calendar, label: 'Calendário' },
     { href: '/configuracoes', icon: Settings, label: 'Configurações' },
   ]
@@ -62,11 +61,11 @@ export default function Sidebar() {
       <div className="">
         <Button 
           onClick={() => setModalAberto(true)}
-          variant='ghost'
-          className="w-full justify-start gap-3 rounded-xl py-6 font-bold"
+          variant="ghost"
+          className="w-full justify-start gap-3 rounded-xl px-4 py-3 h-auto font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 group"
         >
-          <PlusCircle className="w-5 h-5" />
-          Novo Horário
+          <PlusCircle className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors duration-200" />
+          <span>Novo Horário</span>
         </Button>
       </div>
 
