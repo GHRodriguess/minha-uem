@@ -17,7 +17,8 @@ import {
   Loader2,
   FileText,
   ArrowUpDown,
-  Layers
+  Layers,
+  Laptop
 } from 'lucide-react'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
@@ -304,9 +305,9 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                   <button
                     onClick={() => abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)}
                     className="flex items-center justify-center p-2 h-8 w-8 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                    title="Visualizar arquivo local"
+                    title="Abrir arquivo localmente"
                   >
-                    <Folder className="w-3.5 h-3.5" />
+                    <Laptop className="w-3.5 h-3.5" />
                   </button>
                 )}
 
