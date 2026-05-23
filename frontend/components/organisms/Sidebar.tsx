@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle, Settings } from 'lucide-react'
+import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle, Settings, X } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
 import { signOut, useSession } from 'next-auth/react'
@@ -12,7 +12,13 @@ import CardUploadPDF from './CardUploadPDF'
 import { useClassroom } from '../providers/ProvedorClassroom'
 import { clsx } from 'clsx'
 
-export default function Sidebar() {
+interface SidebarProps {
+  className?: string
+  isMobile?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ className, isMobile, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [modalAberto, setModalAberto] = useState(false)
@@ -30,9 +36,23 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="w-64 h-screen bg-card border-r border-border flex flex-col p-6 sticky top-0 z-30">
-      <div className="mb-10">
+    <aside className={clsx(
+      "w-64 h-screen bg-card border-r border-border flex flex-col p-6 sticky top-0 z-30",
+      isMobile && "h-full border-r-0 p-0 static w-full",
+      className
+    )}>
+      <div className="mb-10 flex items-center justify-between">
         <Logo />
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        )}
       </div>
 
       <nav className="flex-1 space-y-2">
@@ -43,6 +63,7 @@ export default function Sidebar() {
               key={link.href}
               {...link}
               active={pathname === link.href}
+              onClick={onClose}
               badge={isDisciplinas && notificationsCount > 0 ? (
                 <span className={clsx(
                   "flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full text-[10px] font-black leading-none",
@@ -60,7 +81,9 @@ export default function Sidebar() {
     
       <div className="">
         <Button 
-          onClick={() => setModalAberto(true)}
+          onClick={() => {
+            setModalAberto(true)
+          }}
           variant="ghost"
           className="w-full justify-start gap-3 rounded-xl px-4 py-3 h-auto font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 group"
         >
@@ -71,7 +94,10 @@ export default function Sidebar() {
 
       <Button
         variant="ghost"
-        onClick={handleSair}
+        onClick={() => {
+          handleSair()
+          if (isMobile && onClose) onClose()
+        }}
         className="justify-start gap-3 px-4 py-6 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 transition-colors mt-auto"
       >
         <LogOut className="w-5 h-5" />
@@ -86,7 +112,10 @@ export default function Sidebar() {
         <div className="p-1">
           <CardUploadPDF 
             token={session?.accessToken || ''}
-            onSuccess={() => setModalAberto(false)}
+            onSuccess={() => {
+              setModalAberto(false)
+              if (isMobile && onClose) onClose()
+            }}
           />
         </div>
       </Modal>

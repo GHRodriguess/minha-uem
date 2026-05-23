@@ -8,12 +8,14 @@ interface ItemNavegacaoProps {
   label: string
   active?: boolean
   badge?: React.ReactNode
+  onClick?: () => void
 }
 
-export default function ItemNavegacao({ href, icon: Icon, label, active, badge }: ItemNavegacaoProps) {
+export default function ItemNavegacao({ href, icon: Icon, label, active, badge, onClick }: ItemNavegacaoProps) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={clsx(
         "flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group",
         active 

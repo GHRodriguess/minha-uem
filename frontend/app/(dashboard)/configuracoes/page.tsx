@@ -20,7 +20,9 @@ export default function ConfiguracoesPage() {
 
       <div className="grid grid-cols-1 gap-8">
         <CardPerfilUsuario />
-        <CardSincronizacaoLocal />
+        <div className="hidden lg:block">
+          <CardSincronizacaoLocal />
+        </div>
         <CardSincronizacaoAgenda />
       </div>
     </div>

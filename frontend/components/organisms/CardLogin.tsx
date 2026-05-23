@@ -12,10 +12,10 @@ export default function CardLogin({ erro }: PropriedadesCardLogin) {
   const isErroServidor = erro === 'BackendError'
 
   return (
-    <div className="p-10 bg-background shadow-2xl rounded-3xl max-w-md w-full border border-border flex flex-col items-center">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Minha UEM</h1>
-        <p className="text-muted-foreground mt-3 text-lg">Acesso exclusivo para @uem.br</p>
+    <div className="p-6 sm:p-10 bg-background shadow-2xl rounded-3xl max-w-md w-full border border-border flex flex-col items-center">
+      <div className="text-center mb-6 sm:mb-10">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">Minha UEM</h1>
+        <p className="text-muted-foreground mt-3 text-base sm:text-lg">Acesso exclusivo para @uem.br</p>
       </div>
       
       {isAcessoNegado && (
