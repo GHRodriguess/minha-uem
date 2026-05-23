@@ -1,7 +1,9 @@
+from django.views import View
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario
 from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer
 from .services import ServicoExtracaoHorario
 import requests
@@ -1191,9 +1193,7 @@ class RegenerarTokenAgendaView(APIView):
             'feed_url': feed_url
         })
 
-class FeedAgendaView(APIView):
-    permission_classes = [permissions.AllowAny]
-
+class FeedAgendaView(View):
     def get(self, request, token):
         try:
             profile = PerfilAcademico.objects.get(calendar_token=token)
@@ -1209,7 +1209,10 @@ class FeedAgendaView(APIView):
         lines.append("X-WR-CALNAME:Minha UEM - Agenda")
         lines.append("X-WR-TIMEZONE:America/Sao_Paulo")
 
-        horarios = profile.horarios.all().select_related('materia')
+        horarios = Horario.objects.filter(
+            Q(anoletivo__perfil=profile) | Q(perfilacademico=profile)
+        ).select_related('materia').distinct()
+
         avaliacoes = Avaliacao.objects.filter(
             configuracao__perfil=profile
         ).select_related('configuracao__materia')
@@ -1275,7 +1278,7 @@ class FeedAgendaView(APIView):
                 desc_lines.append(f"Nota Obtida: {avaliacao.nota}")
             else:
                 desc_lines.append("Nota: Nao lancada")
-            
+
             status_concl = "Concluida (Nota Lancada)" if avaliacao.nota is not None else "Pendente"
             desc_lines.append(f"Status: {status_concl}")
             event_desc = "\\n".join(desc_lines)
@@ -1292,6 +1295,6 @@ class FeedAgendaView(APIView):
         lines.append("END:VCALENDAR")
 
         ics_content = "\r\n".join(lines)
-        response = HttpResponse(ics_content, content_type="text/calendar")
-        response['Content-Disposition'] = f'attachment; filename="agenda_minha_uem.ics"'
+        response = HttpResponse(ics_content, content_type="text/calendar; charset=utf-8")
+        response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
         return response
