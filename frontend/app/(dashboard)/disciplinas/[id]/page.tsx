@@ -3,34 +3,17 @@
 import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback, use } from 'react'
 import { academic_service } from '@/lib/api/academico'
-import { Perfil, Materia } from '@/types/academico'
-import { 
-  AlertTriangle, 
-  Loader2, 
-  ArrowLeft,
-  Calendar,
-  GraduationCap,
-  FileText,
-  Clock,
-  Timer
-} from 'lucide-react'
+import { Materia } from '@/types/academico'
+import { AlertTriangle, Loader2, ArrowLeft, GraduationCap, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { CardGestaoNotas } from '@/components/organisms/CardGestaoNotas'
 import { CardClassroom } from '@/components/organisms/CardClassroom'
 import MuralClassroom from '@/components/organisms/MuralClassroom'
-
-function agruparFaltasPorDia(absences: { data: string; aula: number; faltas: number }[]) {
-  const groupedAbsences = absences.reduce((accumulator, item) => {
-    accumulator[item.data] = (accumulator[item.data] || 0) + item.faltas
-    return accumulator
-  }, {} as Record<string, number>)
-
-  return Object.entries(groupedAbsences)
-    .map(([date, total]) => ({ data: date, faltas: total }))
-    .sort((a, b) => b.data.localeCompare(a.data))
-}
+import { CardFrequenciaDisciplina } from '@/components/organisms/CardFrequenciaDisciplina'
+import { CardHorariosDisciplina } from '@/components/organisms/CardHorariosDisciplina'
+import { CardPrazosDisciplina } from '@/components/organisms/CardPrazosDisciplina'
 
 interface PaginaDisciplinaProps {
   params: Promise<{ id: string }>
@@ -97,33 +80,6 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   }
 
   const primeiroHorario = materia.horarios?.[0]
-  const maxFaltas = primeiroHorario?.maximo_faltas || 0
-  const porcentagemFaltas = (materia.faltas_atuais / maxFaltas) * 100
-
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-
-  const proximasAvaliacoes = (materia.configuracao_notas?.avaliacoes || [])
-    .filter(a => a.data && new Date(a.data + 'T12:00:00') >= hoje && a.nota === null)
-    .sort((a, b) => a.data!.localeCompare(b.data!))
-    .slice(0, 3)
-
-  const calcularDiasRestantes = (dataStr: string) => {
-    const dataAlvo = new Date(dataStr)
-    const diffTime = dataAlvo.getTime() - hoje.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === 0) return 'Hoje'
-    if (diffDays === 1) return 'Amanhã'
-    return `Em ${diffDays} dias`
-  }
-
-  const horariosOrdenados = [...(materia.horarios || [])].sort((a, b) => {
-    if (a.dia !== b.dia) {
-      return a.dia - b.dia
-    }
-    return a.inicio.localeCompare(b.inicio)
-  })
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
@@ -206,112 +162,9 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
           </div>
 
           <div className="space-y-8">
-            {proximasAvaliacoes.length > 0 && (
-              <div className="bg-primary border border-primary/20 rounded-3xl p-8 shadow-lg shadow-primary/10 text-primary-foreground">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="bg-white/20 p-2.5 rounded-xl">
-                    <Timer className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Próximos Prazos</h2>
-                    <p className="text-xs text-white/60 font-bold uppercase tracking-wider">Fique atento!</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  {proximasAvaliacoes.map((a, i) => (
-                    <div key={i} className="flex justify-between items-center p-4 bg-white/10 rounded-2xl border border-white/5">
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-tight">{a.nome}</p>
-                        <p className="text-[10px] font-bold text-white/60 uppercase">
-                          {new Date(a.data! + 'T12:00:00').toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                      <span className="text-xs font-black bg-white text-primary px-2.5 py-1 rounded-full shadow-sm uppercase">
-                        {calcularDiasRestantes(a.data!)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-primary/10 p-2.5 rounded-xl">
-                  <Clock className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">Frequência</h2>
-                  <p className="text-xs text-muted-foreground font-medium">Controle de ausências</p>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-end mb-3">
-                    <div className="flex items-baseline gap-1">
-                      <p className="text-5xl font-black text-foreground">{materia.faltas_atuais}</p>
-                      <p className="text-sm font-bold text-muted-foreground">faltas</p>
-                    </div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Limite: {maxFaltas}</p>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-300 ${
-                        materia.faltas_atuais > maxFaltas ? 'bg-destructive' : porcentagemFaltas >= 80 ? 'bg-yellow-500' : 'bg-primary'
-                      }`}
-                      style={{ width: `${Math.min(porcentagemFaltas, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {materia.detalhes_faltas && materia.detalhes_faltas.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Histórico Recente</p>
-                    <div className="flex flex-col gap-2">
-                      {agruparFaltasPorDia(materia.detalhes_faltas).slice(0, 3).map((f, i) => (
-                        <div key={i} className="flex justify-between items-center text-sm p-3 bg-muted/30 rounded-xl border border-border/50">
-                          <span className="font-bold text-foreground">{new Date(f.data + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-                          <span className="text-primary font-black text-xs bg-primary/10 px-2 py-0.5 rounded-full">{f.faltas} F</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-primary/10 p-2.5 rounded-xl">
-                  <Calendar className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">Horários</h2>
-                  <p className="text-xs text-muted-foreground font-medium">Cronograma semanal</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {horariosOrdenados.map((h, i) => (
-                  <div key={i} className="flex items-center gap-4 p-3 bg-muted/20 rounded-xl">
-                    <div className="bg-background w-10 h-10 rounded-lg flex flex-col items-center justify-center border border-border">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase leading-none">DIA</span>
-                      <span className="text-sm font-black text-primary">{h.dia + 1}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-foreground uppercase tracking-tight">
-                        {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][h.dia - 1]}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-bold">
-                        {h.inicio.slice(0, 5)} - {h.fim.slice(0, 5)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CardPrazosDisciplina materia={materia} />
+            <CardFrequenciaDisciplina materia={materia} />
+            <CardHorariosDisciplina materia={materia} />
           </div>
         </div>
 

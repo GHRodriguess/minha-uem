@@ -4,10 +4,9 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia } from '@/types/academico'
-import { BookOpen, AlertTriangle, CheckCircle2, Loader2, CalendarDays, LayoutGrid, ListFilter, SortAsc, SortDesc } from 'lucide-react'
-import Link from 'next/link'
+import { BookOpen, Loader2, ListFilter } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
-import { useClassroom } from '@/components/providers/ProvedorClassroom'
+import { CardDisciplina } from '@/components/organisms/CardDisciplina'
 
 type Ordenacao = 'nome' | 'faltas' | 'andamento'
 type Agrupamento = 'nenhum' | 'departamento'
@@ -15,11 +14,10 @@ type Agrupamento = 'nenhum' | 'departamento'
 export default function DisciplinasPage() {
   const { data: session } = useSession()
   const { anoAtivoId, versao } = useAcademico()
-  const { unreadNotifications } = useClassroom()
-  const [perfil, setPerfil] = useState<Perfil | null>(null)
+  const [profile, setProfile] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>('andamento')
-  const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
+  const [sortOrder, setSortOrder] = useState<Ordenacao>('andamento')
+  const [groupType, setGroupType] = useState<Agrupamento>('nenhum')
 
   const buscarPerfil = useCallback(async (silencioso = false) => {
     if (!session?.accessToken) return
@@ -29,7 +27,7 @@ export default function DisciplinasPage() {
     }
     try {
       const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
-      setPerfil(data)
+      setProfile(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
@@ -52,7 +50,7 @@ export default function DisciplinasPage() {
     )
   }
 
-  if (!perfil?.materias || perfil.materias.length === 0) {
+  if (!profile?.materias || profile.materias.length === 0) {
     return (
       <div className="max-w-7xl mx-auto text-center py-20">
         <BookOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-20" />
@@ -62,131 +60,44 @@ export default function DisciplinasPage() {
     )
   }
 
-  const materiasProcessadas = [...perfil.materias].sort((a, b) => {
-    if (ordenacao === 'nome') {
+  const processedMaterias = [...profile.materias].sort((a, b) => {
+    if (sortOrder === 'nome') {
       return a.nome.localeCompare(b.nome)
-    } else if (ordenacao === 'faltas') {
+    } else if (sortOrder === 'faltas') {
       return b.faltas_atuais - a.faltas_atuais
     } else {
-      const hoje = new Date()
-      hoje.setHours(0, 0, 0, 0)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-      const estaEmAndamento = (m: Materia) => {
+      const isCurrent = (m: Materia) => {
         const h = m.horarios?.[0]
         if (!h) return false
-        const inicio = new Date(h.data_inicio + 'T00:00:00')
-        const fim = new Date(h.data_termino + 'T23:59:59')
-        return hoje >= inicio && hoje <= fim
+        const start = new Date(h.data_inicio + 'T00:00:00')
+        const end = new Date(h.data_termino + 'T23:59:59')
+        return today >= start && today <= end
       }
 
-      const aEmAndamento = estaEmAndamento(a)
-      const bEmAndamento = estaEmAndamento(b)
+      const aCurrent = isCurrent(a)
+      const bCurrent = isCurrent(b)
 
-      if (aEmAndamento && !bEmAndamento) return -1
-      if (!aEmAndamento && bEmAndamento) return 1
+      if (aCurrent && !bCurrent) return -1
+      if (!aCurrent && bCurrent) return 1
       
       return a.nome.localeCompare(b.nome)
     }
   })
 
-  const renderizarGrade = (materias: Materia[]) => (
+  const renderizarGrade = (materiasList: Materia[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {materias.map((materia: Materia) => {
-        const primeiroHorario = materia.horarios?.[0]
-        if (!primeiroHorario) return null
-
-        const maxFaltas = primeiroHorario.maximo_faltas
-        const porcentagemFaltas = (materia.faltas_atuais / maxFaltas) * 100
-        const noLimite = porcentagemFaltas >= 80
-        const reprovado = materia.faltas_atuais > maxFaltas
-
-        const notificacaoMateria = unreadNotifications?.atualizacoes.find(
-          (upd) => upd.materia_id === materia.id
-        )
-        const temMensagensNaoLidas = notificacaoMateria && notificacaoMateria.mensagens.length > 0
-        const totalNaoLidas = notificacaoMateria ? notificacaoMateria.mensagens.length : 0
-
-        return (
-          <Link 
-            key={materia.id} 
-            href={`/disciplinas/${materia.id}`}
-            className="group bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between transition-all hover:border-primary/50 hover:shadow-md active:scale-[0.98]"
-          >
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{materia.nome}</h3>
-                  <p className="text-sm text-muted-foreground mt-1 font-medium">
-                    {materia.codigo} • Turma {primeiroHorario.turma}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">
-                    {primeiroHorario.departamento}
-                  </span>
-                  {temMensagensNaoLidas && (
-                    <span className="bg-destructive text-destructive-foreground text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                      +{totalNaoLidas} novidade{totalNaoLidas > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4 mt-6">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total de Faltas</p>
-                    <p className="text-3xl font-black text-foreground">
-                      {materia.faltas_atuais} <span className="text-sm font-normal text-muted-foreground">/ {maxFaltas}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
-                    Ver detalhes
-                    <BookOpen className="w-3 h-3" />
-                  </div>
-                </div>
-
-                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-300 ${
-                      reprovado ? 'bg-destructive' : noLimite ? 'bg-yellow-500' : 'bg-primary'
-                    }`}
-                    style={{ width: `${Math.min(porcentagemFaltas, 100)}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 mt-2">
-                  {reprovado ? (
-                    <div className="flex items-center gap-1.5 text-destructive font-bold text-xs uppercase">
-                      <AlertTriangle className="w-4 h-4" />
-                      Reprovado por faltas
-                    </div>
-                  ) : noLimite ? (
-                    <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-xs uppercase">
-                      <AlertTriangle className="w-4 h-4" />
-                      Atenção ao limite de faltas
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-green-500 font-bold text-xs uppercase">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Frequência regular
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-border flex justify-between text-[10px] text-muted-foreground uppercase font-black tracking-widest">
-              <span>Início: {new Date(primeiroHorario.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-              <span>Término: {new Date(primeiroHorario.data_termino + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-            </div>
-          </Link>
-        )
-      })}
+      {materiasList.map((materia: Materia) => (
+        <CardDisciplina key={materia.id} materia={materia} />
+      ))}
     </div>
   )
 
-  const departamentos = Array.from(new Set(materiasProcessadas.map(m => m.horarios?.[0]?.departamento).filter(Boolean)))
+  const departments = Array.from(
+    new Set(processedMaterias.map(m => m.horarios?.[0]?.departamento).filter(Boolean))
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -203,8 +114,8 @@ export default function DisciplinasPage() {
           </div>
           
           <select 
-            value={agrupamento}
-            onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}
+            value={groupType}
+            onChange={(e) => setGroupType(e.target.value as Agrupamento)}
             className="bg-background border border-border rounded-xl px-3 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="nenhum">Sem Agrupamento</option>
@@ -212,8 +123,8 @@ export default function DisciplinasPage() {
           </select>
 
           <select 
-            value={ordenacao}
-            onChange={(e) => setOrdenacao(e.target.value as Ordenacao)}
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as Ordenacao)}
             className="bg-background border border-border rounded-xl px-3 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="andamento">Em Andamento</option>
@@ -223,28 +134,28 @@ export default function DisciplinasPage() {
         </div>
       </section>
 
-      {agrupamento === 'departamento' ? (
+      {groupType === 'departamento' ? (
         <div className="space-y-12">
-          {departamentos.map(depto => {
-            const materiasDepto = materiasProcessadas.filter(m => m.horarios?.[0]?.departamento === depto)
+          {departments.map(dept => {
+            const materiasDept = processedMaterias.filter(m => m.horarios?.[0]?.departamento === dept)
             return (
-              <div key={depto} className="space-y-6">
+              <div key={dept} className="space-y-6">
                 <div className="flex items-center gap-3">
                   <span className="bg-primary text-primary-foreground text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
-                    {depto}
+                    {dept}
                   </span>
                   <div className="h-px flex-1 bg-border/60" />
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                    {materiasDepto.length} {materiasDepto.length === 1 ? 'materia' : 'materias'}
+                    {materiasDept.length} {materiasDept.length === 1 ? 'matéria' : 'matérias'}
                   </span>
                 </div>
-                {renderizarGrade(materiasDepto)}
+                {renderizarGrade(materiasDept)}
               </div>
             )
           })}
         </div>
       ) : (
-        renderizarGrade(materiasProcessadas)
+        renderizarGrade(processedMaterias)
       )}
     </div>
   )

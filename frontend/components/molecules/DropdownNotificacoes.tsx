@@ -71,7 +71,7 @@ export default function DropdownNotificacoes() {
             <div className="flex items-center gap-2">
               <span className="font-black text-sm text-foreground uppercase tracking-wider">Avisos e Trabalhos</span>
               {notificationsCount > 0 && (
-                <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full">
+                <span className="bg-primary/10 text-primary text-center text-[10px] font-black px-2 py-0.5 rounded-full">
                   {notificationsCount} novo{notificationsCount > 1 ? 's' : ''}
                 </span>
               )}

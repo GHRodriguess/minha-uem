@@ -5,77 +5,21 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, Loader2, UserX, GraduationCap, Trophy, BookOpen, CheckSquare, Search, Award, HelpCircle } from 'lucide-react'
+import { Calendar as CalendarIcon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
-
-function obterConfiguracaoTipo(type: string) {
-  switch (type) {
-    case 'PROVA':
-      return {
-        bg: 'bg-yellow-500/5',
-        border: 'border-yellow-500/20 hover:border-yellow-500/50',
-        text: 'text-yellow-500',
-        badge: 'bg-yellow-500 text-white',
-        icon: Trophy,
-        label: 'Prova'
-      }
-    case 'TRABALHO':
-      return {
-        bg: 'bg-green-500/5',
-        border: 'border-green-500/20 hover:border-green-500/50',
-        text: 'text-green-500',
-        badge: 'bg-green-500 text-white',
-        icon: BookOpen,
-        label: 'Trabalho'
-      }
-    case 'TAREFA':
-      return {
-        bg: 'bg-purple-500/5',
-        border: 'border-purple-500/20 hover:border-purple-500/50',
-        text: 'text-purple-500',
-        badge: 'bg-purple-500 text-white',
-        icon: CheckSquare,
-        label: 'Tarefa'
-      }
-    case 'PESQUISA':
-      return {
-        bg: 'bg-blue-500/5',
-        border: 'border-blue-500/20 hover:border-blue-500/50',
-        text: 'text-blue-500',
-        badge: 'bg-blue-500 text-white',
-        icon: Search,
-        label: 'Pesquisa'
-      }
-    case 'EXAME':
-      return {
-        bg: 'bg-orange-500/5',
-        border: 'border-orange-500/20 hover:border-orange-500/50',
-        text: 'text-orange-500',
-        badge: 'bg-orange-500 text-white',
-        icon: Award,
-        label: 'Exame'
-      }
-    default:
-      return {
-        bg: 'bg-slate-500/5',
-        border: 'border-slate-500/20 hover:border-slate-500/50',
-        text: 'text-slate-500',
-        badge: 'bg-slate-500 text-white',
-        icon: HelpCircle,
-        label: 'Outro'
-      }
-  }
-}
+import { FiltrosCalendario } from '@/components/molecules/FiltrosCalendario'
+import { CalendarioGrade } from '@/components/organisms/CalendarioGrade'
+import { CalendarioListaEventos } from '@/components/organisms/CalendarioListaEventos'
 
 export default function HorariosPage() {
   const { data: session } = useSession()
   const { anoAtivoId, anosDisponiveis, versao } = useAcademico()
-  const [perfil, setPerfil] = useState<Perfil | null>(null)
+  const [profile, setProfile] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dataSelecionada, setDataSelecionada] = useState(new Date())
-  const [filtros, setFiltros] = useState({ aulas: true, avaliacoes: true })
-  const prevAnoId = useRef<number | null>(null)
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [filters, setFilters] = useState({ aulas: true, avaliacoes: true })
+  const prevYearId = useRef<number | null>(null)
 
   const buscarPerfil = useCallback(async (silencioso = false) => {
     if (!session?.accessToken) return
@@ -85,7 +29,7 @@ export default function HorariosPage() {
     }
     try {
       const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
-      setPerfil(data)
+      setProfile(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
     } finally {
@@ -99,115 +43,84 @@ export default function HorariosPage() {
     buscarPerfil()
   }, [buscarPerfil, versao])
 
-  // Atualiza o calendário para o ano selecionado quando o contexto muda
   useEffect(() => {
-    if (anoAtivoId && prevAnoId.current !== anoAtivoId) {
-      const anoEncontrado = anosDisponiveis.find(a => a.id === anoAtivoId)
-      if (anoEncontrado) {
-        setDataSelecionada(prev => {
-          const novaData = new Date(prev)
-          novaData.setFullYear(anoEncontrado.ano)
-          // Se o ano mudou, reseta para Março (início comum na UEM)
-          if (prev.getFullYear() !== anoEncontrado.ano) {
-            novaData.setMonth(2)
-            novaData.setDate(1)
+    if (anoAtivoId && prevYearId.current !== anoAtivoId) {
+      const foundYear = anosDisponiveis.find(a => a.id === anoAtivoId)
+      if (foundYear) {
+        setSelectedDate(prev => {
+          const newDate = new Date(prev)
+          newDate.setFullYear(foundYear.ano)
+          if (prev.getFullYear() !== foundYear.ano) {
+            newDate.setMonth(2)
+            newDate.setDate(1)
           }
-          return novaData
+          return newDate
         })
       }
-      prevAnoId.current = anoAtivoId
+      prevYearId.current = anoAtivoId
     }
   }, [anoAtivoId, anosDisponiveis])
 
   const mudarMes = (delta: number) => {
-    setDataSelecionada(prev => {
-      const nova = new Date(prev)
-      nova.setMonth(prev.getMonth() + delta)
-      return nova
+    setSelectedDate(prev => {
+      const newDate = new Date(prev)
+      newDate.setMonth(prev.getMonth() + delta)
+      return newDate
     })
   }
 
-  const getDiasDoMes = () => {
-    const ano = dataSelecionada.getFullYear()
-    const mes = dataSelecionada.getMonth()
-    const primeiroDia = new Date(ano, mes, 1).getDay()
-    const ultimoDia = new Date(ano, mes + 1, 0).getDate()
-    
-    const dias = []
-    // Domingo (0) -> 0 slots vazios, Segunda (1) -> 1 slot, etc.
-    for (let i = 0; i < primeiroDia; i++) {
-      dias.push(null)
-    }
-    for (let i = 1; i <= ultimoDia; i++) {
-      dias.push(new Date(ano, mes, i))
-    }
-    return dias
-  }
+  const filtrarEventosDoDia = useCallback((date: Date) => {
+    if (!profile?.materias) return { aulas: [], avaliacoes: [] }
 
-  const formatarData = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-  }
+    const dayOfWeek = date.getDay()
+    const backendDay = dayOfWeek === 0 ? 7 : dayOfWeek
+    const dateString = date.toISOString().split('T')[0]
 
-  const formatarMesAno = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()
-  }
+    const classes: { materia: Materia; horario: Horario }[] = []
+    const assessments: { materia: Materia; avaliacao: any }[] = []
 
-  const filtrarEventosDoDia = (data: Date) => {
-    if (!perfil?.materias) return { aulas: [], avaliacoes: [] }
+    profile.materias.forEach(m => {
+      const firstSchedule = m.horarios?.[0]
+      if (firstSchedule) {
+        const [yearI, monthI, dayI] = firstSchedule.data_inicio.split('-').map(Number)
+        const [yearT, monthT, dayT] = firstSchedule.data_termino.split('-').map(Number)
+        const datePure = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+        const startPure = new Date(yearI, monthI - 1, dayI)
+        const endPure = new Date(yearT, monthT - 1, dayT)
 
-    const diaSemana = data.getDay()
-    const backendDia = diaSemana === 0 ? 7 : diaSemana
-    const dataString = data.toISOString().split('T')[0]
-
-    const aulas: { materia: Materia; horario: Horario }[] = []
-    const avaliacoes: { materia: Materia; avaliacao: any }[] = []
-
-    perfil.materias.forEach(materia => {
-      // Filtrar Aulas
-      const primeiroHorario = materia.horarios?.[0]
-      if (primeiroHorario) {
-        const [anoI, mesI, diaI] = primeiroHorario.data_inicio.split('-').map(Number)
-        const [anoT, mesT, diaT] = primeiroHorario.data_termino.split('-').map(Number)
-        const dataPura = new Date(data.getFullYear(), data.getMonth(), data.getDate())
-        const inicioPura = new Date(anoI, mesI - 1, diaI)
-        const terminoPura = new Date(anoT, mesT - 1, diaT)
-
-        if (dataPura >= inicioPura && dataPura <= terminoPura) {
-          materia.horarios?.forEach(h => {
-            if (h.dia === backendDia) {
-              aulas.push({ materia, horario: h })
+        if (datePure >= startPure && datePure <= endPure) {
+          m.horarios?.forEach(h => {
+            if (h.dia === backendDay) {
+              classes.push({ materia: m, horario: h })
             }
           })
         }
       }
 
-      // Filtrar Avaliações
-      materia.configuracao_notas?.avaliacoes?.forEach(a => {
-        if (a.data === dataString) {
-          avaliacoes.push({ materia, avaliacao: a })
+      m.configuracao_notas?.avaliacoes?.forEach(a => {
+        if (a.data === dateString) {
+          assessments.push({ materia: m, avaliacao: a })
         }
       })
     })
 
     return {
-      aulas: aulas.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio)),
-      avaliacoes
+      aulas: classes.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio)),
+      avaliacoes: assessments
     }
-  }
+  }, [profile])
 
-  const alternarFalta = async (materiaId: number, data: string, aulaNum: number, temFalta: boolean) => {
+  const alternarFalta = async (materiaId: number, dateStr: string, classNum: number, hasAbsence: boolean) => {
     if (!session?.accessToken) return
 
-    const novasFaltas = temFalta ? 0 : 1
+    const newAbsences = hasAbsence ? 0 : 1
     try {
-      await academic_service.atualizarFaltas(session.accessToken, materiaId, data, aulaNum, novasFaltas, anoAtivoId || undefined)
+      await academic_service.atualizarFaltas(session.accessToken, materiaId, dateStr, classNum, newAbsences, anoAtivoId || undefined)
       buscarPerfil(true)
     } catch (error) {
       console.error('Erro ao atualizar faltas:', error)
     }
   }
-
-  const eventosHoje = filtrarEventosDoDia(dataSelecionada)
 
   if (loading) {
     return (
@@ -218,6 +131,8 @@ export default function HorariosPage() {
     )
   }
 
+  const eventsToday = filtrarEventosDoDia(selectedDate)
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <section>
@@ -227,196 +142,25 @@ export default function HorariosPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-foreground text-sm">{formatarMesAno(dataSelecionada)}</h3>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => mudarMes(-1)}>
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => mudarMes(1)}>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-muted-foreground mb-2">
-              <span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {getDiasDoMes().map((dia, idx) => {
-                if (!dia) return <div key={`empty-${idx}`} className="h-10" />
-                
-                const isHoje = new Date().toDateString() === dia.toDateString()
-                const isSelecionado = dataSelecionada.toDateString() === dia.toDateString()
-                const eventos = filtrarEventosDoDia(dia)
-                const temAulas = eventos.aulas.length > 0
-                const temAvaliacoes = eventos.avaliacoes.length > 0
-
-                return (
-                  <button
-                    key={dia.toISOString()}
-                    onClick={() => setDataSelecionada(dia)}
-                    className={`h-10 rounded-lg flex flex-col items-center justify-center transition-all relative ${
-                      isSelecionado 
-                        ? 'bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20' 
-                        : 'hover:bg-muted text-foreground'
-                    } ${isHoje && !isSelecionado ? 'border border-primary/50' : ''}`}
-                  >
-                    <span className="text-sm">{dia.getDate()}</span>
-                    <div className="flex gap-0.5 absolute bottom-1">
-                      {temAulas && (
-                        <span className={`w-1 h-1 rounded-full ${isSelecionado ? 'bg-primary-foreground' : 'bg-primary'}`} />
-                      )}
-                      {temAvaliacoes && (
-                        <span className={`w-1 h-1 rounded-full ${isSelecionado ? 'bg-primary-foreground' : 'bg-yellow-500'}`} />
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-            <h4 className="text-xs font-black text-muted-foreground uppercase tracking-wider mb-4">Filtrar Visualização</h4>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={filtros.aulas} 
-                  onChange={e => setFiltros(prev => ({ ...prev, aulas: e.target.checked }))}
-                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">Aulas</span>
-                <span className="ml-auto w-2 h-2 rounded-full bg-primary" />
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={filtros.avaliacoes} 
-                  onChange={e => setFiltros(prev => ({ ...prev, avaliacoes: e.target.checked }))}
-                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">Avaliações</span>
-                <span className="ml-auto w-2 h-2 rounded-full bg-yellow-500" />
-              </label>
-            </div>
-          </div>
+          <CalendarioGrade 
+            dataSelecionada={selectedDate}
+            onMudarData={(date) => setSelectedDate(date)}
+            onMudarMes={mudarMes}
+            filtrarEventosDoDia={filtrarEventosDoDia}
+          />
+          <FiltrosCalendario 
+            filtros={filters}
+            onChange={(newFilters) => setFilters(newFilters)}
+          />
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2 rounded-xl">
-              <CalendarIcon className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground">{formatarData(dataSelecionada)}</h3>
-              <p className="text-sm text-muted-foreground">
-                {(filtros.aulas ? eventosHoje.aulas.length : 0) + (filtros.avaliacoes ? eventosHoje.avaliacoes.length : 0)} compromissos filtrados
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {filtros.avaliacoes && eventosHoje.avaliacoes.map((item, idx) => {
-              const config = obterConfiguracaoTipo(item.avaliacao.tipo)
-              const Icone = config.icon
-              return (
-                <div key={`av-${idx}`} className={`${config.bg} ${config.border} border rounded-2xl p-5 shadow-sm transition-colors flex items-center justify-between gap-4`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`${config.bg} w-16 h-16 rounded-xl flex flex-col items-center justify-center border ${config.border}`}>
-                      <Icone className={`w-8 h-8 ${config.text}`} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg text-foreground leading-tight">{item.avaliacao.nome}</h4>
-                      <p className="text-sm text-muted-foreground mt-1 font-medium">
-                        <Link href={`/disciplinas/${item.materia.id}`} className="hover:underline hover:text-primary transition-colors">
-                          {item.materia.nome}
-                        </Link>
-                        {' '}• {config.label}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] font-black ${config.badge} px-3 py-1 rounded-full uppercase`}>
-                      Peso {item.avaliacao.peso}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-            {filtros.aulas && eventosHoje.aulas.length > 0 ? (
-              eventosHoje.aulas.map((aula, idx) => {
-                const ano = dataSelecionada.getFullYear();
-                const mes = String(dataSelecionada.getMonth() + 1).padStart(2, '0');
-                const dia = String(dataSelecionada.getDate()).padStart(2, '0');
-                const dataString = `${ano}-${mes}-${dia}`;
-                const temFalta = aula.materia.detalhes_faltas?.some(f => f.data === dataString && f.aula === aula.horario.aula && f.faltas > 0)
-
-                return (
-                  <div key={`${aula.materia.id}-${idx}`} className={`bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${temFalta ? 'opacity-50 grayscale' : ''}`}>
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="bg-muted w-16 h-16 rounded-xl flex flex-col items-center justify-center border border-border shrink-0">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Aula</span>
-                        <span className="text-2xl font-black text-foreground">{aula.horario.aula}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-bold text-lg text-foreground leading-tight truncate">
-                            <Link href={`/disciplinas/${aula.materia.id}`} className="hover:underline hover:text-primary transition-colors">
-                              {aula.materia.nome}
-                            </Link>
-                          </h4>
-                          {temFalta && (
-                            <span className="text-[10px] font-bold bg-destructive/10 text-destructive px-2 py-0.5 rounded-full uppercase shrink-0">Falta Marcada</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 font-medium truncate">
-                          {aula.materia.codigo} • Turma {aula.horario.turma}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 md:gap-8 text-sm shrink-0">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Clock className="w-4 h-4 text-primary" />
-                          <span className="font-medium text-foreground">
-                            {aula.horario.inicio.substring(0, 5)} - {aula.horario.fim.substring(0, 5)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin className="w-4 h-4 text-primary" />
-                          <span className="font-medium text-foreground">Sala {aula.horario.sala}</span>
-                        </div>
-                      </div>
-                      
-                      <Button 
-                        variant={temFalta ? "destructive" : "outline"} 
-                        size="sm" 
-                        className="rounded-xl gap-2 font-bold uppercase text-[10px]"
-                        onClick={() => alternarFalta(aula.materia.id, dataString, aula.horario.aula, !!temFalta)}
-                      >
-                        <UserX className="w-4 h-4" />
-                        {temFalta ? "Remover Falta" : "Marcar Falta"}
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })
-            ) : null}
-
-            {(!filtros.aulas || eventosHoje.aulas.length === 0) && (!filtros.avaliacoes || eventosHoje.avaliacoes.length === 0) && (
-              <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed border-border text-muted-foreground">
-                <Clock className="w-12 h-12 mb-4 opacity-10" />
-                <p className="font-medium">Nada programado para este dia.</p>
-                <p className="text-xs">Aproveite para descansar ou adiantar matérias!</p>
-              </div>
-            )}
-          </div>
+          <CalendarioListaEventos 
+            dataSelecionada={selectedDate}
+            eventosHoje={eventsToday}
+            filtros={filters}
+            onAlternarFalta={alternarFalta}
+          />
         </div>
       </div>
 
