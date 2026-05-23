@@ -9,7 +9,8 @@ import {
   Check, 
   RefreshCw, 
   Loader2, 
-  AlertTriangle 
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -138,33 +139,72 @@ export function CardSincronizacaoAgenda() {
 
               <div className="p-6 space-y-4">
                 {selectedCalendarTab === 'google' && (
-                  <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
-                    <li>Acesse o <a href="https://calendar.google.com" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">Google Agenda</a> no computador.</li>
-                    <li>No painel lateral esquerdo, clique no botão <span className="font-bold text-foreground">+</span> ao lado de <span className="font-bold text-foreground">"Outras agendas"</span> e selecione <span className="font-bold text-foreground">"Do URL"</span>.</li>
-                    <li>Cole o link copiado no campo indicado e clique em <span className="font-bold text-foreground">"Adicionar agenda"</span>.</li>
-                    <li>O Google sincronizará automaticamente todas as suas aulas, provas e trabalhos no calendário!</li>
-                  </ol>
+                  <div className="space-y-4">
+                    <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
+                      <li>Acesse o <a href="https://calendar.google.com" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">Google Agenda</a> no computador.</li>
+                      <li>No painel lateral esquerdo, clique no botão <span className="font-bold text-foreground">+</span> ao lado de <span className="font-bold text-foreground">"Outras agendas"</span> e selecione <span className="font-bold text-foreground">"Do URL"</span>.</li>
+                      <li>Cole o link copiado no campo indicado e clique em <span className="font-bold text-foreground">"Adicionar agenda"</span>.</li>
+                      <li>O Google sincronizará automaticamente todas as suas aulas, provas e trabalhos no calendário!</li>
+                    </ol>
+                    <div className="pt-2">
+                      <Button
+                        onClick={() => {
+                          const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}`;
+                          window.open(googleUrl, '_blank');
+                        }}
+                        className="h-10 px-4 rounded-xl font-bold text-xs bg-primary hover:bg-primary/95 text-primary-foreground gap-2 transition-all w-full sm:w-auto"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Adicionar ao Google Agenda
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {selectedCalendarTab === 'apple' && (
-                  <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
-                    <li>Abra o aplicativo <span className="font-bold text-foreground">Calendário</span> no seu Mac, iPhone ou iPad.</li>
-                    <li>No Mac: Vá em <span className="font-bold text-foreground">Arquivo &gt; Nova Assinatura de Calendário</span>, cole o link e clique em Inscrever-se.</li>
-                    <li>No iOS (iPhone/iPad): Acesse Ajustes &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Outra &gt; Adicionar Assinatura de Calendário, cole o link e salve.</li>
-                    <li>Defina o intervalo de atualização automática desejado para manter as datas sempre sincronizadas.</li>
-                  </ol>
+                  <div className="space-y-4">
+                    <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
+                      <li>Abra o aplicativo <span className="font-bold text-foreground">Calendário</span> no seu Mac, iPhone ou iPad.</li>
+                      <li>No Mac: Vá em <span className="font-bold text-foreground">Arquivo &gt; Nova Assinatura de Calendário</span>, cole o link e clique em Inscrever-se.</li>
+                      <li>No iOS (iPhone/iPad): Acesse Ajustes &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Outra &gt; Adicionar Assinatura de Calendário, cole o link e salve.</li>
+                      <li>Defina o intervalo de atualização automática desejado para manter as datas sempre sincronizadas.</li>
+                    </ol>
+                    <div className="pt-2">
+                      <Button
+                        onClick={() => {
+                          const webcalUrl = feedUrl.replace(/^(https?:\/\/)/, 'webcal://');
+                          window.location.href = webcalUrl;
+                        }}
+                        className="h-10 px-4 rounded-xl font-bold text-xs bg-primary hover:bg-primary/95 text-primary-foreground gap-2 transition-all w-full sm:w-auto"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Inscrever-se no Apple Calendar
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {selectedCalendarTab === 'notion' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
-                      O Notion Calendar gerencia seus horários importando dados diretamente das suas contas do Google Calendar.
-                    </p>
-                    <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
-                      <li>Siga as instruções descritas na aba <span className="font-bold text-foreground">"Google Agenda"</span> para adicionar o feed à sua conta institucional do Google Workspace (<span className="font-bold text-primary">@uem.br</span>).</li>
-                      <li>Abra o Notion Calendar e certifique-se de que a conta Google correspondente está vinculada nas configurações de contas do aplicativo.</li>
-                      <li>Ative a exibição do calendário <span className="font-bold text-foreground">"Minha UEM"</span> no painel esquerdo do Notion Calendar para ver todas as suas atividades e prazos integrados!</li>
-                    </ol>
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
+                        O Notion Calendar gerencia seus horários importando dados diretamente das suas contas do Google Calendar.
+                      </p>
+                      <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
+                        <li>Siga as instruções descritas na aba <span className="font-bold text-foreground">"Google Agenda"</span> para adicionar o feed à sua conta institucional do Google Workspace (<span className="font-bold text-primary">@uem.br</span>).</li>
+                        <li>Abra o Notion Calendar e certifique-se de que a conta Google correspondente está vinculada nas configurações de contas do aplicativo.</li>
+                        <li>Ative a exibição do calendário <span className="font-bold text-foreground">"Minha UEM"</span> no painel esquerdo do Notion Calendar para ver todas as suas atividades e prazos integrados!</li>
+                      </ol>
+                    </div>
+                    <div className="pt-2">
+                      <Button
+                        onClick={() => window.open('https://calendar.notion.so', '_blank')}
+                        className="h-10 px-4 rounded-xl font-bold text-xs bg-primary hover:bg-primary/95 text-primary-foreground gap-2 transition-all w-full sm:w-auto"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Abrir Notion Calendar
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
