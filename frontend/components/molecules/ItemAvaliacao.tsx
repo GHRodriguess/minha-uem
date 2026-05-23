@@ -55,20 +55,20 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
         <GripVertical className="w-4 h-4" />
       </div>
       
-      <div className="flex-1 grid grid-cols-12 gap-2 items-center">
-        <div className={groupType === 'PROVA' ? 'col-span-5' : 'col-span-3'}>
+      <div className="flex-1 grid grid-cols-2 sm:grid-cols-12 gap-3 items-center">
+        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-5' : 'col-span-1 sm:col-span-3'}>
           <Input
             value={nomeLocal}
             onChange={(e) => setNomeLocal(e.target.value)}
             onBlur={() => nomeLocal !== avaliacao.nome && onUpdate(avaliacao.id, { nome: nomeLocal })}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
             placeholder="Nome (ex: P1)"
-            className="bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary h-8 font-bold p-0 text-foreground"
+            className="bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary h-8 font-bold p-0 text-foreground text-xs sm:text-sm"
           />
         </div>
 
         {groupType === 'ENTREGA' && (
-          <div className="col-span-2 flex items-center">
+          <div className="col-span-1 sm:col-span-2 flex items-center">
             <select
               value={avaliacao.tipo}
               onChange={(e) => onUpdate(avaliacao.id, { tipo: e.target.value as any })}
@@ -83,26 +83,26 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
           </div>
         )}
         
-        <div className="col-span-2 flex items-center">
-          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted rounded">Peso</span>
+        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
+          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">P</span>
           <InputNota
             value={avaliacao.peso}
             onChange={(val) => onUpdate(avaliacao.id, { peso: val || 0 })}
-            className="h-8 w-16 text-xs font-black min-w-auto"
+            className="h-8 w-full text-xs font-black min-w-auto"
           />
         </div>
 
-        <div className="col-span-2 flex items-center">
-          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted rounded">Nota</span>
+        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
+          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">N</span>
           <InputNota
             value={avaliacao.nota}
             onChange={(val) => onUpdate(avaliacao.id, { nota: val })}
-            className="h-8 w-16 text-sm font-black min-w-auto"
+            className="h-8 w-full text-xs sm:text-sm font-black min-w-auto"
             placeholder="-"
           />
         </div>
 
-        <div className="col-span-3 flex items-center">
+        <div className="col-span-2 sm:col-span-3 flex items-center">
           <Input
             type="date"
             value={dataLocal}

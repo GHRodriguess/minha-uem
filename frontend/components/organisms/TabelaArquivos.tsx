@@ -410,7 +410,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
             {isReallyDownloaded && (
               <button
                 onClick={() => gerenciarAberturaLocal(arquivo)}
-                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                className="hidden lg:inline-flex p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
                 title="Abrir arquivo localmente"
               >
                 <Laptop className="w-3.5 h-3.5" />
@@ -449,7 +449,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                   <button
                     onClick={() => gerenciarDownload(arquivo)}
                     disabled={estaBaixando}
-                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
+                    className="hidden lg:flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
                   >
                     {estaBaixando ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -464,6 +464,174 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
           </div>
         </td>
       </tr>
+    )
+  }
+
+  const renderizarCartaoArquivo = (arquivo: ArquivoClassroom) => {
+    const estaEditando = editingFileId === arquivo.drive_file_id
+    const estaBaixando = downloadingId === arquivo.drive_file_id
+    const isReallyDownloaded = hasFolderPermission
+      ? !missingFiles[arquivo.drive_file_id]
+      : localStorage.getItem('baixado_' + arquivo.drive_file_id) === 'true'
+
+    return (
+      <div 
+        key={arquivo.drive_file_id}
+        className={`bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-4 relative transition-all hover:border-primary/30 ${
+          arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-background border border-border rounded-xl shrink-0">
+            {determinarIcone(arquivo.original_name)}
+          </div>
+
+          <div className="space-y-1 min-w-0 flex-1">
+            {estaEditando ? (
+              <div className="flex items-center gap-1.5 w-full">
+                <input
+                  type="text"
+                  value={customNameInput}
+                  onChange={(e) => setCustomNameInput(e.target.value)}
+                  className="h-8 px-2 border border-border rounded-lg bg-background text-xs font-bold w-full focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
+                  autoFocus
+                />
+                <button
+                  onClick={() => confirmarEdicaoNome(arquivo)}
+                  className="p-1.5 rounded-lg bg-emerald-500 text-white hover:opacity-90 transition-opacity"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setEditingFileId(null)}
+                  className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 group w-full justify-between">
+                <p className="font-bold text-foreground text-xs leading-relaxed break-words whitespace-normal">
+                  {arquivo.custom_name || arquivo.original_name}
+                </p>
+                <button
+                  onClick={() => iniciarEdicaoNome(arquivo)}
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted shrink-0"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {arquivo.custom_name && (
+              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider break-all whitespace-normal">
+                Original: {arquivo.original_name}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50 text-[10px]">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Categoria</span>
+            <select
+              value={arquivo.selected_folder}
+              onChange={(e) => alterarPastaDestino(arquivo, e.target.value)}
+              className="h-8 px-2 border border-border bg-background rounded-lg text-[9px] font-black uppercase tracking-wider focus:outline-none w-full text-foreground"
+            >
+              {listaCategorias.map(cat => (
+                <option key={cat} value={cat}>
+                  {formatarNomeTipo(cat)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wider block">Status</span>
+            <div className="h-8 flex items-center">
+              {isReallyDownloaded ? (
+                <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-500/15 w-fit">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Baixado
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-primary/15 w-fit">
+                  <AlertCircle className="w-3 h-3" />
+                  No Drive
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-border/50">
+          <span className="text-[9px] font-bold text-muted-foreground order-2 sm:order-1">
+            Sinc: {formatarData(arquivo.sync_at)}
+          </span>
+
+          <div className="flex items-center gap-1.5 order-1 sm:order-2">
+            {isReallyDownloaded && (
+              <button
+                onClick={() => gerenciarAberturaLocal(arquivo)}
+                className="hidden lg:inline-flex p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                title="Abrir arquivo localmente"
+              >
+                <Laptop className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <button
+              onClick={() => gerenciarOcultar(arquivo)}
+              className={`p-2 border border-border rounded-xl transition-colors ${
+                arquivo.is_ignored 
+                  ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' 
+                  : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+              title={arquivo.is_ignored ? "Mostrar arquivo" : "Ocultar arquivo"}
+            >
+              {arquivo.is_ignored ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+
+            {!arquivo.drive_file_id.startsWith('local_') && (
+              <>
+                <button
+                  onClick={() => setPreviewFile(arquivo)}
+                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                  title="Pré-visualizar"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+
+                <a
+                  href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                  title="Ver no Google Drive"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                {!isReallyDownloaded && (
+                  <button
+                    onClick={() => gerenciarDownload(arquivo)}
+                    disabled={estaBaixando}
+                    className="hidden lg:flex items-center gap-1 h-8 px-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
+                  >
+                    {estaBaixando ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                    Baixar
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -599,7 +767,71 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+      {/* Visualização Adaptativa em Cartões (Mobile e iPad Retrato) */}
+      <div className="block md:hidden space-y-6">
+        {arquivosOrdenados.length === 0 ? (
+          <div className="py-12 text-center bg-card border border-border rounded-3xl shadow-sm space-y-2">
+            <FolderOpen className="w-8 h-8 mx-auto text-muted-foreground/30" />
+            <p className="text-xs font-bold text-foreground">Nenhum arquivo encontrado</p>
+            <p className="text-[10px] text-muted-foreground">Tente alterar os termos da busca ou os filtros de seleção.</p>
+          </div>
+        ) : groupBy === 'category' ? (
+          [...listaCategorias, 'outros'].map(categoryItem => {
+            const categoryFiles = arquivosOrdenados.filter(fileItem => {
+              if (categoryItem === 'outros') {
+                return !fileItem.selected_folder || !listaCategorias.includes(fileItem.selected_folder)
+              }
+              return fileItem.selected_folder === categoryItem
+            })
+            if (categoryFiles.length === 0) return null
+            return (
+              <div key={categoryItem} className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-primary text-[10px] font-black uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded">
+                    {categoryItem === 'outros' ? 'Sem Categoria' : formatarNomeTipo(categoryItem)}
+                  </span>
+                  <div className="h-px flex-1 bg-border/60" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">{categoryFiles.length}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {categoryFiles.map(renderizarCartaoArquivo)}
+                </div>
+              </div>
+            )
+          })
+        ) : groupBy === 'status' ? (
+          ['Baixados', 'Pendentes'].map(statusGroup => {
+            const arqs = arquivosOrdenados.filter(a => {
+              const isDownloaded = hasFolderPermission
+                ? !missingFiles[a.drive_file_id]
+                : localStorage.getItem('baixado_' + a.drive_file_id) === 'true'
+              return statusGroup === 'Baixados' ? isDownloaded : !isDownloaded
+            })
+            if (arqs.length === 0) return null
+            return (
+              <div key={statusGroup} className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-primary text-[10px] font-black uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded">
+                    {statusGroup === 'Baixados' ? 'Baixados' : 'Disponíveis no Drive'}
+                  </span>
+                  <div className="h-px flex-1 bg-border/60" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">{arqs.length}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {arqs.map(renderizarCartaoArquivo)}
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {arquivosOrdenados.map(renderizarCartaoArquivo)}
+          </div>
+        )}
+      </div>
+
+      {/* Visualização Padrão em Tabela (Laptops/Desktop) */}
+      <div className="hidden md:block bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
         <div className="w-full">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -749,7 +981,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                     gerenciarDownload(previewFile)
                     setPreviewFile(null)
                   }}
-                  className="flex items-center gap-2 h-9 px-4 bg-primary text-primary-foreground hover:opacity-90 rounded-xl text-xs font-bold shadow-sm transition-opacity"
+                  className="hidden lg:flex items-center gap-2 h-9 px-4 bg-primary text-primary-foreground hover:opacity-90 rounded-xl text-xs font-bold shadow-sm transition-opacity"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Baixar Arquivo
