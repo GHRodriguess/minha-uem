@@ -1,4 +1,4 @@
-import { Perfil, ConfiguracaoMateria, Avaliacao } from "@/types/academico";
+import { Perfil, ConfiguracaoMateria, Avaliacao, AnotacaoMateria } from "@/types/academico";
 import { api_client } from "./client";
 
 const base_path = "/api/academico";
@@ -47,5 +47,17 @@ export const academic_service = {
 
   regenerarLinkAgenda(token: string, signal?: AbortSignal) {
     return api_client.postar<{ feed_url: string }>(`${base_path}/agenda/regenerar/`, {}, token, signal);
+  },
+
+  criarAnotacao(token: string, configuracao_id: number, content: string, signal?: AbortSignal) {
+    return api_client.postar<AnotacaoMateria>(`${base_path}/anotacoes/`, { configuracao_id, content }, token, signal);
+  },
+
+  atualizarAnotacao(token: string, anotacao_id: number, content: string, signal?: AbortSignal) {
+    return api_client.patch<AnotacaoMateria>(`${base_path}/anotacoes/${anotacao_id}/`, { content }, token, signal);
+  },
+
+  excluirAnotacao(token: string, anotacao_id: number, signal?: AbortSignal) {
+    return api_client.remover(`${base_path}/anotacoes/${anotacao_id}/`, token, signal);
   }
 };

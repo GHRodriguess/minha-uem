@@ -23,12 +23,18 @@ export interface Avaliacao {
   ordem: number;
 }
 
+export interface AnotacaoMateria {
+  id: number;
+  content: string;
+}
+
 export interface ConfiguracaoMateria {
   id: number;
   media_minima: number;
   avaliacoes: Avaliacao[];
   media_atual: number;
   quanto_falta: number;
+  notes?: AnotacaoMateria[];
 }
 
 export interface Materia {

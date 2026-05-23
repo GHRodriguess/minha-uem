@@ -14,6 +14,7 @@ import MuralClassroom from '@/components/organisms/MuralClassroom'
 import { CardFrequenciaDisciplina } from '@/components/organisms/CardFrequenciaDisciplina'
 import { CardHorariosDisciplina } from '@/components/organisms/CardHorariosDisciplina'
 import { CardPrazosDisciplina } from '@/components/organisms/CardPrazosDisciplina'
+import { CardAnotacoesMateria } from '@/components/organisms/CardAnotacoesMateria'
 
 interface PaginaDisciplinaProps {
   params: Promise<{ id: string }>
@@ -109,56 +110,21 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
       <div className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 flex flex-col gap-8">
-            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex-1">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-primary/10 p-2.5 rounded-xl">
-                  <GraduationCap className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">Gestão de Notas</h2>
-                  <p className="text-xs text-muted-foreground font-medium">Configure seus pesos e acompanhe sua média</p>
-                </div>
-              </div>
-              <CardGestaoNotas materia={materia} anoId={anoAtivoId || 0} />
-            </div>
-
-            {filesCache[materia.id]?.vinculado ? (
-              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in">
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
-                    <FileText className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      {filesCache[materia.id]?.arquivos?.length > 0
-                        ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
-                        : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
-                    </p>
-                  </div>
-                </div>
-                <Link 
-                  href={`/disciplinas/${materia.id}/arquivos`}
-                  className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
-                >
-                  Visualizar Arquivos
-                </Link>
-              </div>
-            ) : (
-              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
+          <div className="lg:col-span-2 flex flex-col">
+            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm h-full flex flex-col justify-between">
+              <div>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="bg-primary/10 p-2.5 rounded-xl">
-                    <FileText className="w-6 h-6 text-primary" />
+                    <GraduationCap className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
-                    <p className="text-xs text-muted-foreground font-medium">Arquivos e documentos sincronizados do Google Classroom</p>
+                    <h2 className="text-xl font-bold text-foreground">Gestão de Notas</h2>
+                    <p className="text-xs text-muted-foreground font-medium">Configure seus pesos e acompanhe sua média</p>
                   </div>
                 </div>
-                <CardClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
+                <CardGestaoNotas materia={materia} anoId={anoAtivoId || 0} />
               </div>
-            )}
+            </div>
           </div>
 
           <div className="space-y-8">
@@ -167,6 +133,45 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
             <CardHorariosDisciplina materia={materia} />
           </div>
         </div>
+
+        <CardAnotacoesMateria materia={materia} />
+
+        {filesCache[materia.id]?.vinculado ? (
+          <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
+                <FileText className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  {filesCache[materia.id]?.arquivos?.length > 0
+                    ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
+                    : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
+                </p>
+              </div>
+            </div>
+            <Link 
+              href={`/disciplinas/${materia.id}/arquivos`}
+              className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
+            >
+              Visualizar Arquivos
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="bg-primary/10 p-2.5 rounded-xl">
+                <FileText className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                <p className="text-xs text-muted-foreground font-medium">Arquivos e documentos sincronizados do Google Classroom</p>
+              </div>
+            </div>
+            <CardClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
+          </div>
+        )}
 
         <MuralClassroom materiaId={materia.id} anoId={anoAtivoId || 0} />
       </div>

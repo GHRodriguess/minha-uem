@@ -3,8 +3,8 @@ from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario
-from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria
+from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer
 from .services import ServicoExtracaoHorario
 import requests
 import re
@@ -204,6 +204,45 @@ class AvaliacaoView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Avaliacao.DoesNotExist:
             return Response({"erro": "Avaliação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AnotacaoMateriaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        config_id = request.data.get('configuracao_id')
+        if not config_id:
+            return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=request.user)
+            serializer = AnotacaoMateriaSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(subject_config=config)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ConfiguracaoMateria.DoesNotExist:
+            return Response({"erro": "Configuração não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request, pk):
+        try:
+            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=request.user)
+            serializer = AnotacaoMateriaSerializer(note, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except AnotacaoMateria.DoesNotExist:
+            return Response({"erro": "Anotação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=request.user)
+            note.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except AnotacaoMateria.DoesNotExist:
+            return Response({"erro": "Anotação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 class ConfiguracaoClassroomView(APIView):
