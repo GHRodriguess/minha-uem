@@ -56,7 +56,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
       </div>
       
       <div className="flex-1 grid grid-cols-2 sm:grid-cols-12 gap-3 items-center">
-        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-5' : 'col-span-1 sm:col-span-3'}>
+        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-4' : 'col-span-1 sm:col-span-3'}>
           <Input
             value={nomeLocal}
             onChange={(e) => setNomeLocal(e.target.value)}
@@ -83,7 +83,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
           </div>
         )}
         
-        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
+        <div className={groupType === 'PROVA' ? 'col-span-1 sm:col-span-2 flex items-center gap-1' : 'col-span-1 sm:col-span-1 flex items-center gap-1'}>
           <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">P</span>
           <InputNota
             value={avaliacao.peso}
@@ -102,13 +102,14 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-3 flex items-center">
+        <div className="col-span-2 sm:col-span-4 flex items-center gap-1">
+          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0 md:hidden">D</span>
           <Input
             type="date"
             value={dataLocal}
             onChange={(e) => setDataLocal(e.target.value)}
             onBlur={() => dataLocal !== (avaliacao.data || "") && onUpdate(avaliacao.id, { data: dataLocal || null })}
-            className="h-8 text-[10px] font-bold uppercase p-1 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary w-full appearance-none"
+            className="h-8 text-[10px] font-bold uppercase p-1 bg-muted/50 border border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-primary w-full appearance-none"
           />
         </div>
       </div>
