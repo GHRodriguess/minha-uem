@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria
 from django.db.models import Sum, F
 
 class CursoSerializer(serializers.ModelSerializer):
@@ -22,14 +22,20 @@ class AvaliacaoSerializer(serializers.ModelSerializer):
         model = Avaliacao
         fields = ['id', 'nome', 'tipo', 'peso', 'nota', 'data', 'ordem']
 
+class AnotacaoMateriaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnotacaoMateria
+        fields = ['id', 'content']
+
 class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
     avaliacoes = AvaliacaoSerializer(many=True, read_only=True)
+    notes = AnotacaoMateriaSerializer(many=True, read_only=True)
     media_atual = serializers.SerializerMethodField()
     quanto_falta = serializers.SerializerMethodField()
 
     class Meta:
         model = ConfiguracaoMateria
-        fields = ['id', 'media_minima', 'avaliacoes', 'media_atual', 'quanto_falta']
+        fields = ['id', 'media_minima', 'avaliacoes', 'notes', 'media_atual', 'quanto_falta']
 
     def get_media_atual(self, obj):
         avaliacoes = obj.avaliacoes.filter(nota__isnull=False)

@@ -142,3 +142,12 @@ class ArquivoMateriaClassroom(models.Model):
     def __str__(self):
         return f"{self.custom_name or self.original_name} ({self.classroom_connection.subject_config.materia.nome})"
 
+
+class AnotacaoMateria(models.Model):
+    subject_config = models.ForeignKey(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='notes')
+    content = models.TextField()
+
+    def __str__(self):
+        return f"Anotacao de {self.subject_config.materia.nome}"
+
+
