@@ -6,8 +6,9 @@ import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
-import { BookOpen, GraduationCap, Calendar, Clock, Loader2, MapPin } from 'lucide-react'
+import { BookOpen, GraduationCap, Calendar, Clock, MapPin } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
+import CarregamentoHome from '@/components/templates/CarregamentoHome'
 
 export default function Home() {
   const { data: session } = useSession()
@@ -63,12 +64,7 @@ export default function Home() {
   }
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium">Carregando seus dados...</p>
-      </div>
-    )
+    return <CarregamentoHome />
   }
 
   if (!profile?.configurado) {

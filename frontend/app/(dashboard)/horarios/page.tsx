@@ -5,10 +5,11 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia, Horario } from '@/types/academico'
-import { Calendar as CalendarIcon, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { FiltrosCalendario } from '@/components/molecules/FiltrosCalendario'
+import CarregamentoHorarios from '@/components/templates/CarregamentoHorarios'
 import { CalendarioGrade } from '@/components/organisms/CalendarioGrade'
 import { CalendarioListaEventos } from '@/components/organisms/CalendarioListaEventos'
 
@@ -123,12 +124,7 @@ export default function HorariosPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium">Carregando horários...</p>
-      </div>
-    )
+    return <CarregamentoHorarios />
   }
 
   const eventsToday = filtrarEventosDoDia(selectedDate)

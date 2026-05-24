@@ -20,6 +20,8 @@ import {
   Inbox
 } from 'lucide-react'
 import { useClassroom } from '../providers/ProvedorClassroom'
+import Esqueleto from '@/components/atoms/Esqueleto'
+import EsqueletoCardMensagemMural from '@/components/atoms/EsqueletoCardMensagemMural'
 
 interface MuralClassroomProps {
   materiaId: number
@@ -298,9 +300,19 @@ export default function MuralClassroom({ materiaId, anoId }: MuralClassroomProps
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center min-h-75 gap-4">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <p className="text-sm font-bold text-muted-foreground">Carregando publicações do Classroom...</p>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Esqueleto className="w-11 h-11 rounded-xl" />
+          <div className="space-y-2">
+            <Esqueleto className="h-7 w-60" />
+            <Esqueleto className="h-4 w-80" />
+          </div>
+        </div>
+        <div className="space-y-6">
+          {[1, 2].map((index) => (
+            <EsqueletoCardMensagemMural key={index} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -333,7 +345,7 @@ export default function MuralClassroom({ materiaId, anoId }: MuralClassroomProps
           </button>
         </div>
       ) : posts.length === 0 ? (
-        <div className="bg-card border border-border rounded-3xl p-12 text-center shadow-sm max-w-xl mx-auto select-none">
+        <div className="bg-card border border-border rounded-3xl p-12 text-center shadow-sm mx-auto select-none">
           <div className="bg-muted p-4 rounded-full w-fit mx-auto mb-4 text-muted-foreground/60">
             <Inbox className="w-8 h-8" />
           </div>

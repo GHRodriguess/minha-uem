@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { 
   ArrowLeft, 
-  Loader2, 
   AlertTriangle,
   Folder,
   CloudLightning,
@@ -16,6 +15,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react'
+import CarregamentoArquivos from '@/components/templates/CarregamentoArquivos'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
 import { StatusVinculoClassroom } from '@/lib/api/classroom'
@@ -78,12 +78,7 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
   const dadosVinculo = filesCache[materiaId]
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium text-sm">Buscando materiais da disciplina...</p>
-      </div>
-    )
+    return <CarregamentoArquivos />
   }
 
   if (!materia) {
