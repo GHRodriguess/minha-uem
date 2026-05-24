@@ -148,14 +148,14 @@ export function CardAnotacoesMateria({ materia }: CardAnotacoesMateriaProps) {
             {notesList.map((note) => (
               <div
                 key={note.id}
-                className="group relative flex flex-col justify-between gap-4 p-5 bg-muted/20 rounded-2xl border border-border/50 hover:bg-muted/40 transition-colors min-h-[140px]"
+                className="group relative flex flex-col justify-between gap-4 p-5 bg-muted/20 rounded-2xl border border-border/50 hover:bg-muted/40 transition-colors min-h-35"
               >
                 {editingId === note.id ? (
                   <div className="flex-col flex justify-between h-full w-full gap-3">
                     <textarea
                       value={editingContent}
                       onChange={(e) => setEditingContent(e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl p-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none flex-1 min-h-[80px]"
+                      className="w-full bg-card border border-border rounded-xl p-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none flex-1 min-h-20"
                       placeholder="Edite seu lembrete..."
                     />
                     <div className="flex gap-2 justify-end">
@@ -182,7 +182,7 @@ export function CardAnotacoesMateria({ materia }: CardAnotacoesMateriaProps) {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm text-foreground font-medium leading-relaxed whitespace-pre-wrap flex-1 break-words">
+                    <p className="text-sm text-foreground font-medium leading-relaxed whitespace-pre-wrap flex-1 wrap-break-words">
                       {note.content}
                     </p>
 
@@ -216,11 +216,11 @@ export function CardAnotacoesMateria({ materia }: CardAnotacoesMateriaProps) {
             ))}
 
             {isAdding && (
-              <div className="p-5 bg-muted/30 rounded-2xl border border-primary/20 flex flex-col justify-between gap-3 min-h-[140px] animate-fade-in">
+              <div className="p-5 bg-muted/30 rounded-2xl border border-primary/20 flex flex-col justify-between gap-3 min-h-35 animate-fade-in">
                 <textarea
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
-                  className="w-full bg-card border border-border rounded-xl p-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none flex-1 min-h-[80px]"
+                  className="w-full bg-card border border-border rounded-xl p-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none flex-1 min-h-20"
                   placeholder="Digite seu lembrete..."
                 />
                 <div className="flex gap-2 justify-end">
