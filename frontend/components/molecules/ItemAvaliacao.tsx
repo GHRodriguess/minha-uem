@@ -83,7 +83,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
           </div>
         )}
         
-        <div className={groupType === 'PROVA' ? 'col-span-1 sm:col-span-2 flex items-center gap-1' : 'col-span-1 sm:col-span-1 flex items-center gap-1'}>
+        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
           <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">P</span>
           <InputNota
             value={avaliacao.peso}
@@ -102,7 +102,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-4 flex items-center gap-1">
+        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-4 flex items-center gap-1' : 'col-span-2 sm:col-span-3 flex items-center gap-1'}>
           <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0 md:hidden">D</span>
           <Input
             type="date"

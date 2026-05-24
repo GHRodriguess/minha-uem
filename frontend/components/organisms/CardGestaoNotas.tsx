@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
 import { academic_service } from '@/lib/api/academico'
 import { ItemAvaliacao } from '../molecules/ItemAvaliacao'
+import { CalculadoraSobrevivencia } from '../molecules/CalculadoraSobrevivencia'
 import { Button } from '../ui/button'
 import { Plus, Calculator, Target, AlertCircle, Loader2, Info } from 'lucide-react'
 import { InputNota } from '../atoms/InputNota'
@@ -317,6 +318,8 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
           className="h-8 w-16 text-sm"
         />
       </div>
+
+      <CalculadoraSobrevivencia config={config} />
     </div>
   )
 }

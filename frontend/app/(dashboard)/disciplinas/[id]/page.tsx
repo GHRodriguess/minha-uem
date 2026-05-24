@@ -129,7 +129,11 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
           <div className="space-y-8">
             <CardPrazosDisciplina materia={materia} />
-            <CardFrequenciaDisciplina materia={materia} />
+            <CardFrequenciaDisciplina 
+              materia={materia} 
+              anoId={anoAtivoId || 0} 
+              onUpdate={() => buscarDados(true)} 
+            />
             <CardHorariosDisciplina materia={materia} />
           </div>
         </div>
