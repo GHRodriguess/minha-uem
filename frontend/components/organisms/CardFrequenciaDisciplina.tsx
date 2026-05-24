@@ -2,9 +2,13 @@
 
 import { Clock } from 'lucide-react'
 import { Materia } from '@/types/academico'
+import { ProjecaoFaltas } from '../molecules/ProjecaoFaltas'
+import { AddAbsenceForm } from '../molecules/AddAbsenceForm'
 
 interface CardFrequenciaDisciplinaProps {
   materia: Materia
+  anoId: number
+  onUpdate?: () => void
 }
 
 function agruparFaltasPorDia(absences: { data: string; aula: number; faltas: number }[]) {
@@ -18,7 +22,7 @@ function agruparFaltasPorDia(absences: { data: string; aula: number; faltas: num
     .sort((a, b) => b.data.localeCompare(a.data))
 }
 
-export function CardFrequenciaDisciplina({ materia }: CardFrequenciaDisciplinaProps) {
+export function CardFrequenciaDisciplina({ materia, anoId, onUpdate }: CardFrequenciaDisciplinaProps) {
   const firstSchedule = materia.horarios?.[0]
   const maxAbsences = firstSchedule?.maximo_faltas || 0
   const absencesPercentage = maxAbsences > 0 ? (materia.faltas_atuais / maxAbsences) * 100 : 0
@@ -52,7 +56,14 @@ export function CardFrequenciaDisciplina({ materia }: CardFrequenciaDisciplinaPr
               style={{ width: `${Math.min(absencesPercentage, 100)}%` }}
             />
           </div>
+          {materia.faltas_atuais > maxAbsences && (
+            <div className="mt-3 text-center text-xs font-black text-destructive uppercase tracking-wider bg-destructive/10 p-2.5 rounded-xl border border-destructive/20 animate-pulse">
+              Reprovado por falta
+            </div>
+          )}
         </div>
+
+        <ProjecaoFaltas materia={materia} />
 
         {materia.detalhes_faltas && materia.detalhes_faltas.length > 0 && (
           <div className="space-y-3">
@@ -67,6 +78,13 @@ export function CardFrequenciaDisciplina({ materia }: CardFrequenciaDisciplinaPr
             </div>
           </div>
         )}
+
+        <AddAbsenceForm 
+          subjectId={materia.id} 
+          yearId={anoId} 
+          schedules={materia.horarios || []} 
+          onUpdate={onUpdate} 
+        />
       </div>
     </div>
   )

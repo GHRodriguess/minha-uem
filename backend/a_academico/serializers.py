@@ -32,10 +32,20 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
     notes = AnotacaoMateriaSerializer(many=True, read_only=True)
     media_atual = serializers.SerializerMethodField()
     quanto_falta = serializers.SerializerMethodField()
+    proportional_average = serializers.SerializerMethodField(method_name='obter_media_proporcional')
+    required_exam_grade = serializers.SerializerMethodField(method_name='obter_nota_exame_necessaria')
+    approval_status = serializers.SerializerMethodField(method_name='obter_status_aprovacao')
+    total_weights_sum = serializers.SerializerMethodField(method_name='obter_soma_pesos_total')
+    graded_weights_sum = serializers.SerializerMethodField(method_name='obter_soma_pesos_com_nota')
+    current_weighted_sum = serializers.SerializerMethodField(method_name='obter_soma_ponderada_atual')
 
     class Meta:
         model = ConfiguracaoMateria
-        fields = ['id', 'media_minima', 'avaliacoes', 'notes', 'media_atual', 'quanto_falta']
+        fields = [
+            'id', 'media_minima', 'avaliacoes', 'notes', 'media_atual', 'quanto_falta',
+            'proportional_average', 'required_exam_grade', 'approval_status',
+            'total_weights_sum', 'graded_weights_sum', 'current_weighted_sum'
+        ]
 
     def get_media_atual(self, obj):
         avaliacoes = obj.avaliacoes.filter(nota__isnull=False)
@@ -74,15 +84,87 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         media_necessaria_restante = falta_pontos / float(soma_pesos_restante)
         return round(media_necessaria_restante, 2)
 
+    def obter_media_proporcional(self, obj):
+        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
+        if not avaliacoes_com_nota.exists():
+            return 0.0
+        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
+        soma_pesos_com_nota = sum(a.peso for a in avaliacoes_com_nota)
+        if soma_pesos_com_nota == 0:
+            return 0.0
+        return round(float(soma_ponderada / soma_pesos_com_nota), 2)
+
+    def obter_nota_exame_necessaria(self, obj):
+        media_projetada = self.get_media_atual(obj)
+        if 3.0 <= media_projetada < float(obj.media_minima):
+            nota_necessaria = 10.0 - media_projetada
+            return round(nota_necessaria, 2)
+        return 0.0
+
+    def obter_status_aprovacao(self, obj):
+        avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
+        media = self.get_media_atual(obj)
+        if not avaliacoes_sem_nota.exists():
+            if media >= float(obj.media_minima):
+                return 'APROVADO'
+            elif media >= 3.0:
+                return 'EXAME'
+            else:
+                return 'REPROVADO'
+        else:
+            if media >= float(obj.media_minima):
+                return 'APROVADO'
+            avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
+            if not avaliacoes_com_nota.exists():
+                return 'EM_ANDAMENTO'
+            soma_ponderada_atual = float(sum(a.nota * a.peso for a in avaliacoes_com_nota))
+            soma_pesos_total = float(sum(a.peso for a in obj.avaliacoes.all()))
+            soma_pesos_restante = float(sum(a.peso for a in avaliacoes_sem_nota))
+            maximo_soma_ponderada = soma_ponderada_atual + (10.0 * soma_pesos_restante)
+            if soma_pesos_total > 0:
+                maxima_media_possivel = maximo_soma_ponderada / soma_pesos_total
+            else:
+                maxima_media_possivel = 0.0
+            if maxima_media_possivel < 3.0:
+                return 'REPROVADO'
+            elif maxima_media_possivel < float(obj.media_minima):
+                return 'EXAME'
+            else:
+                return 'EM_ANDAMENTO'
+
+    def obter_soma_pesos_total(self, obj):
+        soma_pesos = sum(a.peso for a in obj.avaliacoes.all())
+        return float(soma_pesos)
+
+    def obter_soma_pesos_com_nota(self, obj):
+        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
+        soma_pesos = sum(a.peso for a in avaliacoes_com_nota)
+        return float(soma_pesos)
+
+    def obter_soma_ponderada_atual(self, obj):
+        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
+        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
+        return float(soma_ponderada)
+
 class MateriaSerializer(serializers.ModelSerializer):
     horarios = serializers.SerializerMethodField()
     faltas_atuais = serializers.SerializerMethodField()
     detalhes_faltas = serializers.SerializerMethodField()
     configuracao_notas = serializers.SerializerMethodField()
+    max_absences = serializers.SerializerMethodField(method_name='obter_maximo_faltas')
+    remaining_absences = serializers.SerializerMethodField(method_name='obter_faltas_restantes')
+    current_attendance_percentage = serializers.SerializerMethodField(method_name='obter_frequencia_atual_porcentagem')
+    classes_per_week = serializers.SerializerMethodField(method_name='obter_aulas_por_semana')
+    weeks_tolerated_absences = serializers.SerializerMethodField(method_name='obter_semanas_toleradas_faltas')
+    absences_risk_zone = serializers.SerializerMethodField(method_name='obter_zona_risco_faltas')
 
     class Meta:
         model = Materia
-        fields = ['id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas', 'configuracao_notas']
+        fields = [
+            'id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas', 'configuracao_notas',
+            'max_absences', 'remaining_absences', 'current_attendance_percentage',
+            'classes_per_week', 'weeks_tolerated_absences', 'absences_risk_zone'
+        ]
 
     def get_horarios(self, obj):
         perfil = self.context.get('perfil')
@@ -132,6 +214,51 @@ class MateriaSerializer(serializers.ModelSerializer):
         if config:
             return ConfiguracaoMateriaSerializer(config).data
         return None
+
+    def obter_maximo_faltas(self, obj):
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return 0
+        horarios = ano_letivo.horarios.filter(materia=obj)
+        if not horarios.exists():
+            return 0
+        return horarios.first().maximo_faltas
+
+    def obter_faltas_restantes(self, obj):
+        max_faltas = self.obter_maximo_faltas(obj)
+        faltas = self.get_faltas_atuais(obj)
+        return max(0, max_faltas - faltas)
+
+    def obter_frequencia_atual_porcentagem(self, obj):
+        max_faltas = self.obter_maximo_faltas(obj)
+        if max_faltas == 0:
+            return 100.0
+        faltas = self.get_faltas_atuais(obj)
+        total_aulas = max_faltas * 4
+        frequencia = ((total_aulas - faltas) / total_aulas) * 100
+        return round(max(0.0, min(100.0, frequencia)), 2)
+
+    def obter_aulas_por_semana(self, obj):
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return 0
+        return ano_letivo.horarios.filter(materia=obj).count()
+
+    def obter_semanas_toleradas_faltas(self, obj):
+        restantes = self.obter_faltas_restantes(obj)
+        semanais = self.obter_aulas_por_semana(obj)
+        if semanais == 0:
+            return 0
+        return restantes // semanais
+
+    def obter_zona_risco_faltas(self, obj):
+        restantes = self.obter_faltas_restantes(obj)
+        semanais = self.obter_aulas_por_semana(obj)
+        if restantes <= 2 or (semanais > 0 and restantes < semanais):
+            return True
+        return False
 
 class PerfilAcademicoSerializer(serializers.ModelSerializer):
     curso = CursoSerializer(read_only=True)

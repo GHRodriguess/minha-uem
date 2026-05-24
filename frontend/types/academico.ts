@@ -35,6 +35,12 @@ export interface ConfiguracaoMateria {
   media_atual: number;
   quanto_falta: number;
   notes?: AnotacaoMateria[];
+  proportional_average?: number;
+  required_exam_grade?: number;
+  approval_status?: 'APROVADO' | 'EXAME' | 'REPROVADO' | 'EM_ANDAMENTO';
+  total_weights_sum?: number;
+  graded_weights_sum?: number;
+  current_weighted_sum?: number;
 }
 
 export interface Materia {
@@ -45,6 +51,12 @@ export interface Materia {
   detalhes_faltas?: { data: string; aula: number; faltas: number }[];
   horarios?: Horario[];
   configuracao_notas?: ConfiguracaoMateria | null;
+  max_absences?: number;
+  remaining_absences?: number;
+  current_attendance_percentage?: number;
+  classes_per_week?: number;
+  weeks_tolerated_absences?: number;
+  absences_risk_zone?: boolean;
 }
 
 export interface Curso {
