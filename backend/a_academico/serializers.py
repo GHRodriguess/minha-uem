@@ -296,13 +296,14 @@ class ConfiguracaoMateriaResumidaSerializer(serializers.ModelSerializer):
 class MateriaResumidaSerializer(serializers.ModelSerializer):
     horarios = serializers.SerializerMethodField()
     faltas_atuais = serializers.SerializerMethodField()
+    detalhes_faltas = serializers.SerializerMethodField(method_name='obter_detalhes_faltas')
     configuracao_notas = serializers.SerializerMethodField()
     max_absences = serializers.SerializerMethodField(method_name='obter_maximo_faltas')
 
     class Meta:
         model = Materia
         fields = [
-            'id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'configuracao_notas',
+            'id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'detalhes_faltas', 'configuracao_notas',
             'max_absences'
         ]
 
@@ -333,6 +334,21 @@ class MateriaResumidaSerializer(serializers.ModelSerializer):
             ano_letivo=ano_letivo
         ).aggregate(Sum('faltas'))['faltas__sum']
         return total or 0
+
+    def obter_detalhes_faltas(self, obj):
+        details_mapping = self.context.get('detalhes_mapeamento')
+        if details_mapping is not None:
+            return details_mapping.get(obj.id, [])
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return []
+        from .models import RegistroFalta
+        return RegistroFalta.objects.filter(
+            perfil=perfil, 
+            materia=obj, 
+            ano_letivo=ano_letivo
+        ).values('data', 'aula', 'faltas')
 
     def get_configuracao_notas(self, obj):
         incluir_avaliacoes = self.context.get('incluir_avaliacoes', False)
