@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta
 from django.db.models import Sum, F
 
 class CursoSerializer(serializers.ModelSerializer):
@@ -167,6 +167,10 @@ class MateriaSerializer(serializers.ModelSerializer):
         ]
 
     def get_horarios(self, obj):
+        horarios_mapeamento = self.context.get('horarios_mapeamento')
+        if horarios_mapeamento is not None:
+            horarios = horarios_mapeamento.get(obj.id, [])
+            return HorarioSerializer(horarios, many=True).data
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -175,6 +179,9 @@ class MateriaSerializer(serializers.ModelSerializer):
         return HorarioSerializer(horarios, many=True).data
 
     def get_faltas_atuais(self, obj):
+        faltas_mapeamento = self.context.get('faltas_mapeamento')
+        if faltas_mapeamento is not None:
+            return faltas_mapeamento.get(obj.id, 0)
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -188,6 +195,9 @@ class MateriaSerializer(serializers.ModelSerializer):
         return total or 0
 
     def get_detalhes_faltas(self, obj):
+        detalhes_mapeamento = self.context.get('detalhes_mapeamento')
+        if detalhes_mapeamento is not None:
+            return detalhes_mapeamento.get(obj.id, [])
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -200,6 +210,12 @@ class MateriaSerializer(serializers.ModelSerializer):
         ).values('data', 'aula', 'faltas')
 
     def get_configuracao_notas(self, obj):
+        configs_mapeamento = self.context.get('configs_mapeamento')
+        if configs_mapeamento is not None:
+            config = configs_mapeamento.get(obj.id)
+            if config:
+                return ConfiguracaoMateriaSerializer(config).data
+            return None
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -216,6 +232,12 @@ class MateriaSerializer(serializers.ModelSerializer):
         return None
 
     def obter_maximo_faltas(self, obj):
+        horarios_mapeamento = self.context.get('horarios_mapeamento')
+        if horarios_mapeamento is not None:
+            horarios = horarios_mapeamento.get(obj.id, [])
+            if not horarios:
+                return 0
+            return horarios[0].maximo_faltas
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -240,6 +262,9 @@ class MateriaSerializer(serializers.ModelSerializer):
         return round(max(0.0, min(100.0, frequencia)), 2)
 
     def obter_aulas_por_semana(self, obj):
+        horarios_mapeamento = self.context.get('horarios_mapeamento')
+        if horarios_mapeamento is not None:
+            return len(horarios_mapeamento.get(obj.id, []))
         perfil = self.context.get('perfil')
         ano_letivo = self.context.get('ano_letivo')
         if not perfil or not ano_letivo:
@@ -260,6 +285,97 @@ class MateriaSerializer(serializers.ModelSerializer):
             return True
         return False
 
+class ConfiguracaoMateriaResumidaSerializer(serializers.ModelSerializer):
+    avaliacoes = AvaliacaoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ConfiguracaoMateria
+        fields = ['id', 'avaliacoes']
+
+
+class MateriaResumidaSerializer(serializers.ModelSerializer):
+    horarios = serializers.SerializerMethodField()
+    faltas_atuais = serializers.SerializerMethodField()
+    configuracao_notas = serializers.SerializerMethodField()
+    max_absences = serializers.SerializerMethodField(method_name='obter_maximo_faltas')
+
+    class Meta:
+        model = Materia
+        fields = [
+            'id', 'codigo', 'nome', 'horarios', 'faltas_atuais', 'configuracao_notas',
+            'max_absences'
+        ]
+
+    def get_horarios(self, obj):
+        horarios_mapeamento = self.context.get('horarios_mapeamento')
+        if horarios_mapeamento is not None:
+            horarios = horarios_mapeamento.get(obj.id, [])
+            return HorarioSerializer(horarios, many=True).data
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return []
+        horarios = ano_letivo.horarios.filter(materia=obj)
+        return HorarioSerializer(horarios, many=True).data
+
+    def get_faltas_atuais(self, obj):
+        faltas_mapeamento = self.context.get('faltas_mapeamento')
+        if faltas_mapeamento is not None:
+            return faltas_mapeamento.get(obj.id, 0)
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return 0
+        from .models import RegistroFalta
+        total = RegistroFalta.objects.filter(
+            perfil=perfil, 
+            materia=obj, 
+            ano_letivo=ano_letivo
+        ).aggregate(Sum('faltas'))['faltas__sum']
+        return total or 0
+
+    def get_configuracao_notas(self, obj):
+        incluir_avaliacoes = self.context.get('incluir_avaliacoes', False)
+        if not incluir_avaliacoes:
+            return None
+        configs_mapeamento = self.context.get('configs_mapeamento')
+        if configs_mapeamento is not None:
+            config = configs_mapeamento.get(obj.id)
+            if config:
+                return ConfiguracaoMateriaResumidaSerializer(config).data
+            return None
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return None
+        
+        config = ConfiguracaoMateria.objects.filter(
+            perfil=perfil,
+            materia=obj,
+            ano_letivo=ano_letivo
+        ).first()
+        
+        if config:
+            return ConfiguracaoMateriaResumidaSerializer(config).data
+        return None
+
+    def obter_maximo_faltas(self, obj):
+        horarios_mapeamento = self.context.get('horarios_mapeamento')
+        if horarios_mapeamento is not None:
+            horarios = horarios_mapeamento.get(obj.id, [])
+            if not horarios:
+                return 0
+            return horarios[0].maximo_faltas
+        perfil = self.context.get('perfil')
+        ano_letivo = self.context.get('ano_letivo')
+        if not perfil or not ano_letivo:
+            return 0
+        horarios = ano_letivo.horarios.filter(materia=obj)
+        if not horarios.exists():
+            return 0
+        return horarios.first().maximo_faltas
+
+
 class PerfilAcademicoSerializer(serializers.ModelSerializer):
     curso = CursoSerializer(read_only=True)
     materias = serializers.SerializerMethodField()
@@ -279,12 +395,66 @@ class PerfilAcademicoSerializer(serializers.ModelSerializer):
         
         if not ano_letivo:
             return []
+
+        from django.db.models import Sum
+        from collections import defaultdict
+
+        faltas_agg = RegistroFalta.objects.filter(
+            perfil=obj, 
+            ano_letivo=ano_letivo
+        ).values('materia_id').annotate(total=Sum('faltas'))
+        
+        faltas_mapeamento = {f['materia_id']: f['total'] for f in faltas_agg}
+        
+        faltas_detalhes = RegistroFalta.objects.filter(
+            perfil=obj, 
+            ano_letivo=ano_letivo
+        ).values('materia_id', 'data', 'aula', 'faltas')
+        
+        detalhes_mapeamento = defaultdict(list)
+        for fd in faltas_detalhes:
+            detalhes_mapeamento[fd['materia_id']].append({
+                'data': fd['data'],
+                'aula': fd['aula'],
+                'faltas': fd['faltas']
+            })
             
-        return MateriaSerializer(
-            ano_letivo.materias.all(), 
-            many=True, 
-            context={'perfil': obj, 'ano_letivo': ano_letivo}
-        ).data
+        horarios_lista = list(ano_letivo.horarios.all())
+        horarios_mapeamento = defaultdict(list)
+        for h in horarios_lista:
+            horarios_mapeamento[h.materia_id].append(h)
+            
+        configs_lista = ConfiguracaoMateria.objects.filter(
+            perfil=obj,
+            ano_letivo=ano_letivo
+        ).prefetch_related('avaliacoes', 'notes')
+        
+        configs_mapeamento = {c.materia_id: c for c in configs_lista}
+        
+        contexto_materia = {
+            'perfil': obj,
+            'ano_letivo': ano_letivo,
+            'faltas_mapeamento': faltas_mapeamento,
+            'detalhes_mapeamento': detalhes_mapeamento,
+            'horarios_mapeamento': horarios_mapeamento,
+            'configs_mapeamento': configs_mapeamento,
+            'incluir_avaliacoes': self.context.get('incluir_avaliacoes', False)
+        }
+        
+        resumido = self.context.get('resumido', True)
+        
+        if resumido:
+            return MateriaResumidaSerializer(
+                ano_letivo.materias.all(),
+                many=True,
+                context=contexto_materia
+            ).data
+        else:
+            return MateriaSerializer(
+                ano_letivo.materias.all(), 
+                many=True, 
+                context=contexto_materia
+            ).data
 
     def get_configurado(self, obj):
         return obj.curso is not None

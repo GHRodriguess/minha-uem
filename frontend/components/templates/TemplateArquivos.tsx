@@ -46,8 +46,7 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
     
     setLoadingMateria(true)
     try {
-      const profile = await academic_service.obterPerfil(session.accessToken, anoAtivoId)
-      const foundSubject = profile.materias?.find(m => m.id === materiaId)
+      const foundSubject = await academic_service.obterMateria(session.accessToken, materiaId, anoAtivoId)
       if (foundSubject) {
         setMateria(foundSubject)
       }

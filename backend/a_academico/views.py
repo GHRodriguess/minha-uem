@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria
-from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer
+from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer
 from .services import ServicoExtracaoHorario
 import requests
 import re
@@ -41,8 +41,46 @@ class PerfilAcademicoView(APIView):
     def get(self, request):
         perfil, created = PerfilAcademico.objects.get_or_create(user=request.user)
         ano_id = request.query_params.get('ano_id')
-        serializer = PerfilAcademicoSerializer(perfil, context={'perfil': perfil, 'ano_id': ano_id})
+        resumido = request.query_params.get('resumido', 'true') == 'true'
+        incluir_avaliacoes = request.query_params.get('incluir_avaliacoes') == 'true'
+        serializer = PerfilAcademicoSerializer(
+            perfil, 
+            context={
+                'perfil': perfil, 
+                'ano_id': ano_id, 
+                'resumido': resumido,
+                'incluir_avaliacoes': incluir_avaliacoes
+            }
+        )
         return Response(serializer.data)
+
+
+class MateriaDetalheView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, materia_id):
+        try:
+            perfil, created = PerfilAcademico.objects.get_or_create(user=request.user)
+            ano_id = request.query_params.get('ano_id')
+            
+            if ano_id:
+                ano_letivo = perfil.anos.filter(id=ano_id).first()
+            else:
+                ano_letivo = perfil.anos.order_by('-ano').first()
+                
+            if not ano_letivo:
+                return Response({"erro": "Nenhum ano letivo configurado."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            materia = ano_letivo.materias.get(id=materia_id)
+            serializer = MateriaSerializer(
+                materia, 
+                context={'perfil': perfil, 'ano_letivo': ano_letivo}
+            )
+            return Response(serializer.data)
+        except Materia.DoesNotExist:
+            return Response({"erro": "Materia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class UploadHorarioView(APIView):
     permission_classes = [permissions.IsAuthenticated]

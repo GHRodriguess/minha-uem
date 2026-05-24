@@ -29,7 +29,7 @@ export default function HorariosPage() {
       setLoading(true)
     }
     try {
-      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
+      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined, true, true)
       setProfile(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)

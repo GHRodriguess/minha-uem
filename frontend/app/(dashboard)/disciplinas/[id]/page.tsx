@@ -36,8 +36,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
       setLoading(true)
     }
     try {
-      const perfil = await academic_service.obterPerfil(session.accessToken, anoAtivoId)
-      const encontrada = perfil.materias?.find(m => m.id === parseInt(id))
+      const encontrada = await academic_service.obterMateria(session.accessToken, parseInt(id), anoAtivoId)
       if (encontrada) {
         setMateria(encontrada)
       }
