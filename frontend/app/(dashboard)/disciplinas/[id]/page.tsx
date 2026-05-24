@@ -4,10 +4,11 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback, use } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
-import { AlertTriangle, Loader2, ArrowLeft, GraduationCap, FileText } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, GraduationCap, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
+import CarregamentoDetalheDisciplina from '@/components/templates/CarregamentoDetalheDisciplina'
 import { CardGestaoNotas } from '@/components/organisms/CardGestaoNotas'
 import { CardClassroom } from '@/components/organisms/CardClassroom'
 import MuralClassroom from '@/components/organisms/MuralClassroom'
@@ -60,12 +61,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   }, [id, anoAtivoId, preCarregarArquivos])
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium">Carregando detalhes da disciplina...</p>
-      </div>
-    )
+    return <CarregamentoDetalheDisciplina />
   }
 
   if (!materia) {

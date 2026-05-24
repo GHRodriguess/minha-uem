@@ -4,9 +4,10 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil, Materia } from '@/types/academico'
-import { BookOpen, Loader2, ListFilter } from 'lucide-react'
+import { BookOpen, ListFilter } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { CardDisciplina } from '@/components/organisms/CardDisciplina'
+import CarregamentoDisciplinas from '@/components/templates/CarregamentoDisciplinas'
 
 type Ordenacao = 'nome' | 'faltas' | 'andamento'
 type Agrupamento = 'nenhum' | 'departamento'
@@ -42,12 +43,7 @@ export default function DisciplinasPage() {
   }, [buscarPerfil, versao])
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted-foreground font-medium">Carregando disciplinas...</p>
-      </div>
-    )
+    return <CarregamentoDisciplinas />
   }
 
   if (!profile?.materias || profile.materias.length === 0) {
