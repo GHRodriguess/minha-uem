@@ -115,14 +115,14 @@ export function CalendarioListaEventos({
           const config = obterConfiguracaoTipo(item.avaliacao.tipo)
           const Icone = config.icon
           return (
-            <div key={`av-${idx}`} className={`${config.bg} ${config.border} border rounded-2xl p-5 shadow-sm transition-colors flex items-center justify-between gap-4`}>
-              <div className="flex items-center gap-4">
-                <div className={`${config.bg} w-16 h-16 rounded-xl flex flex-col items-center justify-center border ${config.border}`}>
+            <div key={`av-${idx}`} className={`${config.bg} ${config.border} border rounded-2xl p-5 shadow-sm transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+              <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
+                <div className={`${config.bg} w-16 h-16 rounded-xl flex flex-col items-center justify-center border ${config.border} shrink-0`}>
                   <Icone className={`w-8 h-8 ${config.text}`} />
                 </div>
-                <div>
-                  <h4 className="font-bold text-lg text-foreground leading-tight">{item.avaliacao.nome}</h4>
-                  <p className="text-sm text-muted-foreground mt-1 font-medium">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-lg text-foreground leading-tight truncate">{item.avaliacao.nome}</h4>
+                  <p className="text-sm text-muted-foreground mt-1 font-medium truncate">
                     <Link href={`/disciplinas/${item.materia.id}`} className="hover:underline hover:text-primary transition-colors">
                       {item.materia.nome}
                     </Link>
@@ -130,8 +130,8 @@ export function CalendarioListaEventos({
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`text-[10px] font-black ${config.badge} px-3 py-1 rounded-full uppercase`}>
+              <div className="text-left sm:text-right shrink-0">
+                <span className={`text-[10px] font-black ${config.badge} px-3 py-1 rounded-full uppercase whitespace-nowrap`}>
                   Peso {item.avaliacao.peso}
                 </span>
               </div>

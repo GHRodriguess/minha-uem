@@ -103,16 +103,16 @@ export default function DisciplinasPage() {
           <p className="text-muted-foreground mt-1 font-medium">Gerencie suas notas, faltas e materiais de estudo</p>
         </div>
 
-        <div className="flex items-center gap-3 bg-muted/30 p-1.5 rounded-2xl border border-border">
-          <div className="flex items-center gap-1.5 px-3">
-            <ListFilter className="w-4 h-4 text-muted-foreground" />
+        <div className="flex flex-wrap items-center gap-2 bg-muted/30 p-1.5 rounded-2xl border border-border w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 px-2">
+            <ListFilter className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Visualização:</span>
           </div>
           
           <select 
             value={groupType}
             onChange={(e) => setGroupType(e.target.value as Agrupamento)}
-            className="bg-background border border-border rounded-xl px-3 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-[130px]"
           >
             <option value="nenhum">Sem Agrupamento</option>
             <option value="departamento">Por Departamento</option>
@@ -121,7 +121,7 @@ export default function DisciplinasPage() {
           <select 
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as Ordenacao)}
-            className="bg-background border border-border rounded-xl px-3 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-[130px]"
           >
             <option value="andamento">Em Andamento</option>
             <option value="nome">Nome (A-Z)</option>
