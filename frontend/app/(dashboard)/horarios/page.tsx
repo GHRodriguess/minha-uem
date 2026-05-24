@@ -117,7 +117,32 @@ export default function HorariosPage() {
     const newAbsences = hasAbsence ? 0 : 1
     try {
       await academic_service.atualizarFaltas(session.accessToken, materiaId, dateStr, classNum, newAbsences, anoAtivoId || undefined)
-      buscarPerfil(true)
+      setProfile(prev => {
+        if (!prev || !prev.materias) return prev
+        const updatedMaterias = prev.materias.map(m => {
+          if (m.id !== materiaId) return m
+          const currentAbsences = m.detalhes_faltas || []
+          let updatedAbsences = [...currentAbsences]
+          if (newAbsences === 0) {
+            updatedAbsences = currentAbsences.filter(f => !(f.data === dateStr && f.aula === classNum))
+          } else {
+            const exists = currentAbsences.some(f => f.data === dateStr && f.aula === classNum)
+            if (!exists) {
+              updatedAbsences.push({ data: dateStr, aula: classNum, faltas: 1 })
+            }
+          }
+          const newTotal = updatedAbsences.reduce((acc, f) => acc + (f.faltas || 0), 0)
+          return {
+            ...m,
+            detalhes_faltas: updatedAbsences,
+            faltas_atuais: newTotal
+          }
+        })
+        return {
+          ...prev,
+          materias: updatedMaterias
+        }
+      })
     } catch (error) {
       console.error('Erro ao atualizar faltas:', error)
     }
