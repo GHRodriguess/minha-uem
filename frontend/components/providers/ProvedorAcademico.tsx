@@ -33,7 +33,7 @@ export function ProvedorAcademico({ children }: { children: React.ReactNode }) {
     
     setCarregandoAnos(true)
     try {
-      const perfil = await academic_service.obterPerfil(session.accessToken)
+      const perfil = await academic_service.obterPerfil(session.accessToken, undefined, true)
       if (perfil.anos) {
         setAnosDisponiveis(perfil.anos)
         

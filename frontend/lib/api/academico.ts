@@ -1,11 +1,15 @@
-import { Perfil, ConfiguracaoMateria, Avaliacao, AnotacaoMateria } from "@/types/academico";
+import { Perfil, Materia, ConfiguracaoMateria, Avaliacao, AnotacaoMateria } from "@/types/academico";
 import { api_client } from "./client";
 
 const base_path = "/api/academico";
 
 export const academic_service = {
-  obterPerfil(token: string, ano_id?: number, signal?: AbortSignal) {
-    return api_client.obter<Perfil>(`${base_path}/perfil/`, { ano_id }, token, signal);
+  obterPerfil(token: string, ano_id?: number, resumido?: boolean, incluir_avaliacoes?: boolean, signal?: AbortSignal) {
+    return api_client.obter<Perfil>(`${base_path}/perfil/`, { ano_id, resumido, incluir_avaliacoes }, token, signal);
+  },
+
+  obterMateria(token: string, materia_id: number, ano_id?: number, signal?: AbortSignal) {
+    return api_client.obter<Materia>(`${base_path}/materias/${materia_id}/`, { ano_id }, token, signal);
   },
 
   enviarHorario(token: string, file: File, confirmar: boolean = false, signal?: AbortSignal) {

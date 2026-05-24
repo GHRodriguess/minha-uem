@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     PerfilAcademicoView, 
+    MateriaDetalheView,
     UploadHorarioView, 
     ControleFaltaView, 
     ConfiguracaoMateriaView, 
@@ -27,6 +28,7 @@ from .views import (
 
 urlpatterns = [
     path('perfil/', PerfilAcademicoView.as_view(), name='perfil'),
+    path('materias/<int:materia_id>/', MateriaDetalheView.as_view(), name='materia_detalhe'),
     path('upload-horario/', UploadHorarioView.as_view(), name='upload_horario'),
     path('controle-falta/', ControleFaltaView.as_view(), name='controle_falta'),
     path('configuracao-notas/', ConfiguracaoMateriaView.as_view(), name='configuracao_notas'),
