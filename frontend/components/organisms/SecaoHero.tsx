@@ -17,7 +17,7 @@ export default function SecaoHero() {
           </BadgeFuncionalidade>
           
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-foreground tracking-tight leading-none">
-            Seu ecossistema acadêmico, <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">simplificado.</span>
+            Seu ecossistema acadêmico, <span className="bg-linear-to-r from-primary to-blue-500 bg-clip-text text-transparent">simplificado.</span>
           </h1>
           
           <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
