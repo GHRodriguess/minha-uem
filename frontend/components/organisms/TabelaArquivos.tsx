@@ -509,7 +509,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
               </div>
             ) : (
               <div className="flex items-start gap-2 group w-full justify-between">
-                <p className="font-bold text-foreground text-xs leading-relaxed break-words whitespace-normal">
+                <p className="font-bold text-foreground text-xs leading-relaxed wrap-break-words whitespace-normal">
                   {arquivo.custom_name || arquivo.original_name}
                 </p>
                 <button
