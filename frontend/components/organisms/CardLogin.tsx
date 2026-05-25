@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import BotaoLoginGoogle from '../atoms/BotaoLoginGoogle'
 import AlertaErroDominio from '../molecules/AlertaErroDominio'
 
@@ -30,8 +31,14 @@ export default function CardLogin({ erro }: PropriedadesCardLogin) {
         <BotaoLoginGoogle />
       </div>
       
-      <div className="mt-8 pt-6 border-t border-border w-full text-center">
-        <p className="text-sm text-muted-foreground">
+      <div className="mt-8 pt-6 border-t border-border w-full text-center flex flex-col gap-3">
+        <Link
+          href="/landing"
+          className="text-sm font-semibold text-primary hover:opacity-85 transition-opacity"
+        >
+          Conhecer as funcionalidades do Minha UEM
+        </Link>
+        <p className="text-xs text-muted-foreground">
           Problemas com o acesso? Contate o suporte da UEM.
         </p>
       </div>
