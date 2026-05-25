@@ -66,7 +66,7 @@ export default function DropdownNotificacoes() {
       <SinoNotificacoes count={notificationsCount} onClick={() => setIsOpen(!isOpen)} />
 
       {isOpen && (
-        <div className="fixed inset-x-4 top-[88px] sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 rounded-3xl border border-border bg-card/80 backdrop-blur-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-3 duration-200 origin-top-right">
+        <div className="fixed inset-x-4 top-22 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 rounded-3xl border border-border bg-card/80 backdrop-blur-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-3 duration-200 origin-top-right">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-2">
               <span className="font-black text-sm text-foreground uppercase tracking-wider">Avisos e Trabalhos</span>

@@ -127,7 +127,7 @@ export interface StatusMuralClassroom {
 
 export interface MensagemNotificacaoClassroom {
     id: string;
-    tipo: "aviso" | "tarefa";
+    tipo: "aviso" | "tarefa" | "material";
     titulo: string;
     data_criacao: string;
 }
