@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, GraduationCap, Calendar, LogOut, PlusCircle, Settings, X } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Calendar, LogOut, PlusCircle, Settings, X } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
 import { signOut, useSession } from 'next-auth/react'

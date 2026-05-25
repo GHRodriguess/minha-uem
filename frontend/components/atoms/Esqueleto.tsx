@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-interface EsqueletoProps extends React.HTMLAttributes<HTMLDivElement> {}
+type EsqueletoProps = React.HTMLAttributes<HTMLDivElement>
 
 export default function Esqueleto({ className, ...props }: EsqueletoProps) {
   return (

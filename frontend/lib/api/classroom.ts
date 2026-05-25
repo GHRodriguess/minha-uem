@@ -363,7 +363,6 @@ export const classroom_service = {
             selected_folder: string;
             local_path: string;
         }>,
-        signal?: AbortSignal,
     ) {
         return api_client.postar<ArquivoClassroom[]>(
             `${base_path}/arquivos/sincronizar/`,

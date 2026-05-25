@@ -17,7 +17,6 @@ export function CardAnotacoesMateria({ materia }: CardAnotacoesMateriaProps) {
   const [newContent, setNewContent] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState('')
-  const [loading, setLoading] = useState(false)
   const [actionLoadingId, setActionLoadingId] = useState<number | 'new' | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 

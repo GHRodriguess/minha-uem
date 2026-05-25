@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
 import { academic_service } from '@/lib/api/academico'
@@ -42,13 +42,7 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
     })
   )
 
-  useEffect(() => {
-    if (!materia.configuracao_notas && session?.accessToken) {
-      buscarConfiguracao()
-    }
-  }, [materia.id, anoId, session])
-
-  async function buscarConfiguracao() {
+  const buscarConfiguracao = useCallback(async () => {
     if (!session?.accessToken) return
     setLoading(true)
     try {
@@ -59,7 +53,13 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session?.accessToken, materia.id, anoId])
+
+  useEffect(() => {
+    if (!materia.configuracao_notas && session?.accessToken) {
+      buscarConfiguracao()
+    }
+  }, [materia.configuracao_notas, session?.accessToken, buscarConfiguracao])
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event

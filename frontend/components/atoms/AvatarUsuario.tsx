@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 interface AvatarUsuarioProps {
   src?: string | null
   alt?: string | null
@@ -10,10 +12,13 @@ export default function AvatarUsuario({ src, alt, className }: AvatarUsuarioProp
 
   if (src) {
     return (
-      <img
+      <Image
         src={src}
         alt={alt || 'Avatar'}
         className={classes}
+        width={40}
+        height={40}
+        unoptimized
       />
     )
   }

@@ -11,7 +11,6 @@ import {
   Edit2,
   Check,
   X,
-  Folder,
   AlertCircle,
   CheckCircle2,
   Loader2,
@@ -43,7 +42,6 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     hasFolderPermission,
     isFileSystemSupported,
     solicitarAcessoPasta,
-    desvincularPasta,
     obterArquivos,
     baixarItem,
     salvarNomePersonalizado,
@@ -124,7 +122,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     return () => {
       isMounted = false
     }
-  }, [filesHash, statusVinculo?.curso_nome, statusVinculo?.ano_letivo, statusVinculo?.materia_nome, directoryHandle, hasFolderPermission])
+  }, [filesHash, statusVinculo?.curso_nome, statusVinculo?.ano_letivo, statusVinculo?.materia_nome, directoryHandle, hasFolderPermission, statusVinculo?.arquivos])
 
   const iniciarEdicaoNome = (arquivo: ArquivoClassroom) => {
     setEditingFileId(arquivo.drive_file_id)
