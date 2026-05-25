@@ -1142,34 +1142,45 @@ class NotificacoesClassroomView(APIView):
             global_unread_count = 0
             subject_updates = []
 
-            def buscar_novidades_turma(conn):
-                course_id = conn.classroom_course_id
-                ann_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements?pageSize=3'
-                cw_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork?pageSize=3'
-
-                def realizar_requisicao(url):
-                    try:
-                        res = requests.get(url, headers=headers)
-                        if res.status_code == 401:
-                            raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
-                        if res.status_code == 200:
-                            return res.json()
-                    except Exception:
-                        pass
-                    return {}
-
-                with ThreadPoolExecutor(max_workers=2) as exec_local:
-                    fut_local = [
-                        exec_local.submit(realizar_requisicao, ann_url),
-                        exec_local.submit(realizar_requisicao, cw_url)
-                    ]
-                    res_local = [f.result() for f in fut_local]
-
-                return res_local[0], res_local[1]
-
-            for conn in connections:
+            def realizar_requisicao(url):
                 try:
-                    ann_data, cw_data = buscar_novidades_turma(conn)
+                    res = requests.get(url, headers=headers)
+                    if res.status_code == 401:
+                        raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
+                    if res.status_code == 200:
+                        return res.json()
+                except PermissionError:
+                    raise
+                except Exception:
+                    pass
+                return {}
+
+            tarefas_futuras = []
+
+            with ThreadPoolExecutor(max_workers=15) as executor:
+                for conn in connections:
+                    course_id = conn.classroom_course_id
+                    ann_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements?pageSize=3'
+                    cw_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork?pageSize=3'
+                    cwm_url = f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials?pageSize=3'
+
+                    f_ann = executor.submit(realizar_requisicao, ann_url)
+                    f_cw = executor.submit(realizar_requisicao, cw_url)
+                    f_cwm = executor.submit(realizar_requisicao, cwm_url)
+
+                    tarefas_futuras.append({
+                        'conn': conn,
+                        'f_ann': f_ann,
+                        'f_cw': f_cw,
+                        'f_cwm': f_cwm
+                    })
+
+            for tarefa in tarefas_futuras:
+                conn = tarefa['conn']
+                try:
+                    ann_data = tarefa['f_ann'].result()
+                    cw_data = tarefa['f_cw'].result()
+                    cwm_data = tarefa['f_cwm'].result()
                 except PermissionError:
                     return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1187,6 +1198,14 @@ class NotificacoesClassroomView(APIView):
                     items.append({
                         'id': item.get('id'),
                         'tipo': 'tarefa',
+                        'titulo': item.get('title'),
+                        'data_criacao': item.get('creationTime')
+                    })
+
+                for item in cwm_data.get('courseWorkMaterial', []):
+                    items.append({
+                        'id': item.get('id'),
+                        'tipo': 'material',
                         'titulo': item.get('title'),
                         'data_criacao': item.get('creationTime')
                     })

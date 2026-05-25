@@ -66,7 +66,7 @@ export default function DropdownNotificacoes() {
       <SinoNotificacoes count={notificationsCount} onClick={() => setIsOpen(!isOpen)} />
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-96 rounded-3xl border border-border bg-card/80 backdrop-blur-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-3 duration-200">
+        <div className="fixed inset-x-4 top-[88px] sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 rounded-3xl border border-border bg-card/80 backdrop-blur-xl shadow-xl z-50 animate-in fade-in slide-in-from-top-3 duration-200 origin-top-right">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-2">
               <span className="font-black text-sm text-foreground uppercase tracking-wider">Avisos e Trabalhos</span>
@@ -118,10 +118,16 @@ export default function DropdownNotificacoes() {
                         className="group flex items-start gap-3 p-2.5 rounded-2xl hover:bg-muted transition-colors border border-transparent hover:border-border"
                       >
                         <div className={`p-2 rounded-xl shrink-0 ${
-                          msg.tipo === 'tarefa' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                          msg.tipo === 'tarefa' 
+                            ? 'bg-amber-500/10 text-amber-500' 
+                            : msg.tipo === 'material'
+                            ? 'bg-emerald-500/10 text-emerald-500'
+                            : 'bg-blue-500/10 text-blue-500'
                         }`}>
                           {msg.tipo === 'tarefa' ? (
                             <FileText className="w-4 h-4" />
+                          ) : msg.tipo === 'material' ? (
+                            <BookOpen className="w-4 h-4" />
                           ) : (
                             <AlertCircle className="w-4 h-4" />
                           )}
@@ -131,7 +137,11 @@ export default function DropdownNotificacoes() {
                             {msg.titulo}
                           </p>
                           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">
-                            {msg.tipo === 'tarefa' ? 'Tarefa' : 'Aviso no Mural'} • {formatarTempoRelativo(msg.data_criacao)}
+                            {msg.tipo === 'tarefa' 
+                              ? 'Tarefa' 
+                              : msg.tipo === 'material' 
+                              ? 'Material' 
+                              : 'Aviso no Mural'} • {formatarTempoRelativo(msg.data_criacao)}
                           </span>
                         </div>
                       </Link>
