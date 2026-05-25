@@ -142,8 +142,8 @@ export function CardSincronizacaoAgenda() {
                   <div className="space-y-4">
                     <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
                       <li>Acesse o <a href="https://calendar.google.com" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">Google Agenda</a> no computador.</li>
-                      <li>No painel lateral esquerdo, clique no botão <span className="font-bold text-foreground">+</span> ao lado de <span className="font-bold text-foreground">"Outras agendas"</span> e selecione <span className="font-bold text-foreground">"Do URL"</span>.</li>
-                      <li>Cole o link copiado no campo indicado e clique em <span className="font-bold text-foreground">"Adicionar agenda"</span>.</li>
+                      <li>No painel lateral esquerdo, clique no botão <span className="font-bold text-foreground">+</span> ao lado de <span className="font-bold text-foreground">&quot;Outras agendas&quot;</span> e selecione <span className="font-bold text-foreground">&quot;Do URL&quot;</span>.</li>
+                      <li>Cole o link copiado no campo indicado e clique em <span className="font-bold text-foreground">&quot;Adicionar agenda&quot;</span>.</li>
                       <li>O Google sincronizará automaticamente todas as suas aulas, provas e trabalhos no calendário!</li>
                     </ol>
                     <div className="pt-2">
@@ -191,9 +191,9 @@ export function CardSincronizacaoAgenda() {
                         O Notion Calendar gerencia seus horários importando dados diretamente das suas contas do Google Calendar.
                       </p>
                       <ol className="list-decimal list-inside space-y-3 text-xs text-muted-foreground font-semibold leading-relaxed">
-                        <li>Siga as instruções descritas na aba <span className="font-bold text-foreground">"Google Agenda"</span> para adicionar o feed à sua conta institucional do Google Workspace (<span className="font-bold text-primary">@uem.br</span>).</li>
+                        <li>Siga as instruções descritas na aba <span className="font-bold text-foreground">&quot;Google Agenda&quot;</span> para adicionar o feed à sua conta institucional do Google Workspace (<span className="font-bold text-primary">@uem.br</span>).</li>
                         <li>Abra o Notion Calendar e certifique-se de que a conta Google correspondente está vinculada nas configurações de contas do aplicativo.</li>
-                        <li>Ative a exibição do calendário <span className="font-bold text-foreground">"Minha UEM"</span> no painel esquerdo do Notion Calendar para ver todas as suas atividades e prazos integrados!</li>
+                        <li>Ative a exibição do calendário <span className="font-bold text-foreground">&quot;Minha UEM&quot;</span> no painel esquerdo do Notion Calendar para ver todas as suas atividades e prazos integrados!</li>
                       </ol>
                     </div>
                     <div className="pt-2">

@@ -21,7 +21,6 @@ import {
   FileBox,
   FileSignature,
   Filter,
-  RefreshCw,
   FolderOpen,
   ArrowUpDown,
   ArrowUp,
@@ -50,8 +49,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     directoryHandle,
     hasFolderPermission,
     isFileSystemSupported,
-    solicitarAcessoPasta,
-    desvincularPasta
+    solicitarAcessoPasta
   } = useClassroom()
 
   const [searchText, setSearchText] = useState('')
@@ -118,7 +116,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     return () => {
       isMounted = false
     }
-  }, [filesHash, dadosVinculo?.curso_nome, dadosVinculo?.ano_letivo, dadosVinculo?.materia_nome, directoryHandle, hasFolderPermission])
+  }, [filesHash, dadosVinculo?.curso_nome, dadosVinculo?.ano_letivo, dadosVinculo?.materia_nome, directoryHandle, hasFolderPermission, dadosVinculo?.arquivos])
 
   const alterarOrdenacao = (campo: 'nome' | 'sincronizacao') => {
     if (sortField === campo) {

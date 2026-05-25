@@ -64,7 +64,7 @@ export class GerenciadorDiretorio {
       if ((await (handle as any).requestPermission(options)) === "granted") {
         return true;
       }
-    } catch (e) {
+    } catch {
       return false;
     }
     return false;

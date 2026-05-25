@@ -8,7 +8,6 @@ import {
   ArrowLeft, 
   AlertTriangle,
   Folder,
-  CloudLightning,
   FileCheck2,
   HardDriveDownload,
   School,
@@ -18,7 +17,6 @@ import {
 import CarregamentoArquivos from '@/components/templates/CarregamentoArquivos'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
-import { StatusVinculoClassroom } from '@/lib/api/classroom'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { TabelaArquivos } from '@/components/organisms/TabelaArquivos'
