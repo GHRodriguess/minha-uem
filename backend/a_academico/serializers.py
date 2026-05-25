@@ -61,6 +61,8 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         return round(float(soma_ponderada / soma_pesos), 2)
 
     def get_quanto_falta(self, obj):
+        if not obj.avaliacoes.exists():
+            return 0.0
         avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
         avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
         
@@ -102,6 +104,8 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         return 0.0
 
     def obter_status_aprovacao(self, obj):
+        if not obj.avaliacoes.exists():
+            return 'EM_ANDAMENTO'
         avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
         media = self.get_media_atual(obj)
         if not avaliacoes_sem_nota.exists():

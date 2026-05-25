@@ -2,13 +2,15 @@
 
 import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
-import { Perfil, Materia, Horario } from '@/types/academico'
+import { Perfil } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
-import { BookOpen, GraduationCap, Calendar, Clock, MapPin } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import CarregamentoHome from '@/components/templates/CarregamentoHome'
+import { CardMateriaHome } from '@/components/organisms/CardMateriaHome'
+import { GridEstatisticasHome } from '@/components/organisms/GridEstatisticasHome'
+import { PainelLateralHome } from '@/components/organisms/PainelLateralHome'
+import { obterAulasHoje } from '@/lib/utils/aulas'
 
 export default function Home() {
   const { data: session } = useSession()
@@ -18,10 +20,9 @@ export default function Home() {
 
   const buscarPerfil = useCallback(async () => {
     if (!session?.accessToken) return
-
     setLoading(true)
     try {
-      const data = await academic_service.obterPerfil(session.accessToken, activeYearId || undefined)
+      const data = await academic_service.obterPerfil(session.accessToken, activeYearId || undefined, false, true)
       setProfile(data)
     } catch (error) {
       console.error('Erro ao buscar perfil:', error)
@@ -34,167 +35,70 @@ export default function Home() {
     buscarPerfil()
   }, [buscarPerfil, version])
 
-  const filtrarAulasHoje = () => {
-    if (!profile?.materias) return []
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const backendDay = dayOfWeek === 0 ? 7 : dayOfWeek
-
-    const classes: { materia: Materia; horario: Horario }[] = []
-    profile.materias.forEach(m => {
-      const firstSchedule = m.horarios?.[0]
-      if (!firstSchedule) return
-
-      const [yearS, monthS, dayS] = firstSchedule.data_inicio.split('-').map(Number)
-      const [yearE, monthE, dayE] = firstSchedule.data_termino.split('-').map(Number)
-      
-      const todayPure = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-      const startPure = new Date(yearS, monthS - 1, dayS)
-      const endPure = new Date(yearE, monthE - 1, dayE)
-
-      if (todayPure >= startPure && todayPure <= endPure) {
-        m.horarios?.forEach(h => {
-          if (h.dia === backendDay) {
-            classes.push({ materia: m, horario: h })
-          }
+  const alternarFalta = async (materiaId: number, dateStr: string, classNum: number, hasAbsence: boolean) => {
+    if (!session?.accessToken) return
+    const newAbsences = hasAbsence ? 0 : 1
+    try {
+      await academic_service.atualizarFaltas(session.accessToken, materiaId, dateStr, classNum, newAbsences, activeYearId || undefined)
+      setProfile(prev => {
+        if (!prev || !prev.materias) return prev
+        const updated = prev.materias.map(m => {
+          if (m.id !== materiaId) return m
+          const current = m.detalhes_faltas || []
+          const updatedAbsences = newAbsences === 0
+            ? current.filter(f => !(f.data === dateStr && f.aula === classNum))
+            : [...current.filter(f => !(f.data === dateStr && f.aula === classNum)), { data: dateStr, aula: classNum, faltas: 1 }]
+          return { ...m, detalhes_faltas: updatedAbsences, faltas_atuais: updatedAbsences.reduce((acc, f) => acc + f.faltas, 0) }
         })
-      }
-    })
-    return classes.sort((a, b) => a.horario.inicio.localeCompare(b.horario.inicio))
+        return { ...prev, materias: updated }
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar faltas:', error)
+    }
   }
 
-  if (loading) {
-    return <CarregamentoHome />
-  }
-
+  if (loading) return <CarregamentoHome />
   if (!profile?.configurado) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <CardUploadPDF 
-          token={session?.accessToken || ''} 
-          onSuccess={(newProfile) => setProfile(newProfile)} 
-        />
+        <CardUploadPDF token={session?.accessToken || ''} onSuccess={setProfile} />
       </div>
     )
   }
 
-  const todayClasses = filtrarAulasHoje()
+  const todayClasses = obterAulasHoje(profile)
+  const todayStr = new Date().toISOString().split('T')[0]
+  const nextClass = todayClasses.find(a => a.horario.inicio > `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`)
+  const activeYearLabel = availableYears.find(a => a.id === activeYearId)?.ano || '---'
 
-  const obterProximaAula = () => {
-    const now = new Date()
-    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-    return todayClasses.find(a => a.horario.inicio > timeString)
-  }
-
-  const nextClass = obterProximaAula()
-  const activeAcademicYear = availableYears.find(a => a.id === activeYearId)?.ano
+  const sortedMaterias = [...(profile.materias || [])].sort((a, b) => {
+    const firstA = a.horarios?.[0]
+    const firstB = b.horarios?.[0]
+    const isEmCursoA = firstA && todayStr >= firstA.data_inicio && todayStr <= firstA.data_termino ? 1 : 0
+    const isEmCursoB = firstB && todayStr >= firstB.data_inicio && todayStr <= firstB.data_termino ? 1 : 0
+    return isEmCursoB - isEmCursoA || a.nome.localeCompare(b.nome)
+  })
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
       <section>
-        <h2 className="text-3xl font-bold text-foreground">Visão Geral</h2>
-        <p className="text-muted-foreground mt-2">Bem-vindo ao seu painel acadêmico.</p>
+        <h2 className="text-3xl font-black text-foreground tracking-tight">Visão Geral</h2>
+        <p className="text-sm text-muted-foreground mt-1 font-semibold">Painel acadêmico integrado.</p>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-          <div className="bg-primary/10 w-12 h-12 rounded-xl flex items-center justify-center mb-4">
-            <GraduationCap className="w-6 h-6 text-primary" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">Curso</p>
-          <p className="text-lg font-bold text-foreground mt-1 truncate" title={`${profile.curso?.codigo} - ${profile.curso?.nome}`}>
-            {profile.curso?.codigo} - {profile.curso?.nome}
-          </p>
-        </div>
-
-        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-          <div className="bg-blue-500/10 w-12 h-12 rounded-xl flex items-center justify-center mb-4">
-            <BookOpen className="w-6 h-6 text-blue-500" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">Disciplinas</p>
-          <p className="text-2xl font-bold text-foreground mt-1">
-            {profile.materias?.length}
-          </p>
-        </div>
-
-        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-          <div className="bg-green-500/10 w-12 h-12 rounded-xl flex items-center justify-center mb-4">
-            <Calendar className="w-6 h-6 text-green-500" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">Ano Letivo</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{activeAcademicYear || '---'}</p>
-        </div>
-
-        <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-          <div className="bg-purple-500/10 w-12 h-12 rounded-xl flex items-center justify-center mb-4">
-            <Clock className="w-6 h-6 text-purple-500" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">Próxima Aula</p>
-          <p className="text-lg font-bold text-foreground mt-1">
-            {nextClass ? nextClass.horario.inicio.substring(0, 5) : 'Sem mais hoje'}
-          </p>
-        </div>
-      </div>
+      <GridEstatisticasHome profile={profile} activeYearLabel={activeYearLabel} nextClass={nextClass} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-xl font-bold text-foreground mb-6">Suas Disciplinas</h3>
-          <div className="space-y-4">
-            {profile.materias?.map((materia: Materia) => (
-              <Link
-                key={materia.id}
-                href={`/disciplinas/${materia.id}`}
-                className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                <div>
-                  <p className="font-bold text-foreground hover:text-primary transition-colors">{materia.nome}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{materia.codigo} • Turma {materia.horarios?.[0]?.turma}</p>
-                </div>
-                <div className="text-right">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                    {materia.horarios?.[0]?.departamento}
-                  </span>
-                </div>
-              </Link>
+          <h3 className="text-lg font-black text-foreground mb-6 uppercase tracking-wider">Suas Disciplinas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sortedMaterias.map(materia => (
+              <CardMateriaHome key={materia.id} materia={materia} />
             ))}
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-xl font-bold text-foreground mb-6">Horário Hoje</h3>
-          <div className="space-y-4">
-            {todayClasses.length > 0 ? (
-              todayClasses.map((aula, idx) => (
-                <Link
-                  key={idx}
-                  href={`/disciplinas/${aula.materia.id}`}
-                  className="block p-4 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-bold text-foreground hover:text-primary transition-colors">{aula.materia.nome}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <Clock className="w-3 h-3" />
-                        {aula.horario.inicio.substring(0, 5)} - {aula.horario.fim.substring(0, 5)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center justify-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                        <MapPin className="w-7 h-7"/>
-                        <span className='text-left pl-1'>{aula.horario.sala.replace("-", " ")}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center">
-                <Calendar className="w-12 h-12 mb-4 opacity-20" />
-                <p>Nenhuma aula hoje.</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <PainelLateralHome aulasHoje={todayClasses} dataString={todayStr} onAlternarFalta={alternarFalta} materias={profile.materias || []} />
       </div>
     </div>
   )
