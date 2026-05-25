@@ -7,6 +7,13 @@ import { Horario } from '@/types/academico'
 import { Button } from '../ui/button'
 import { Loader2, Plus, AlertCircle } from 'lucide-react'
 
+function obterDataFormatada(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 interface AddAbsenceFormProps {
   subjectId: number
   yearId: number
@@ -16,7 +23,7 @@ interface AddAbsenceFormProps {
 
 export function AddAbsenceForm({ subjectId, yearId, schedules = [], onUpdate }: AddAbsenceFormProps) {
   const { data: session } = useSession()
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(obterDataFormatada(new Date()))
   const [selectedClasses, setSelectedClasses] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)

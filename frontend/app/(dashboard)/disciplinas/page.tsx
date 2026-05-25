@@ -112,7 +112,7 @@ export default function DisciplinasPage() {
           <select 
             value={groupType}
             onChange={(e) => setGroupType(e.target.value as Agrupamento)}
-            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-[130px]"
+            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-32.5"
           >
             <option value="nenhum">Sem Agrupamento</option>
             <option value="departamento">Por Departamento</option>
@@ -121,7 +121,7 @@ export default function DisciplinasPage() {
           <select 
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as Ordenacao)}
-            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-[130px]"
+            className="bg-background border border-border rounded-xl px-2 h-9 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 sm:flex-initial min-w-32.5"
           >
             <option value="andamento">Em Andamento</option>
             <option value="nome">Nome (A-Z)</option>

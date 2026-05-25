@@ -13,6 +13,13 @@ import CarregamentoHorarios from '@/components/templates/CarregamentoHorarios'
 import { CalendarioGrade } from '@/components/organisms/CalendarioGrade'
 import { CalendarioListaEventos } from '@/components/organisms/CalendarioListaEventos'
 
+function obterDataFormatada(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function HorariosPage() {
   const { data: session } = useSession()
   const { anoAtivoId, anosDisponiveis, versao } = useAcademico()
@@ -75,7 +82,7 @@ export default function HorariosPage() {
 
     const dayOfWeek = date.getDay()
     const backendDay = dayOfWeek === 0 ? 7 : dayOfWeek
-    const dateString = date.toISOString().split('T')[0]
+    const dateString = obterDataFormatada(date)
 
     const classes: { materia: Materia; horario: Horario }[] = []
     const assessments: { materia: Materia; avaliacao: any }[] = []
