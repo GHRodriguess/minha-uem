@@ -1,15 +1,17 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, Calendar, LogOut, PlusCircle, Settings, X } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Calendar, LogOut, PlusCircle, Settings, X, LifeBuoy, Shield, Newspaper } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
 import { signOut, useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Modal from '../shared/Modal'
 import CardUploadPDF from './CardUploadPDF'
 import { useClassroom } from '../providers/ProvedorClassroom'
+import { useSuporte } from '../providers/ProvedorSuporte'
+import { suporte_servico } from '@/lib/api/suporte'
 import { clsx } from 'clsx'
 
 interface SidebarProps {
@@ -23,6 +25,26 @@ export default function Sidebar({ className, isMobile, onClose }: SidebarProps) 
   const { data: session } = useSession()
   const [modalAberto, setModalAberto] = useState(false)
   const { notificationsCount } = useClassroom()
+  const { usuarioMe, notificacoesUsuario, notificacoesAdmin } = useSuporte()
+  const [latestNewsId, setLatestNewsId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const token = session?.accessToken
+    if (!token) return
+    const verificarNoticias = async () => {
+      try {
+        const list = await suporte_servico.listarNoticias(token)
+        if (list.length > 0) {
+          const maxId = Math.max(...list.map(n => n.id))
+          setLatestNewsId(maxId)
+        }
+      } catch {
+      }
+    }
+    verificarNoticias()
+    const interval = setInterval(verificarNoticias, 60000)
+    return () => clearInterval(interval)
+  }, [session?.accessToken])
 
   const handleSair = () => {
     signOut({ callbackUrl: '/login' })
@@ -32,8 +54,15 @@ export default function Sidebar({ className, isMobile, onClose }: SidebarProps) 
     { href: '/', icon: LayoutDashboard, label: 'Início' },
     { href: '/disciplinas', icon: BookOpen, label: 'Disciplinas' },
     { href: '/horarios', icon: Calendar, label: 'Calendário' },
+    { href: '/noticias', icon: Newspaper, label: 'Notícias' },
+    { href: '/suporte', icon: LifeBuoy, label: 'Suporte' },
     { href: '/configuracoes', icon: Settings, label: 'Configurações' },
   ]
+
+  if (usuarioMe?.is_staff) {
+    links.splice(4, 0, { href: '/admin', icon: Shield, label: 'Administração' })
+  }
+
 
   return (
     <aside className={clsx(
@@ -58,20 +87,37 @@ export default function Sidebar({ className, isMobile, onClose }: SidebarProps) 
       <nav className="flex-1 space-y-2">
         {links.map((link) => {
           const isDisciplinas = link.href === '/disciplinas'
+          const isSuporte = link.href === '/suporte'
+          const isAdmin = link.href === '/admin'
+          const isNoticias = link.href === '/noticias'
+
+          let contagemBadge = 0
+          if (isDisciplinas) contagemBadge = notificationsCount
+          if (isSuporte) contagemBadge = notificacoesUsuario
+          if (isAdmin) contagemBadge = notificacoesAdmin
+
+          let showBadge = contagemBadge > 0
+          if (isNoticias) {
+            const lastRead = typeof window !== 'undefined' ? localStorage.getItem('lastReadNewsId') : null
+            if (latestNewsId && (!lastRead || parseInt(lastRead) < latestNewsId)) {
+              showBadge = true
+            }
+          }
+
           return (
             <ItemNavegacao
               key={link.href}
               {...link}
               active={pathname === link.href}
               onClick={onClose}
-              badge={isDisciplinas && notificationsCount > 0 ? (
+              badge={showBadge ? (
                 <span className={clsx(
                   "flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full text-[10px] font-black leading-none",
                   pathname === link.href 
                     ? "bg-primary-foreground text-primary" 
                     : "bg-destructive text-destructive-foreground animate-pulse"
                 )}>
-                  {notificationsCount}
+                  {isNoticias ? "!" : contagemBadge}
                 </span>
               ) : undefined}
             />

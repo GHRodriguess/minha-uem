@@ -23,14 +23,30 @@ class LoginGoogle(APIView):
             )
             
             email = id_info.get('email')
+            given_name = id_info.get('given_name', '')
+            family_name = id_info.get('family_name', '')
+            name = id_info.get('name', '')
             
             if not email.endswith('@uem.br'):
                 return Response({'erro': 'Acesso restrito ao domínio @uem.br'}, status=status.HTTP_403_FORBIDDEN)
             
             user, created = User.objects.get_or_create(
                 email=email,
-                defaults={'username': email.split('@')[0]}
+                defaults={
+                    'username': email.split('@')[0],
+                    'first_name': given_name or name,
+                    'last_name': family_name
+                }
             )
+            
+            from django.utils.timezone import now
+            user.last_login = now()
+            
+            if created or not user.first_name:
+                user.first_name = given_name or name
+                user.last_name = family_name
+            
+            user.save()
             
             refresh = RefreshToken.for_user(user)
             
@@ -43,3 +59,25 @@ class LoginGoogle(APIView):
             import traceback
             traceback.print_exc()
             return Response({'erro': 'Token inválido', 'detalhe': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+from rest_framework.permissions import IsAuthenticated
+
+class ObterUsuarioLogadoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.utils.timezone import now
+        from a_academico.views import obter_perfil_ativo
+        
+        _, resolved_user = obter_perfil_ativo(request)
+        
+        request.user.last_login = now()
+        request.user.save(update_fields=['last_login'])
+        
+        return Response({
+            'username': resolved_user.username,
+            'email': resolved_user.email,
+            'is_staff': resolved_user.is_staff or resolved_user.is_superuser
+        })
+

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { academic_service } from '@/lib/api/academico'
-import { AnoLetivo } from '@/types/academico'
+import { AnoLetivo, Perfil } from '@/types/academico'
 
 interface ContextoAcademicoData {
   anoAtivoId: number | null
@@ -13,6 +13,8 @@ interface ContextoAcademicoData {
   atualizarAnos: () => Promise<void>
   versao: number
   notificarMudanca: () => void
+  perfil: Perfil | null
+  setPerfil: React.Dispatch<React.SetStateAction<Perfil | null>>
 }
 
 const ContextoAcademico = createContext<ContextoAcademicoData>({} as ContextoAcademicoData)
@@ -21,7 +23,8 @@ export function ProvedorAcademico({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const [anoAtivoId, setAnoAtivoIdState] = useState<number | null>(null)
   const [anosDisponiveis, setAnosDisponiveis] = useState<AnoLetivo[]>([])
-  const [carregandoAnos, setCarregandoAnos] = useState(false)
+  const [carregandoAnos, setCarregandoAnos] = useState(true)
+  const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [versao, setVersao] = useState(0)
 
   const notificarMudanca = useCallback(() => {
@@ -29,31 +32,51 @@ export function ProvedorAcademico({ children }: { children: React.ReactNode }) {
   }, [])
 
   const atualizarAnos = useCallback(async () => {
-    if (!session?.accessToken) return
+    if (!session?.accessToken) {
+      setCarregandoAnos(false)
+      return
+    }
     
     setCarregandoAnos(true)
     try {
-      const perfil = await academic_service.obterPerfil(session.accessToken, undefined, true)
-      if (perfil.anos) {
-        setAnosDisponiveis(perfil.anos)
+      let activeId: number | null = null
+      const salvo = localStorage.getItem('anoAtivoId')
+      if (salvo) {
+        activeId = parseInt(salvo)
+      }
+
+      const data = await academic_service.obterPerfil(
+        session.accessToken, 
+        activeId || undefined, 
+        true, 
+        true
+      )
+      
+      setPerfil(data)
+      
+      if (data.anos) {
+        setAnosDisponiveis(data.anos)
         
-        // Se não houver ano ativo selecionado, tenta recuperar do localStorage
-        // ou seleciona o mais recente
-        const salvo = localStorage.getItem('anoAtivoId')
-        if (salvo) {
-          const idSalvo = parseInt(salvo)
-          if (perfil.anos.some(a => a.id === idSalvo)) {
-            setAnoAtivoIdState(idSalvo)
-          } else if (perfil.anos.length > 0) {
-            setAnoAtivoIdState(perfil.anos[0].id)
-          }
-        } else if (perfil.anos.length > 0) {
-          const maisRecente = [...perfil.anos].sort((a, b) => b.ano - a.ano)[0]
+        if (activeId && data.anos.some(a => a.id === activeId)) {
+          setAnoAtivoIdState(activeId)
+        } else if (data.anos.length > 0) {
+          const maisRecente = [...data.anos].sort((a, b) => b.ano - a.ano)[0]
           setAnoAtivoIdState(maisRecente.id)
+          localStorage.setItem('anoAtivoId', maisRecente.id.toString())
+          
+          if (!activeId) {
+            const dataRecente = await academic_service.obterPerfil(
+              session.accessToken, 
+              maisRecente.id, 
+              true, 
+              true
+            )
+            setPerfil(dataRecente)
+          }
         }
       }
     } catch (error) {
-      console.error('Erro ao buscar anos disponíveis:', error)
+      console.error('Erro ao carregar perfil:', error)
     } finally {
       setCarregandoAnos(false)
     }
@@ -61,14 +84,26 @@ export function ProvedorAcademico({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     atualizarAnos()
-  }, [atualizarAnos])
+  }, [atualizarAnos, versao])
 
-  const setAnoAtivoId = (id: number | null) => {
+  const setAnoAtivoId = async (id: number | null) => {
     setAnoAtivoIdState(id)
     if (id) {
       localStorage.setItem('anoAtivoId', id.toString())
+      if (session?.accessToken) {
+        setCarregandoAnos(true)
+        try {
+          const data = await academic_service.obterPerfil(session.accessToken, id, true, true)
+          setPerfil(data)
+        } catch (error) {
+          console.error(error)
+        } finally {
+          setCarregandoAnos(false)
+        }
+      }
     } else {
       localStorage.removeItem('anoAtivoId')
+      setPerfil(null)
     }
   }
 
@@ -80,7 +115,9 @@ export function ProvedorAcademico({ children }: { children: React.ReactNode }) {
       carregandoAnos,
       atualizarAnos,
       versao,
-      notificarMudanca
+      notificarMudanca,
+      perfil,
+      setPerfil
     }}>
       {children}
     </ContextoAcademico.Provider>

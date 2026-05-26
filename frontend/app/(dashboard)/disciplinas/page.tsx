@@ -1,9 +1,7 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
-import { useEffect, useState, useCallback } from 'react'
-import { academic_service } from '@/lib/api/academico'
-import { Perfil, Materia } from '@/types/academico'
+import { useState } from 'react'
+import { Materia } from '@/types/academico'
 import { BookOpen, ListFilter } from 'lucide-react'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { CardDisciplina } from '@/components/organisms/CardDisciplina'
@@ -13,36 +11,11 @@ type Ordenacao = 'nome' | 'faltas' | 'andamento'
 type Agrupamento = 'nenhum' | 'departamento'
 
 export default function DisciplinasPage() {
-  const { data: session } = useSession()
-  const { anoAtivoId, versao } = useAcademico()
-  const [profile, setProfile] = useState<Perfil | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { carregandoAnos, perfil: profile } = useAcademico()
   const [sortOrder, setSortOrder] = useState<Ordenacao>('andamento')
   const [groupType, setGroupType] = useState<Agrupamento>('nenhum')
 
-  const buscarPerfil = useCallback(async (silencioso = false) => {
-    if (!session?.accessToken) return
-
-    if (!silencioso) {
-      setLoading(true)
-    }
-    try {
-      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined)
-      setProfile(data)
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error)
-    } finally {
-      if (!silencioso) {
-        setLoading(false)
-      }
-    }
-  }, [session, anoAtivoId])
-
-  useEffect(() => {
-    buscarPerfil()
-  }, [buscarPerfil, versao])
-
-  if (loading) {
+  if (carregandoAnos && !profile) {
     return <CarregamentoDisciplinas />
   }
 

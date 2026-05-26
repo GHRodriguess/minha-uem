@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { academic_service } from '@/lib/api/academico'
-import { Perfil, Materia, Horario } from '@/types/academico'
+import { Materia, Horario } from '@/types/academico'
 import { Calendar as CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
@@ -22,34 +22,10 @@ function obterDataFormatada(date: Date): string {
 
 export default function HorariosPage() {
   const { data: session } = useSession()
-  const { anoAtivoId, anosDisponiveis, versao } = useAcademico()
-  const [profile, setProfile] = useState<Perfil | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { anoAtivoId, anosDisponiveis, carregandoAnos, perfil: profile, setPerfil: setProfile } = useAcademico()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [filters, setFilters] = useState({ aulas: true, avaliacoes: true })
   const prevYearId = useRef<number | null>(null)
-
-  const buscarPerfil = useCallback(async (silencioso = false) => {
-    if (!session?.accessToken) return
-
-    if (!silencioso) {
-      setLoading(true)
-    }
-    try {
-      const data = await academic_service.obterPerfil(session.accessToken, anoAtivoId || undefined, true, true)
-      setProfile(data)
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error)
-    } finally {
-      if (!silencioso) {
-        setLoading(false)
-      }
-    }
-  }, [session, anoAtivoId])
-
-  useEffect(() => {
-    buscarPerfil()
-  }, [buscarPerfil, versao])
 
   useEffect(() => {
     if (anoAtivoId && prevYearId.current !== anoAtivoId) {
@@ -155,7 +131,7 @@ export default function HorariosPage() {
     }
   }
 
-  if (loading) {
+  if (carregandoAnos && !profile) {
     return <CarregamentoHorarios />
   }
 

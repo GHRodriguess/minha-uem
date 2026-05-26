@@ -69,6 +69,13 @@ export async function requisitar<T>(
     rawHeaders.Authorization = `Bearer ${token}`;
   }
 
+  if (typeof window !== "undefined") {
+    const impersonateEmail = localStorage.getItem('impersonatedUserEmail');
+    if (impersonateEmail) {
+      rawHeaders["X-Impersonate-User"] = impersonateEmail;
+    }
+  }
+
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(rawHeaders)) {
     if (value !== undefined && value !== null) {

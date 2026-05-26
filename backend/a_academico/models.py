@@ -151,3 +151,61 @@ class AnotacaoMateria(models.Model):
         return f"Anotacao de {self.subject_config.materia.nome}"
 
 
+class ChamadoSuporte(models.Model):
+    CATEGORIA_CHOICES = [
+        ('INTERFACE', 'Interface'),
+        ('ACADEMICO', 'Acadêmico'),
+        ('CLASSROOM', 'Google Classroom'),
+        ('OUTRO', 'Outro'),
+    ]
+
+    STATUS_CHOICES = [
+        ('ABERTO', 'Aberto'),
+        ('RESOLVIDO', 'Resolvido'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chamados_suporte')
+    title = models.CharField(max_length=255)
+    category = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='OUTRO')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ABERTO')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    read_by_user = models.BooleanField(default=True)
+    read_by_admin = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.title} ({self.user.username}) - {self.status}"
+
+
+class MensagemChamado(models.Model):
+    ticket = models.ForeignKey(ChamadoSuporte, on_delete=models.CASCADE, related_name='mensagens')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Mensagem de {self.sender.username} em {self.ticket.title}"
+
+
+class Noticia(models.Model):
+    CATEGORIA_CHOICES = [
+        ('GERAL', 'Geral'),
+        ('ACADEMICO', 'Acadêmico'),
+        ('CLASSROOM', 'Google Classroom'),
+        ('MANUTENCAO', 'Manutenção'),
+        ('NOVIDADES', 'Novidades'),
+    ]
+
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='GERAL')
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.category})"
+
+
+
+

@@ -1,9 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useEffect, useState, useCallback } from 'react'
 import { academic_service } from '@/lib/api/academico'
-import { Perfil } from '@/types/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import CarregamentoHome from '@/components/templates/CarregamentoHome'
@@ -14,26 +12,7 @@ import { obterAulasHoje } from '@/lib/utils/aulas'
 
 export default function Home() {
   const { data: session } = useSession()
-  const { anoAtivoId: activeYearId, versao: version, anosDisponiveis: availableYears } = useAcademico()
-  const [profile, setProfile] = useState<Perfil | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const buscarPerfil = useCallback(async () => {
-    if (!session?.accessToken) return
-    setLoading(true)
-    try {
-      const data = await academic_service.obterPerfil(session.accessToken, activeYearId || undefined, false, true)
-      setProfile(data)
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [session, activeYearId])
-
-  useEffect(() => {
-    buscarPerfil()
-  }, [buscarPerfil, version])
+  const { anoAtivoId: activeYearId, anosDisponiveis: availableYears, carregandoAnos, perfil: profile, setPerfil: setProfile } = useAcademico()
 
   const alternarFalta = async (materiaId: number, dateStr: string, classNum: number, hasAbsence: boolean) => {
     if (!session?.accessToken) return
@@ -57,7 +36,7 @@ export default function Home() {
     }
   }
 
-  if (loading) return <CarregamentoHome />
+  if (carregandoAnos && !profile) return <CarregamentoHome />
   if (!profile?.configurado) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">

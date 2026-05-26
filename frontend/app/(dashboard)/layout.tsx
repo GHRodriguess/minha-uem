@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from '@/components/organisms/Sidebar'
 import Topbar from '@/components/organisms/Topbar'
+import { useSuporte } from '@/components/providers/ProvedorSuporte'
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
   const { data: session, status } = useSession()
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const { isImpersonating, impersonatedUserName, encerrarSimulacao } = useSuporte()
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -52,6 +54,17 @@ export default function DashboardLayout({
       )}
 
       <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+        {isImpersonating && (
+          <div className="bg-destructive text-destructive-foreground px-4 py-2.5 text-center text-xs font-bold flex items-center justify-center gap-3 shrink-0 transition-all z-50 animate-in slide-in-from-top duration-300">
+            <span>Modo Simulação Ativo: Visualizando como {impersonatedUserName}</span>
+            <button
+              onClick={encerrarSimulacao}
+              className="bg-background text-foreground hover:bg-background/90 px-3 py-1 rounded-xl transition-all font-bold text-[10px] uppercase shadow-sm"
+            >
+              Encerrar Simulação
+            </button>
+          </div>
+        )}
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 md:p-8">
           {children}
@@ -60,3 +73,4 @@ export default function DashboardLayout({
     </div>
   )
 }
+

@@ -5,6 +5,7 @@ import ProvedorSessao from "@/components/providers/ProvedorSessao";
 import { ProvedorTema } from "@/components/providers/ProvedorTema";
 import { ProvedorAcademico } from "@/components/providers/ProvedorAcademico";
 import { ProvedorClassroom } from "@/components/providers/ProvedorClassroom";
+import { ProvedorSuporte } from "@/components/providers/ProvedorSuporte";
 import { cn } from "@/lib/utils";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -47,9 +48,11 @@ export default function RootLayout({
           <ProvedorSessao>
             <ProvedorAcademico>
               <ProvedorClassroom>
-                {children}
-                <SpeedInsights />
-                <Analytics />
+                <ProvedorSuporte>
+                  {children}
+                  <SpeedInsights />
+                  <Analytics />
+                </ProvedorSuporte>
               </ProvedorClassroom>
             </ProvedorAcademico>
           </ProvedorSessao>
