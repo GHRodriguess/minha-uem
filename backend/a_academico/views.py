@@ -181,7 +181,7 @@ class ConfiguracaoMateriaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, materia_id, ano_id):
-        perfil, _ = PerfilAcademico.objects.get_or_create(user=self.request.user)
+        perfil, _ = obter_perfil_ativo(self.request)
         ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=perfil)
         materia = Materia.objects.get(id=materia_id)
         config, _ = ConfiguracaoMateria.objects.get_or_create(
@@ -229,7 +229,8 @@ class AvaliacaoView(APIView):
             return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=active_user)
             serializer = AvaliacaoSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(configuracao=config)
@@ -240,7 +241,8 @@ class AvaliacaoView(APIView):
 
     def patch(self, request, pk):
         try:
-            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=active_user)
             serializer = AvaliacaoSerializer(avaliacao, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -251,7 +253,8 @@ class AvaliacaoView(APIView):
 
     def delete(self, request, pk):
         try:
-            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=active_user)
             avaliacao.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Avaliacao.DoesNotExist:
@@ -267,7 +270,8 @@ class AnotacaoMateriaView(APIView):
             return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=active_user)
             serializer = AnotacaoMateriaSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save(subject_config=config)
@@ -278,7 +282,8 @@ class AnotacaoMateriaView(APIView):
 
     def patch(self, request, pk):
         try:
-            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=active_user)
             serializer = AnotacaoMateriaSerializer(note, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -289,7 +294,8 @@ class AnotacaoMateriaView(APIView):
 
     def delete(self, request, pk):
         try:
-            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=request.user)
+            _, active_user = obter_perfil_ativo(request)
+            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=active_user)
             note.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except AnotacaoMateria.DoesNotExist:
@@ -349,7 +355,7 @@ class VincularCursoClassroomView(APIView):
             return Response({'erro': 'Campos obrigatórios faltando'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=profile)
             materia = Materia.objects.get(id=materia_id)
             subject_config, _ = ConfiguracaoMateria.objects.get_or_create(
@@ -378,7 +384,7 @@ class VincularCursoClassroomView(APIView):
             return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connection = VinculoGoogleClassroom.objects.get(
                 subject_config__perfil=profile,
                 subject_config__materia_id=materia_id,
@@ -454,7 +460,7 @@ class ArquivosMateriaClassroomView(APIView):
             return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connection = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__materia_id=materia_id,
@@ -462,11 +468,13 @@ class ArquivosMateriaClassroomView(APIView):
             ).first()
 
             if not connection and google_token:
-                config_materia = ConfiguracaoMateria.objects.filter(
+                materia = Materia.objects.get(id=materia_id)
+                ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=profile)
+                config_materia, _ = ConfiguracaoMateria.objects.get_or_create(
                     perfil=profile,
-                    materia_id=materia_id,
-                    ano_letivo_id=ano_id
-                ).first()
+                    materia=materia,
+                    ano_letivo=ano_letivo
+                )
 
                 if config_materia:
                     headers = {'Authorization': f'Bearer {google_token}'}
@@ -480,11 +488,16 @@ class ArquivosMateriaClassroomView(APIView):
                         for course in courses_data:
                             nome_curso_normalizado = course.get('name', '')
                             if nomes_sao_compativeis(nome_materia_normalizado, nome_curso_normalizado):
-                                connection = VinculoGoogleClassroom.objects.create(
-                                    subject_config=config_materia,
-                                    classroom_course_id=course.get('id'),
-                                    classroom_course_name=course.get('name')
-                                )
+                                try:
+                                    connection, _ = VinculoGoogleClassroom.objects.get_or_create(
+                                        subject_config=config_materia,
+                                        defaults={
+                                            'classroom_course_id': course.get('id'),
+                                            'classroom_course_name': course.get('name')
+                                        }
+                                    )
+                                except Exception:
+                                    connection = VinculoGoogleClassroom.objects.filter(subject_config=config_materia).first()
                                 break
 
             if not connection:
@@ -630,7 +643,7 @@ class AtualizarArquivoClassroomView(APIView):
 
     def patch(self, request, drive_file_id):
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             materia_id = request.data.get('materia_id')
             ano_id = request.data.get('ano_id')
             
@@ -708,7 +721,7 @@ class BaixarArquivoClassroomView(APIView):
 
     def post(self, request, drive_file_id):
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             materia_id = request.data.get('materia_id')
             ano_id = request.data.get('ano_id')
             original_name = request.data.get('original_name', 'Arquivo Sem Nome')
@@ -767,7 +780,7 @@ class AdicionarArquivoLocalView(APIView):
             return Response({'erro': 'materia_id, ano_id e original_name são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             
             connection = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
@@ -820,7 +833,7 @@ class SincronizarArquivosLocaisView(APIView):
             return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connection = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__materia_id=materia_id,
@@ -828,7 +841,7 @@ class SincronizarArquivosLocaisView(APIView):
             ).first()
             
             if not connection:
-                return Response({'erro': 'Vínculo do Classroom não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+                return Response([])
                 
             local_paths = {item.get('local_path'): item for item in local_files if item.get('local_path')}
             local_drive_ids = {item.get('drive_file_id'): item for item in local_files if item.get('drive_file_id')}
@@ -988,7 +1001,7 @@ class MuralClassroomView(APIView):
             return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connection = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__materia_id=materia_id,
@@ -1116,7 +1129,7 @@ class MarcarMuralLidoView(APIView):
             return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connection = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__materia_id=materia_id,
@@ -1146,7 +1159,7 @@ class NotificacoesClassroomView(APIView):
             return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            profile = PerfilAcademico.objects.get(user=request.user)
+            profile, _ = obter_perfil_ativo(request)
             connections = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__ano_letivo_id=ano_id
