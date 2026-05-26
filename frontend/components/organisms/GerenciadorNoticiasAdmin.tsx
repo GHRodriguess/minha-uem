@@ -17,7 +17,7 @@ export default function GerenciadorNoticiasAdmin({ noticiaEmEdicao, onSucesso, o
   const { data: session } = useSession()
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [category, setCategory] = useState<'GERAL' | 'ACADEMICO' | 'CLASSROOM' | 'MANUTENCAO'>('GERAL')
+  const [category, setCategory] = useState<'GERAL' | 'ACADEMICO' | 'CLASSROOM' | 'MANUTENCAO' | 'NOVIDADES'>('GERAL')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -74,6 +74,7 @@ export default function GerenciadorNoticiasAdmin({ noticiaEmEdicao, onSucesso, o
             <option value="ACADEMICO">Acadêmico</option>
             <option value="CLASSROOM">Classroom</option>
             <option value="MANUTENCAO">Manutenção</option>
+            <option value="NOVIDADES">Novidades</option>
           </select>
         </div>
       </div>

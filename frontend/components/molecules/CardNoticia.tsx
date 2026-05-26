@@ -22,6 +22,8 @@ export default function CardNoticia({ noticia, isAdmin, onEdit, onDelete }: Card
         return 'bg-purple-500/10 text-purple-500'
       case 'MANUTENCAO':
         return 'bg-amber-500/10 text-amber-500'
+      case 'NOVIDADES':
+        return 'bg-sky-500/10 text-sky-500'
       default:
         return 'bg-muted text-muted-foreground'
     }

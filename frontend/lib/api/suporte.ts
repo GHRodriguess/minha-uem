@@ -64,7 +64,7 @@ export interface Noticia {
   id: number
   title: string
   content: string
-  category: 'GERAL' | 'ACADEMICO' | 'CLASSROOM' | 'MANUTENCAO'
+  category: 'GERAL' | 'ACADEMICO' | 'CLASSROOM' | 'MANUTENCAO' | 'NOVIDADES'
   author: number
   author_username: string
   author_first_name: string

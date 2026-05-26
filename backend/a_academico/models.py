@@ -193,6 +193,7 @@ class Noticia(models.Model):
         ('ACADEMICO', 'Acadêmico'),
         ('CLASSROOM', 'Google Classroom'),
         ('MANUTENCAO', 'Manutenção'),
+        ('NOVIDADES', 'Novidades'),
     ]
 
     title = models.CharField(max_length=255)

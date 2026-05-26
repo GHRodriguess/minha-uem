@@ -80,7 +80,7 @@ export default function NoticiasPage() {
       )}
 
       <FiltroCategoriasNoticias
-        categorias={['TODAS', 'GERAL', 'ACADEMICO', 'CLASSROOM', 'MANUTENCAO']}
+        categorias={['TODAS', 'GERAL', 'ACADEMICO', 'CLASSROOM', 'MANUTENCAO', 'NOVIDADES']}
         categoriaAtiva={categoriaAtiva}
         onSelecionarCategoria={setCategoriaAtiva}
       />
