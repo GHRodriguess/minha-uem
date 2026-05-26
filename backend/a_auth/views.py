@@ -68,13 +68,16 @@ class ObterUsuarioLogadoView(APIView):
 
     def get(self, request):
         from django.utils.timezone import now
-        user = request.user
-        user.last_login = now()
-        user.save(update_fields=['last_login'])
+        from a_academico.views import obter_perfil_ativo
+        
+        _, resolved_user = obter_perfil_ativo(request)
+        
+        request.user.last_login = now()
+        request.user.save(update_fields=['last_login'])
         
         return Response({
-            'username': user.username,
-            'email': user.email,
-            'is_staff': user.is_staff or user.is_superuser
+            'username': resolved_user.username,
+            'email': resolved_user.email,
+            'is_staff': resolved_user.is_staff or resolved_user.is_superuser
         })
 
