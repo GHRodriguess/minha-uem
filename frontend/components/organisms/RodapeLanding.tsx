@@ -22,6 +22,9 @@ export default function RodapeLanding() {
           <Link href="/politica-de-privacidade" className="text-muted-foreground hover:text-primary transition-colors">
             Política de Privacidade
           </Link>
+          <Link href="/termos-de-servico" className="text-muted-foreground hover:text-primary transition-colors">
+            Termos de Serviço
+          </Link>
           <a href="#recursos" className="text-muted-foreground hover:text-primary transition-colors">
             Funcionalidades
           </a>
