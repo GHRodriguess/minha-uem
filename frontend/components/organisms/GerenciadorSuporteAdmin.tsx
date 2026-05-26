@@ -13,6 +13,7 @@ export default function GerenciadorSuporteAdmin() {
   const { data: session } = useSession()
   const { chamados, marcarComoLidoLocal, adicionarMensagemLocal, atualizarStatusLocal } = useSuporte()
   const [chamadoSelecionado, setChamadoSelecionado] = useState<ChamadoSuporte | null>(null)
+  const [paginaAtual, setPaginaAtual] = useState(1)
 
   const handleSelecionarChamado = async (id: number) => {
     if (!session?.accessToken) return
@@ -21,7 +22,7 @@ export default function GerenciadorSuporteAdmin() {
       setChamadoSelecionado(detalhes)
       marcarComoLidoLocal(id, true)
     } catch (err) {
-      console.error('Erro ao carregar detalhes do chamado no admin:', err)
+      console.error(err)
     }
   }
 
@@ -42,16 +43,56 @@ export default function GerenciadorSuporteAdmin() {
       atualizarStatusLocal(chamadoSelecionado.id, 'RESOLVIDO')
       setChamadoSelecionado(prev => prev ? { ...prev, status: 'RESOLVIDO' } : null)
     } catch (err) {
-      console.error('Erro ao resolver chamado:', err)
+      console.error(err)
     }
   }
+
+  const chamadosOrdenados = [...chamados].sort((a, b) => {
+    if (a.status === 'ABERTO' && b.status !== 'ABERTO') return -1
+    if (a.status !== 'ABERTO' && b.status === 'ABERTO') return 1
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  })
+
+  const itensPorPagina = 5
+  const totalPaginas = Math.ceil(chamadosOrdenados.length / itensPorPagina)
+  const chamadosPaginados = chamadosOrdenados.slice(
+    (paginaAtual - 1) * itensPorPagina,
+    paginaAtual * itensPorPagina
+  )
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className={chamadoSelecionado ? "hidden md:block md:col-span-1" : "col-span-1"}>
         <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
           <h2 className="font-bold text-sm text-foreground">Todos os Chamados</h2>
-          <ListaChamados chamados={chamados} chamadoSelecionadoId={chamadoSelecionado?.id || null} onSelecionarChamado={handleSelecionarChamado} />
+          <ListaChamados chamados={chamadosPaginados} chamadoSelecionadoId={chamadoSelecionado?.id || null} onSelecionarChamado={handleSelecionarChamado} />
+          {totalPaginas > 1 && (
+            <div className="flex justify-between items-center pt-3 border-t border-border select-none text-[10px]">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={paginaAtual === 1}
+                onClick={() => setPaginaAtual(prev => prev - 1)}
+                className="rounded-xl px-2.5 h-7 font-bold text-[10px]"
+              >
+                Anterior
+              </Button>
+              <span className="font-extrabold text-muted-foreground">
+                Pág. {paginaAtual} de {totalPaginas}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={paginaAtual === totalPaginas}
+                onClick={() => setPaginaAtual(prev => prev + 1)}
+                className="rounded-xl px-2.5 h-7 font-bold text-[10px]"
+              >
+                Próxima
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

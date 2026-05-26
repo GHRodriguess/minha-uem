@@ -16,6 +16,11 @@ interface ContextoSuporteData {
   adicionarChamadoLocal: (ticket: ChamadoSuporte) => void
   notificacoesUsuario: number
   notificacoesAdmin: number
+  isImpersonating: boolean
+  impersonatedUserEmail: string | null
+  impersonatedUserName: string | null
+  iniciarSimulacao: (email: string, nome: string) => void
+  encerrarSimulacao: () => void
 }
 
 const ContextoSuporte = createContext<ContextoSuporteData>({} as ContextoSuporteData)
@@ -26,6 +31,33 @@ export function ProvedorSuporte({ children }: { children: React.ReactNode }) {
   const [carregandoMe, setCarregandoMe] = useState(true)
   const [chamados, setChamados] = useState<ChamadoSuporte[]>([])
   const [carregandoChamados, setCarregandoChamados] = useState(false)
+  const [isImpersonating, setIsImpersonating] = useState(false)
+  const [impersonatedUserEmail, setImpersonatedUserEmail] = useState<string | null>(null)
+  const [impersonatedUserName, setImpersonatedUserName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const email = localStorage.getItem('impersonatedUserEmail')
+      const nome = localStorage.getItem('impersonatedUserName')
+      if (email && nome) {
+        setIsImpersonating(true)
+        setImpersonatedUserEmail(email)
+        setImpersonatedUserName(nome)
+      }
+    }
+  }, [])
+
+  const iniciarSimulacao = useCallback((email: string, nome: string) => {
+    localStorage.setItem('impersonatedUserEmail', email)
+    localStorage.setItem('impersonatedUserName', nome)
+    window.location.reload()
+  }, [])
+
+  const encerrarSimulacao = useCallback(() => {
+    localStorage.removeItem('impersonatedUserEmail')
+    localStorage.removeItem('impersonatedUserName')
+    window.location.reload()
+  }, [])
 
   const carregarPerfilMe = useCallback(async () => {
     if (!session?.accessToken) {
@@ -127,7 +159,12 @@ export function ProvedorSuporte({ children }: { children: React.ReactNode }) {
       adicionarMensagemLocal,
       adicionarChamadoLocal,
       notificacoesUsuario,
-      notificacoesAdmin
+      notificacoesAdmin,
+      isImpersonating,
+      impersonatedUserEmail,
+      impersonatedUserName,
+      iniciarSimulacao,
+      encerrarSimulacao
     }}>
       {children}
     </ContextoSuporte.Provider>

@@ -57,6 +57,19 @@ export interface UsuarioAdminDet {
   curso_nome: string
   total_materias: number
   materias: MateriaSimplificada[]
+  is_staff: boolean
+}
+
+export interface Noticia {
+  id: number
+  title: string
+  content: string
+  category: 'GERAL' | 'ACADEMICO' | 'CLASSROOM' | 'MANUTENCAO'
+  author: number
+  author_username: string
+  author_first_name: string
+  created_at: string
+  updated_at: string
 }
 
 export const suporte_servico = {
@@ -90,5 +103,25 @@ export const suporte_servico = {
 
   listarUsuariosAdmin: async (token: string): Promise<UsuarioAdminDet[]> => {
     return api_client.obter<UsuarioAdminDet[]>('/api/academico/admin/usuarios/', undefined, token)
+  },
+
+  alternarAcessoAdmin: async (token: string, userId: number): Promise<UsuarioAdminDet> => {
+    return api_client.patch<UsuarioAdminDet>(`/api/academico/admin/usuarios/${userId}/alternar-staff/`, undefined, token)
+  },
+
+  listarNoticias: async (token: string): Promise<Noticia[]> => {
+    return api_client.obter<Noticia[]>('/api/academico/noticias/', undefined, token)
+  },
+
+  criarNoticia: async (token: string, title: string, content: string, category: string): Promise<Noticia> => {
+    return api_client.postar<Noticia>('/api/academico/noticias/', { title, content, category }, token)
+  },
+
+  atualizarNoticia: async (token: string, id: number, title: string, content: string, category: string): Promise<Noticia> => {
+    return api_client.patch<Noticia>(`/api/academico/noticias/${id}/`, { title, content, category }, token)
+  },
+
+  excluirNoticia: async (token: string, id: number): Promise<void> => {
+    return api_client.remover<void>(`/api/academico/noticias/${id}/`, token)
   }
 }

@@ -90,7 +90,18 @@ export default function AdminPage() {
 
       <div className="transition-all duration-300">
         {abaAtiva === 'estatisticas' && <VisualizadorEstatisticas estatisticas={estatisticas} />}
-        {abaAtiva === 'usuarios' && <TabelaUsuariosAdmin usuarios={usuarios} />}
+        {abaAtiva === 'usuarios' && (
+          <TabelaUsuariosAdmin 
+            usuarios={usuarios} 
+            onUsuarioAlterado={() => {
+              if (session?.accessToken) {
+                suporte_servico.listarUsuariosAdmin(session.accessToken)
+                  .then(setUsuarios)
+                  .catch(err => console.error(err))
+              }
+            }} 
+          />
+        )}
         {abaAtiva === 'suporte' && <GerenciadorSuporteAdmin />}
       </div>
     </div>
