@@ -144,7 +144,7 @@ export function ProvedorSuporte({ children }: { children: React.ReactNode }) {
     setChamados(prev => [ticket, ...prev])
   }, [])
 
-  const notificacoesUsuario = chamados.filter(c => !c.read_by_user).length
+  const notificacoesUsuario = chamados.filter(c => c.user_email === usuarioMe?.email && !c.read_by_user).length
   const notificacoesAdmin = chamados.filter(c => !c.read_by_admin && c.status === 'ABERTO').length
 
   return (

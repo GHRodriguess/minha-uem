@@ -290,12 +290,10 @@ class MateriaSerializer(serializers.ModelSerializer):
             return True
         return False
 
-class ConfiguracaoMateriaResumidaSerializer(serializers.ModelSerializer):
-    avaliacoes = AvaliacaoSerializer(many=True, read_only=True)
-
+class ConfiguracaoMateriaResumidaSerializer(ConfiguracaoMateriaSerializer):
     class Meta:
         model = ConfiguracaoMateria
-        fields = ['id', 'avaliacoes']
+        fields = ['id', 'avaliacoes', 'media_atual', 'quanto_falta', 'approval_status']
 
 
 class MateriaResumidaSerializer(serializers.ModelSerializer):
@@ -514,7 +512,7 @@ class MensagemChamadoSerializer(serializers.ModelSerializer):
 class ChamadoSuporteSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
-    mensagens = MensagemChamadoSerializer(many=True, read_only=True)
+    mensagens = serializers.SerializerMethodField()
 
     class Meta:
         model = ChamadoSuporte
@@ -524,6 +522,12 @@ class ChamadoSuporteSerializer(serializers.ModelSerializer):
             'read_by_user', 'read_by_admin', 'mensagens'
         ]
         read_only_fields = ['user']
+
+    def get_mensagens(self, obj):
+        if self.context.get('list_mode', False):
+            return []
+        serializer = MensagemChamadoSerializer(obj.mensagens.all(), many=True)
+        return serializer.data
 
 
 class MateriaSimplificadaSerializer(serializers.ModelSerializer):

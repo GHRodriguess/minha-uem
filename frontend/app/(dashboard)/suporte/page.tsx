@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSuporte } from '@/components/providers/ProvedorSuporte'
 import { suporte_servico, ChamadoSuporte } from '@/lib/api/suporte'
@@ -15,6 +15,8 @@ export default function SuportePage() {
   const { chamados, marcarComoLidoLocal, adicionarMensagemLocal, adicionarChamadoLocal } = useSuporte()
   const [chamadoSelecionado, setChamadoSelecionado] = useState<ChamadoSuporte | null>(null)
   const [exibirFormulario, setExibirFormulario] = useState(false)
+
+  const myTickets = chamados.filter(c => c.user_email === session?.user?.email)
 
   const handleSelecionarChamado = async (id: number) => {
     if (!session?.accessToken) return
@@ -46,6 +48,21 @@ export default function SuportePage() {
     } : null)
   }
 
+  useEffect(() => {
+    const token = session?.accessToken
+    const activeId = chamadoSelecionado?.id
+    if (!token || !activeId) return
+    const buscarMensagensRecentes = async () => {
+      try {
+        const detalhes = await suporte_servico.obterDetalhesChamado(token, activeId, false)
+        setChamadoSelecionado(detalhes)
+      } catch {
+      }
+    }
+    const interval = setInterval(buscarMensagensRecentes, 8000)
+    return () => clearInterval(interval)
+  }, [session?.accessToken, chamadoSelecionado?.id])
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -63,7 +80,7 @@ export default function SuportePage() {
         <div className={chamadoSelecionado || exibirFormulario ? "hidden md:block md:col-span-1" : "col-span-1"}>
           <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
             <h2 className="font-bold text-sm text-foreground">Meus Chamados</h2>
-            <ListaChamados chamados={chamados} chamadoSelecionadoId={chamadoSelecionado?.id || null} onSelecionarChamado={handleSelecionarChamado} />
+            <ListaChamados chamados={myTickets} chamadoSelecionadoId={chamadoSelecionado?.id || null} onSelecionarChamado={handleSelecionarChamado} />
           </div>
         </div>
 

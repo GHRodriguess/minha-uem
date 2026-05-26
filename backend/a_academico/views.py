@@ -1435,7 +1435,7 @@ class ListarCriarChamadoView(APIView):
         else:
             chamados = ChamadoSuporte.objects.filter(user=request.user).order_by('-updated_at')
         
-        serializer = ChamadoSuporteSerializer(chamados, many=True)
+        serializer = ChamadoSuporteSerializer(chamados, many=True, context={'list_mode': True})
         return Response(serializer.data)
 
     def post(self, request):

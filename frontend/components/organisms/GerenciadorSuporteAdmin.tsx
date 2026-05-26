@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSuporte } from '@/components/providers/ProvedorSuporte'
 import { suporte_servico, ChamadoSuporte } from '@/lib/api/suporte'
@@ -46,6 +46,21 @@ export default function GerenciadorSuporteAdmin() {
       console.error(err)
     }
   }
+
+  useEffect(() => {
+    const token = session?.accessToken
+    const activeId = chamadoSelecionado?.id
+    if (!token || !activeId) return
+    const buscarMensagensRecentes = async () => {
+      try {
+        const detalhes = await suporte_servico.obterDetalhesChamado(token, activeId, true)
+        setChamadoSelecionado(detalhes)
+      } catch {
+      }
+    }
+    const interval = setInterval(buscarMensagensRecentes, 8000)
+    return () => clearInterval(interval)
+  }, [session?.accessToken, chamadoSelecionado?.id])
 
   const chamadosOrdenados = [...chamados].sort((a, b) => {
     if (a.status === 'ABERTO' && b.status !== 'ABERTO') return -1
