@@ -23,7 +23,12 @@ from .views import (
     NotificacoesClassroomView,
     ObterInfoAgendaView,
     RegenerarTokenAgendaView,
-    FeedAgendaView
+    FeedAgendaView,
+    ListarCriarChamadoView,
+    DetalheChamadoSuporteView,
+    AtualizarStatusChamadoView,
+    VisualizarEstatisticasAdminView,
+    ListarUsuariosAdminView
 )
 
 urlpatterns = [
@@ -53,6 +58,11 @@ urlpatterns = [
     path('agenda/info/', ObterInfoAgendaView.as_view(), name='agenda_info'),
     path('agenda/regenerar/', RegenerarTokenAgendaView.as_view(), name='agenda_regenerar'),
     path('agenda/feed/<uuid:token>/', FeedAgendaView.as_view(), name='agenda_feed'),
+    path('suporte/chamados/', ListarCriarChamadoView.as_view(), name='listar_criar_chamado'),
+    path('suporte/chamados/<int:pk>/', DetalheChamadoSuporteView.as_view(), name='detalhe_chamado_suporte'),
+    path('suporte/chamados/<int:pk>/status/', AtualizarStatusChamadoView.as_view(), name='atualizar_status_chamado'),
+    path('admin/estatisticas/', VisualizarEstatisticasAdminView.as_view(), name='visualizar_estatisticas_admin'),
+    path('admin/usuarios/', ListarUsuariosAdminView.as_view(), name='listar_usuarios_admin'),
 ]
 
 

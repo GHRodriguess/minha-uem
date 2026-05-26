@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado
 from django.db.models import Sum, F
+from django.contrib.auth.models import User
 
 class CursoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -498,3 +499,87 @@ class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = VinculoGoogleClassroom
         fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'arquivos']
+
+
+class MensagemChamadoSerializer(serializers.ModelSerializer):
+    sender_username = serializers.CharField(source='sender.username', read_only=True)
+    sender_email = serializers.CharField(source='sender.email', read_only=True)
+
+    class Meta:
+        model = MensagemChamado
+        fields = ['id', 'ticket', 'sender', 'sender_username', 'sender_email', 'message', 'created_at']
+        read_only_fields = ['sender']
+
+
+class ChamadoSuporteSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    mensagens = MensagemChamadoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ChamadoSuporte
+        fields = [
+            'id', 'user', 'user_username', 'user_email', 'title', 
+            'category', 'status', 'created_at', 'updated_at', 
+            'read_by_user', 'read_by_admin', 'mensagens'
+        ]
+        read_only_fields = ['user']
+
+
+class MateriaSimplificadaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Materia
+        fields = ['codigo', 'nome']
+
+
+class UsuarioAdminSerializer(serializers.ModelSerializer):
+    nome_completo = serializers.SerializerMethodField()
+    curso_nome = serializers.SerializerMethodField()
+    total_materias = serializers.SerializerMethodField()
+    materias = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'nome_completo', 
+            'first_name', 'last_name', 'date_joined', 
+            'last_login', 'curso_nome', 'total_materias', 'materias'
+        ]
+
+    def get_nome_completo(self, obj):
+        if obj.first_name or obj.last_name:
+            return f"{obj.first_name} {obj.last_name}".strip()
+        return obj.username
+
+    def get_curso_nome(self, obj):
+        try:
+            if hasattr(obj, 'perfil_academico') and obj.perfil_academico.curso:
+                return obj.perfil_academico.curso.nome
+        except:
+            pass
+        return 'Não Configurado'
+
+    def get_materias(self, obj):
+        try:
+            if hasattr(obj, 'perfil_academico'):
+                perfil = obj.perfil_academico
+                ano_letivo = perfil.anos.order_by('-ano').first()
+                if ano_letivo:
+                    return MateriaSimplificadaSerializer(ano_letivo.materias.all(), many=True).data
+        except:
+            pass
+        return []
+
+    def get_total_materias(self, obj):
+        try:
+            if hasattr(obj, 'perfil_academico'):
+                perfil = obj.perfil_academico
+                ano_letivo = perfil.anos.order_by('-ano').first()
+                if ano_letivo:
+                    return ano_letivo.materias.count()
+        except:
+            pass
+        return 0
+
+
+
