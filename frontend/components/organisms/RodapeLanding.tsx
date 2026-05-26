@@ -3,7 +3,7 @@
 import Link from 'next/link'
 
 export default function RodapeLanding() {
-  const currentYear = new Date().getFullYear()
+  const current_year = new Date().getFullYear()
 
   return (
     <footer className="bg-card border-t border-border py-12 px-4">
@@ -15,9 +15,12 @@ export default function RodapeLanding() {
           </p>
         </div>
         
-        <div className="flex gap-6 text-sm">
+        <div className="flex gap-6 text-sm flex-wrap justify-center">
           <Link href="/login" className="text-muted-foreground hover:text-primary transition-colors">
             Acessar Sistema
+          </Link>
+          <Link href="/politica-de-privacidade" className="text-muted-foreground hover:text-primary transition-colors">
+            Política de Privacidade
           </Link>
           <a href="#recursos" className="text-muted-foreground hover:text-primary transition-colors">
             Funcionalidades
@@ -29,8 +32,9 @@ export default function RodapeLanding() {
       </div>
       
       <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-border/30 text-center text-xs text-muted-foreground">
-        <p>© {currentYear} Minha UEM. Todos os direitos reservados. Este projeto não possui vínculo oficial com a administração da UEM.</p>
+        <p>© {current_year} Minha UEM. Todos os direitos reservados. Este projeto não possui vínculo oficial com a administração da UEM.</p>
       </div>
     </footer>
   )
 }
+

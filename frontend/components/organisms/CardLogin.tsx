@@ -5,12 +5,12 @@ import BotaoLoginGoogle from '../atoms/BotaoLoginGoogle'
 import AlertaErroDominio from '../molecules/AlertaErroDominio'
 
 interface PropriedadesCardLogin {
-  erro?: string | null
+  error?: string | null
 }
 
-export default function CardLogin({ erro }: PropriedadesCardLogin) {
-  const isAcessoNegado = erro === 'AccessDenied'
-  const isErroServidor = erro === 'BackendError'
+export default function CardLogin({ error }: PropriedadesCardLogin) {
+  const is_access_denied = error === 'AccessDenied'
+  const is_server_error = error === 'BackendError'
 
   return (
     <div className="p-6 sm:p-10 bg-background shadow-2xl rounded-3xl max-w-md w-full border border-border flex flex-col items-center">
@@ -19,11 +19,11 @@ export default function CardLogin({ erro }: PropriedadesCardLogin) {
         <p className="text-muted-foreground mt-3 text-base sm:text-lg">Acesso exclusivo para @uem.br</p>
       </div>
       
-      {isAcessoNegado && (
+      {is_access_denied && (
         <AlertaErroDominio mensagem="Você deve utilizar um e-mail institucional @uem.br para acessar esta plataforma." />
       )}
 
-      {isErroServidor && (
+      {is_server_error && (
         <AlertaErroDominio mensagem="Não foi possível estabelecer uma conexão com o servidor. Por favor, verifique se a API do backend está ativa e configurada corretamente em produção." />
       )}
       
@@ -38,10 +38,19 @@ export default function CardLogin({ erro }: PropriedadesCardLogin) {
         >
           Conhecer as funcionalidades do Minha UEM
         </Link>
-        <p className="text-xs text-muted-foreground">
-          Problemas com o acesso? Contate o suporte da UEM.
-        </p>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">
+            Problemas com o acesso? Contate o suporte da UEM.
+          </p>
+          <Link
+            href="/politica-de-privacidade"
+            className="inline-block text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
+          >
+            Política de Privacidade
+          </Link>
+        </div>
       </div>
     </div>
   )
 }
+
