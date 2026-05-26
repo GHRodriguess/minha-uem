@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia
 from django.db.models import Sum, F
 from django.contrib.auth.models import User
 
@@ -543,7 +543,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'nome_completo', 
             'first_name', 'last_name', 'date_joined', 
-            'last_login', 'curso_nome', 'total_materias', 'materias'
+            'last_login', 'curso_nome', 'total_materias', 'materias', 'is_staff'
         ]
 
     def get_nome_completo(self, obj):
@@ -580,6 +580,21 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         except:
             pass
         return 0
+
+
+class NoticiaSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(source='author.username', read_only=True)
+    author_first_name = serializers.CharField(source='author.first_name', read_only=True)
+
+    class Meta:
+        model = Noticia
+        fields = [
+            'id', 'title', 'content', 'category', 
+            'author', 'author_username', 'author_first_name', 
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['author']
+
 
 
 

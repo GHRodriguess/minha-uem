@@ -3,12 +3,26 @@ from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso
-from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer
+from django.contrib.auth.models import User
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia
+from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer, NoticiaSerializer
 from .services import ServicoExtracaoHorario
 import requests
 import re
 import unicodedata
+
+def obter_perfil_ativo(request):
+    user = request.user
+    impersonate_email = request.headers.get('X-Impersonate-User')
+    if impersonate_email and (user.is_staff or user.is_superuser):
+        try:
+            impersonated_user = User.objects.get(email=impersonate_email)
+            perfil, _ = PerfilAcademico.objects.get_or_create(user=impersonated_user)
+            return perfil, impersonated_user
+        except User.DoesNotExist:
+            pass
+    perfil, _ = PerfilAcademico.objects.get_or_create(user=user)
+    return perfil, user
 
 def normalizar_para_busca(text):
     text_lower = text.lower()
@@ -39,7 +53,7 @@ class PerfilAcademicoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        perfil, created = PerfilAcademico.objects.get_or_create(user=request.user)
+        perfil, _ = obter_perfil_ativo(request)
         ano_id = request.query_params.get('ano_id')
         resumido = request.query_params.get('resumido', 'true') == 'true'
         incluir_avaliacoes = request.query_params.get('incluir_avaliacoes') == 'true'
@@ -60,7 +74,7 @@ class MateriaDetalheView(APIView):
 
     def get(self, request, materia_id):
         try:
-            perfil, created = PerfilAcademico.objects.get_or_create(user=request.user)
+            perfil, _ = obter_perfil_ativo(request)
             ano_id = request.query_params.get('ano_id')
             
             if ano_id:
@@ -91,10 +105,10 @@ class UploadHorarioView(APIView):
         
         pdf_file = request.FILES['file']
         confirmar = request.data.get('confirmar') == 'true'
-        servico = ServicoExtracaoHorario(pdf_file, request.user)
+        perfil, user_ativo = obter_perfil_ativo(request)
+        servico = ServicoExtracaoHorario(pdf_file, user_ativo)
         
         try:
-            perfil, _ = PerfilAcademico.objects.get_or_create(user=request.user)
             
             if not confirmar:
                 analise = servico.processar(apenas_analisar=True)
@@ -127,7 +141,7 @@ class ControleFaltaView(APIView):
             return Response({"erro": "materia_id, data, aula e faltas são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            perfil, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+            perfil, _ = obter_perfil_ativo(request)
             materia = Materia.objects.get(id=materia_id)
             
             from .models import AnoLetivo
@@ -287,13 +301,13 @@ class ConfiguracaoClassroomView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        profile, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+        profile, _ = obter_perfil_ativo(request)
         config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
         serializer = ConfiguracaoGeralClassroomSerializer(config)
         return Response(serializer.data)
 
     def patch(self, request):
-        profile, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+        profile, _ = obter_perfil_ativo(request)
         config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
         serializer = ConfiguracaoGeralClassroomSerializer(config, data=request.data, partial=True)
         if serializer.is_valid():
@@ -1264,7 +1278,7 @@ class ObterInfoAgendaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        profile, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+        profile, _ = obter_perfil_ativo(request)
         if not profile.calendar_token:
             profile.calendar_token = uuid.uuid4()
             profile.save()
@@ -1279,7 +1293,7 @@ class RegenerarTokenAgendaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        profile, _ = PerfilAcademico.objects.get_or_create(user=request.user)
+        profile, _ = obter_perfil_ativo(request)
         profile.calendar_token = uuid.uuid4()
         profile.save()
         feed_url = request.build_absolute_uri(
@@ -1555,5 +1569,98 @@ class ListarUsuariosAdminView(APIView):
         usuarios = User.objects.all().select_related('perfil_academico', 'perfil_academico__curso').prefetch_related('perfil_academico__materias').order_by('-date_joined')
         serializer = UsuarioAdminSerializer(usuarios, many=True)
         return Response(serializer.data)
+
+
+class AlternarAcessoAdminView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            target_user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"erro": "Usuario nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        if target_user == request.user:
+            return Response({"erro": "Voce nao pode alterar seus proprios acessos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        target_user.is_staff = not target_user.is_staff
+        target_user.save()
+
+        serializer = UsuarioAdminSerializer(target_user)
+        return Response(serializer.data)
+
+
+class ListarCriarNoticiaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        noticias = Noticia.objects.all().order_by('-created_at')
+        serializer = NoticiaSerializer(noticias, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
+
+        title = request.data.get('title')
+        content = request.data.get('content')
+        category = request.data.get('category', 'GERAL')
+
+        if not title or not content:
+            return Response({"erro": "Titulo e conteudo sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
+
+        noticia = Noticia.objects.create(
+            title=title,
+            content=content,
+            category=category,
+            author=request.user
+        )
+
+        serializer = NoticiaSerializer(noticia)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class DetalheNoticiaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            noticia = Noticia.objects.get(pk=pk)
+        except Noticia.DoesNotExist:
+            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = NoticiaSerializer(noticia)
+        return Response(serializer.data)
+
+    def patch(self, request, pk):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            noticia = Noticia.objects.get(pk=pk)
+        except Noticia.DoesNotExist:
+            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = NoticiaSerializer(noticia, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            noticia = Noticia.objects.get(pk=pk)
+        except Noticia.DoesNotExist:
+            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        noticia.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 

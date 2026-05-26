@@ -187,4 +187,24 @@ class MensagemChamado(models.Model):
         return f"Mensagem de {self.sender.username} em {self.ticket.title}"
 
 
+class Noticia(models.Model):
+    CATEGORIA_CHOICES = [
+        ('GERAL', 'Geral'),
+        ('ACADEMICO', 'Acadêmico'),
+        ('CLASSROOM', 'Google Classroom'),
+        ('MANUTENCAO', 'Manutenção'),
+    ]
+
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='GERAL')
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.category})"
+
+
+
 

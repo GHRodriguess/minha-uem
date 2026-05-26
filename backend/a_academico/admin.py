@@ -3,12 +3,12 @@ from .models import (
     Curso, Materia, Horario, PerfilAcademico, AnoLetivo, 
     RegistroFalta, ConfiguracaoMateria, Avaliacao, 
     ConfiguracaoGeralClassroom, VinculoGoogleClassroom, 
-    ArquivoMateriaClassroom, ChamadoSuporte, MensagemChamado
+    ArquivoMateriaClassroom, ChamadoSuporte, MensagemChamado, Noticia
 )
 
 admin.site.register([
     Curso, Materia, Horario, PerfilAcademico, AnoLetivo, 
     RegistroFalta, ConfiguracaoMateria, Avaliacao, 
     ConfiguracaoGeralClassroom, VinculoGoogleClassroom, 
-    ArquivoMateriaClassroom, ChamadoSuporte, MensagemChamado
+    ArquivoMateriaClassroom, ChamadoSuporte, MensagemChamado, Noticia
 ])

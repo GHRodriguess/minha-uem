@@ -28,7 +28,10 @@ from .views import (
     DetalheChamadoSuporteView,
     AtualizarStatusChamadoView,
     VisualizarEstatisticasAdminView,
-    ListarUsuariosAdminView
+    ListarUsuariosAdminView,
+    AlternarAcessoAdminView,
+    ListarCriarNoticiaView,
+    DetalheNoticiaView
 )
 
 urlpatterns = [
@@ -63,6 +66,9 @@ urlpatterns = [
     path('suporte/chamados/<int:pk>/status/', AtualizarStatusChamadoView.as_view(), name='atualizar_status_chamado'),
     path('admin/estatisticas/', VisualizarEstatisticasAdminView.as_view(), name='visualizar_estatisticas_admin'),
     path('admin/usuarios/', ListarUsuariosAdminView.as_view(), name='listar_usuarios_admin'),
+    path('admin/usuarios/<int:pk>/alternar-staff/', AlternarAcessoAdminView.as_view(), name='alternar_acesso_admin'),
+    path('noticias/', ListarCriarNoticiaView.as_view(), name='listar_criar_noticia'),
+    path('noticias/<int:pk>/', DetalheNoticiaView.as_view(), name='detalhe_noticia'),
 ]
 
 
