@@ -38,19 +38,27 @@ export default function CardLogin({ error }: PropriedadesCardLogin) {
         >
           Conhecer as funcionalidades do Minha UEM
         </Link>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">
             Problemas com o acesso? Contate o suporte da UEM.
           </p>
-          <Link
-            href="/politica-de-privacidade"
-            className="inline-block text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
-          >
-            Política de Privacidade
-          </Link>
+          <div className="flex justify-center items-center gap-2 flex-wrap text-xs text-muted-foreground">
+            <Link
+              href="/politica-de-privacidade"
+              className="hover:text-primary transition-colors underline underline-offset-2"
+            >
+              Política de Privacidade
+            </Link>
+            <span>•</span>
+            <Link
+              href="/termos-de-servico"
+              className="hover:text-primary transition-colors underline underline-offset-2"
+            >
+              Termos de Serviço
+            </Link>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-
