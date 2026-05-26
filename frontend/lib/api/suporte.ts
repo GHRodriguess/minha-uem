@@ -68,6 +68,7 @@ export interface Noticia {
   author: number
   author_username: string
   author_first_name: string
+  author_name: string
   created_at: string
   updated_at: string
 }

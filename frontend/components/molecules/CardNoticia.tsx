@@ -74,7 +74,7 @@ export default function CardNoticia({ noticia, isAdmin, onEdit, onDelete }: Card
           </div>
           <div className="flex items-center gap-1">
             <User className="w-3.5 h-3.5" />
-            <span>{noticia.author_first_name || noticia.author_username}</span>
+            <span>{noticia.author_name}</span>
           </div>
         </div>
       </div>

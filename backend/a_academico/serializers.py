@@ -589,15 +589,20 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 class NoticiaSerializer(serializers.ModelSerializer):
     author_username = serializers.CharField(source='author.username', read_only=True)
     author_first_name = serializers.CharField(source='author.first_name', read_only=True)
+    author_name = serializers.SerializerMethodField(method_name='obter_nome_autor')
 
     class Meta:
         model = Noticia
         fields = [
             'id', 'title', 'content', 'category', 
-            'author', 'author_username', 'author_first_name', 
+            'author', 'author_username', 'author_first_name', 'author_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['author']
+
+    def obter_nome_autor(self, obj):
+        full_name = f"{obj.author.first_name} {obj.author.last_name}".strip()
+        return full_name if full_name else obj.author.username
 
 
 
