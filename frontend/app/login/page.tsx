@@ -8,8 +8,8 @@ import CardLogin from '@/components/organisms/CardLogin'
 function ConteudoLogin() {
   const { status } = useSession()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const erro = searchParams.get('error')
+  const search_params = useSearchParams()
+  const error = search_params.get('error')
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -27,7 +27,7 @@ function ConteudoLogin() {
 
   return (
     <main className="flex-1 flex items-center justify-center bg-background p-4">
-      <CardLogin erro={erro} />
+      <CardLogin error={error} />
     </main>
   )
 }
