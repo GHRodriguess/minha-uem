@@ -451,33 +451,38 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       if (directoryHandle && hasFolderPermission) {
         const cache = filesCacheRef.current[materiaId]
         const fileItem = cache?.arquivos.find(f => f.drive_file_id === driveFileId)
-        const isDownloaded = localStorage.getItem('baixado_' + driveFileId) === 'true'
-        if (fileItem && isDownloaded && fileItem.local_path) {
+        if (fileItem && fileItem.local_path) {
           try {
             const courseName = cache.curso_nome || "Sem_Curso"
             const year = cache.ano_letivo || String(anoId)
             const subjectName = cache.materia_nome || "Materia"
             
             const oldParts = fileItem.local_path.split('/')
-            const oldFileName = fileItem.custom_name || fileItem.original_name
-            const fileBlob = await GerenciadorDiretorio.lerArquivoLocal(directoryHandle, oldParts, oldFileName)
+            const oldFileName = oldParts.pop() || fileItem.custom_name || fileItem.original_name
             
-            const newParts = ['UEM', 'Cursos', courseName, year, subjectName, novaPasta]
-            const newLocalPath = await GerenciadorDiretorio.gravarArquivoLocal(directoryHandle, newParts, oldFileName, fileBlob)
-            
-            const downloadedItem = await classroom_service.baixarArquivo(
-              session.accessToken,
-              driveFileId,
-              materiaId,
-              anoId,
-              originalName,
-              newLocalPath,
-              novaPasta
-            )
-            
-            atualizarArquivoLocal(materiaId, driveFileId, {
-              local_path: downloadedItem.local_path
-            })
+            const existeLocal = await GerenciadorDiretorio.verificarArquivoExiste(directoryHandle, oldParts, oldFileName)
+            if (existeLocal) {
+              const fileBlob = await GerenciadorDiretorio.lerArquivoLocal(directoryHandle, oldParts, oldFileName)
+              
+              const newParts = ['UEM', 'Cursos', courseName, year, subjectName, novaPasta]
+              const newLocalPath = await GerenciadorDiretorio.gravarArquivoLocal(directoryHandle, newParts, oldFileName, fileBlob)
+              
+              const downloadedItem = await classroom_service.baixarArquivo(
+                session.accessToken,
+                driveFileId,
+                materiaId,
+                anoId,
+                originalName,
+                newLocalPath,
+                novaPasta
+              )
+              
+              atualizarArquivoLocal(materiaId, driveFileId, {
+                local_path: downloadedItem.local_path
+              })
+              
+              await GerenciadorDiretorio.removerArquivoLocal(directoryHandle, oldParts, oldFileName)
+            }
           } catch (e) {
             console.error(e)
           }

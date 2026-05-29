@@ -150,6 +150,17 @@ export class GerenciadorDiretorio {
     }
   }
 
+  static async removerArquivoLocal(root: FileSystemDirectoryHandle, pathParts: string[], fileName: string): Promise<boolean> {
+    try {
+      const dirHandle = await this.obterSubdiretorioSemCriar(root, pathParts);
+      if (!dirHandle) return false;
+      await dirHandle.removeEntry(fileName);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   static async escanearDiretorioLocal(root: FileSystemDirectoryHandle): Promise<Array<{
     drive_file_id: string | null;
     original_name: string;

@@ -56,7 +56,7 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
       </div>
       
       <div className="flex-1 grid grid-cols-2 sm:grid-cols-12 gap-3 items-center">
-        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-4' : 'col-span-1 sm:col-span-3'}>
+        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-3' : 'col-span-1 sm:col-span-3'}>
           <Input
             value={nomeLocal}
             onChange={(e) => setNomeLocal(e.target.value)}
@@ -84,25 +84,25 @@ export function ItemAvaliacao({ avaliacao, onUpdate, onDelete, groupType }: Item
         )}
         
         <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
-          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">P</span>
+          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">Peso</span>
           <InputNota
             value={avaliacao.peso}
             onChange={(val) => onUpdate(avaliacao.id, { peso: val || 0 })}
-            className="h-8 w-full text-xs font-black min-w-auto"
+            className="h-8 w-full text-xs font-black px-1"
           />
         </div>
 
-        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
-          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">N</span>
+        <div className="col-span-1 sm:col-span-3 flex items-center gap-1">
+          <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0">Nota</span>
           <InputNota
             value={avaliacao.nota}
             onChange={(val) => onUpdate(avaliacao.id, { nota: val })}
-            className="h-8 w-full text-xs sm:text-sm font-black min-w-auto"
+            className="h-8 w-full text-xs sm:text-sm font-black px-1"
             placeholder="-"
           />
         </div>
 
-        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-4 flex items-center gap-1' : 'col-span-2 sm:col-span-3 flex items-center gap-1'}>
+        <div className={groupType === 'PROVA' ? 'col-span-2 sm:col-span-4 flex items-center gap-1' : 'col-span-2 sm:col-span-2 flex items-center gap-1'}>
           <span className="text-[8px] font-black text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded shrink-0 md:hidden">D</span>
           <Input
             type="date"
