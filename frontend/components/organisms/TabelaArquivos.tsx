@@ -49,7 +49,8 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     directoryHandle,
     hasFolderPermission,
     isFileSystemSupported,
-    solicitarAcessoPasta
+    solicitarAcessoPasta,
+    escanearPastaLocal
   } = useClassroom()
 
   const [searchText, setSearchText] = useState('')
@@ -117,6 +118,27 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
       isMounted = false
     }
   }, [filesHash, dadosVinculo?.curso_nome, dadosVinculo?.ano_letivo, dadosVinculo?.materia_nome, directoryHandle, hasFolderPermission, dadosVinculo?.arquivos])
+
+  useEffect(() => {
+    if (!directoryHandle || !hasFolderPermission) return
+
+    const sincronizarAoFocar = async () => {
+      try {
+        await escanearPastaLocal(materiaId, anoId)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
+    const lidarComFoco = () => {
+      sincronizarAoFocar()
+    }
+
+    window.addEventListener('focus', lidarComFoco)
+    return () => {
+      window.removeEventListener('focus', lidarComFoco)
+    }
+  }, [materiaId, anoId, directoryHandle, hasFolderPermission, escanearPastaLocal])
 
   const alterarOrdenacao = (campo: 'nome' | 'sincronizacao') => {
     if (sortField === campo) {

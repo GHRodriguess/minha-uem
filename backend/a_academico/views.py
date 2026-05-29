@@ -847,6 +847,8 @@ class SincronizarArquivosLocaisView(APIView):
             local_drive_ids = {item.get('drive_file_id'): item for item in local_files if item.get('drive_file_id')}
             
             arquivos = connection.arquivos.all()
+            caminhos_pareados = set()
+            
             for arq in arquivos:
                 downloaded_now = False
                 found_path = None
@@ -867,20 +869,27 @@ class SincronizarArquivosLocaisView(APIView):
                 if downloaded_now:
                     if found_path:
                         arq.local_path = found_path
+                        arq.save()
+                        caminhos_pareados.add(found_path)
                 else:
-                    arq.local_path = None
-                arq.save()
+                    if arq.drive_file_id.startswith('local_'):
+                        arq.delete()
+                    else:
+                        arq.local_path = None
+                        arq.save()
                 
+            import uuid
             for item in local_files:
-                drive_file_id = item.get('drive_file_id')
-                if drive_file_id and drive_file_id.startswith('local_'):
+                path_key = item.get('local_path')
+                if path_key and path_key not in caminhos_pareados:
+                    drive_file_id = item.get('drive_file_id') or f"local_{uuid.uuid4()}"
                     if not connection.arquivos.filter(drive_file_id=drive_file_id).exists():
                         ArquivoMateriaClassroom.objects.create(
                             classroom_connection=connection,
                             drive_file_id=drive_file_id,
                             original_name=item.get('original_name'),
                             selected_folder=item.get('selected_folder', 'documentos'),
-                            local_path=item.get('local_path')
+                            local_path=path_key
                         )
             
             arquivos_atualizados = connection.arquivos.all().order_by('-sync_at')
