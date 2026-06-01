@@ -507,7 +507,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
         <td className="py-4 px-6 text-left">
           <div className="flex items-center justify-start gap-1.5">
-            {!arquivo.drive_file_id.startsWith('local_') && (
+            {(!arquivo.drive_file_id.startsWith('local_') || obterExtensao(arquivo.original_name) === 'pdf') && (
               <button
                 onClick={() => lidarComPreVisualizacao(arquivo)}
                 className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors cursor-pointer"
@@ -688,7 +688,7 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
             Sinc: {formatarData(arquivo.sync_at)}
           </span>
           <div className="flex items-center gap-1.5 order-1 sm:order-2">
-            {!arquivo.drive_file_id.startsWith('local_') && (
+            {(!arquivo.drive_file_id.startsWith('local_') || obterExtensao(arquivo.original_name) === 'pdf') && (
               <button
                 onClick={() => lidarComPreVisualizacao(arquivo)}
                 className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors cursor-pointer"
