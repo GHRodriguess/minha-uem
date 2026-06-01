@@ -25,8 +25,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Laptop
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { ArquivoClassroom, StatusVinculoClassroom } from '@/lib/api/classroom'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
@@ -38,12 +40,12 @@ interface TabelaArquivosProps {
 }
 
 export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivosProps) {
+  const router = useRouter()
   const { 
     classroomConfig,
     baixarItem,
     salvarNomePersonalizado,
     salvarPastaDestino,
-    abrirItemLocal,
     alternarOcultarArquivo,
     enviarArquivoLocal,
     directoryHandle,
@@ -53,6 +55,14 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     escanearPastaLocal
   } = useClassroom()
 
+  const lidarComPreVisualizacao = (arquivo: ArquivoClassroom) => {
+    if (obterExtensao(arquivo.original_name) === 'pdf') {
+      router.push(`/disciplinas/${materiaId}/arquivos/visualizador?fileId=${arquivo.drive_file_id}`)
+    } else {
+      setPreviewFile(arquivo)
+    }
+  }
+
   const [searchText, setSearchText] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('todos')
   const [selectedExtension, setSelectedExtension] = useState('todos')
@@ -61,7 +71,9 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   const [customNameInput, setCustomNameInput] = useState('')
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [previewFile, setPreviewFile] = useState<ArquivoClassroom | null>(null)
-  const [sortField, setSortField] = useState<'nome' | 'sincronizacao'>('nome')
+  const [sortField, setSortField] = useState<'nome' | 'sincronizacao' | 'manual'>('manual')
+  const [ordemManualVersao, setOrdemManualVersao] = useState(0)
+  const [arquivoParaExcluir, setArquivoParaExcluir] = useState<ArquivoClassroom | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [mostrarOcultados, setMostrarOcultados] = useState(false)
   const [uploadModalAberto, setUploadModalAberto] = useState(false)
@@ -73,8 +85,8 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
   const filesHash = useMemo(() => {
     if (!dadosVinculo?.arquivos) return ''
-    return JSON.stringify(dadosVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder, a.local_path]))
-  }, [dadosVinculo?.arquivos])
+    return JSON.stringify(dadosVinculo.arquivos.map(a => [a.drive_file_id, a.custom_name, a.original_name, a.selected_folder, a.local_path])) + `_${ordemManualVersao}`
+  }, [dadosVinculo?.arquivos, ordemManualVersao])
 
   useEffect(() => {
     if (!directoryHandle || !hasFolderPermission || !dadosVinculo?.arquivos) return
@@ -253,12 +265,45 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     setGroupBy('category')
   }
 
-  const gerenciarAberturaLocal = async (arquivo: ArquivoClassroom) => {
+  const gerenciarExclusaoLocal = (arquivo: ArquivoClassroom) => {
+    setArquivoParaExcluir(arquivo)
+  }
+
+  const confirmarExclusaoFisica = async () => {
+    if (!arquivoParaExcluir || !directoryHandle || !hasFolderPermission || !dadosVinculo) return
     try {
-      await abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)
+      const courseName = dadosVinculo.curso_nome || "Sem_Curso"
+      const year = dadosVinculo.ano_letivo || ""
+      const subjectName = dadosVinculo.materia_nome || ""
+      const folder = arquivoParaExcluir.selected_folder || "documentos"
+      const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
+      const fileName = arquivoParaExcluir.custom_name || arquivoParaExcluir.original_name
+      
+      const success = await GerenciadorDiretorio.removerArquivoLocal(directoryHandle, parts, fileName)
+      if (success) {
+        localStorage.removeItem('baixado_' + arquivoParaExcluir.drive_file_id)
+        await escanearPastaLocal(materiaId, anoId)
+      }
     } catch (error) {
       console.error(error)
+    } finally {
+      setArquivoParaExcluir(null)
     }
+  }
+
+  const lidarComReordenacaoManual = (draggedId: string, targetId: string) => {
+    const list = [...arquivosOrdenados]
+    const idxDragged = list.findIndex(f => f.drive_file_id === draggedId)
+    const idxTarget = list.findIndex(f => f.drive_file_id === targetId)
+    if (idxDragged === -1 || idxTarget === -1) return
+
+    const [draggedItem] = list.splice(idxDragged, 1)
+    list.splice(idxTarget, 0, draggedItem)
+
+    const orderedIds = list.map(f => f.drive_file_id)
+    localStorage.setItem(`minha_uem_visualizador_ordem_${materiaId}`, JSON.stringify(orderedIds))
+    setSortField('manual')
+    setOrdemManualVersao(v => v + 1)
   }
 
   const gerenciarOcultar = async (arquivo: ArquivoClassroom) => {
@@ -315,6 +360,27 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
   })
 
   const arquivosOrdenados = [...arquivosFiltrados].sort((a, b) => {
+    if (sortField === 'manual') {
+      const storedOrder = localStorage.getItem(`minha_uem_visualizador_ordem_${materiaId}`)
+      if (storedOrder) {
+        try {
+          const orderedIds: string[] = JSON.parse(storedOrder)
+          const idxA = orderedIds.indexOf(a.drive_file_id)
+          const idxB = orderedIds.indexOf(b.drive_file_id)
+          if (idxA !== -1 && idxB !== -1) {
+            return sortDirection === 'asc' ? idxA - idxB : idxB - idxA
+          }
+          if (idxA !== -1) return sortDirection === 'asc' ? -1 : 1
+          if (idxB !== -1) return sortDirection === 'asc' ? 1 : -1
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      const nomeA = (a.custom_name || a.original_name).toLowerCase()
+      const nomeB = (b.custom_name || b.original_name).toLowerCase()
+      return nomeA.localeCompare(nomeB, 'pt-BR')
+    }
+
     if (sortField === 'nome') {
       const nomeA = (a.custom_name || a.original_name).toLowerCase()
       const nomeB = (b.custom_name || b.original_name).toLowerCase()
@@ -339,7 +405,21 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     return (
       <tr 
         key={arquivo.drive_file_id} 
-        className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium ${arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''}`}
+        draggable={true}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', arquivo.drive_file_id)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const draggedId = e.dataTransfer.getData('text/plain')
+          if (draggedId && draggedId !== arquivo.drive_file_id) {
+            lidarComReordenacaoManual(draggedId, arquivo.drive_file_id)
+          }
+        }}
+        className={`hover:bg-muted/10 transition-colors text-xs text-foreground font-medium cursor-grab active:cursor-grabbing ${arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''}`}
       >
         <td className="py-4 px-6">
           <div className="flex items-start gap-3">
@@ -427,13 +507,13 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
 
         <td className="py-4 px-6 text-left">
           <div className="flex items-center justify-start gap-1.5">
-            {isReallyDownloaded && (
+            {!arquivo.drive_file_id.startsWith('local_') && (
               <button
-                onClick={() => gerenciarAberturaLocal(arquivo)}
-                className="hidden lg:inline-flex p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                title="Abrir arquivo localmente"
+                onClick={() => lidarComPreVisualizacao(arquivo)}
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors cursor-pointer"
+                title="Pré-visualizar"
               >
-                <Laptop className="w-3.5 h-3.5" />
+                <Eye className="w-3.5 h-3.5" />
               </button>
             )}
 
@@ -446,40 +526,44 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
             </button>
 
             {!arquivo.drive_file_id.startsWith('local_') && (
-              <>
-                <button
-                  onClick={() => setPreviewFile(arquivo)}
-                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                  title="Pré-visualizar"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                </button>
+              <a
+                href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                title="Ver no Google Drive"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
 
-                <a
-                  href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                  title="Ver no Google Drive"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-
-                {!isReallyDownloaded && (
-                  <button
-                    onClick={() => gerenciarDownload(arquivo)}
-                    disabled={estaBaixando}
-                    className="hidden lg:flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
-                  >
-                    {estaBaixando ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                    Baixar
-                  </button>
+            {!arquivo.drive_file_id.startsWith('local_') && !isReallyDownloaded && (
+              <button
+                onClick={() => gerenciarDownload(arquivo)}
+                disabled={estaBaixando}
+                className="hidden lg:flex items-center gap-1.5 h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                {estaBaixando ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3" />
                 )}
-              </>
+                Baixar
+              </button>
+            )}
+
+            {isReallyDownloaded && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  gerenciarExclusaoLocal(arquivo)
+                }}
+                className="p-2 border border-border bg-background hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-colors cursor-pointer"
+                title="Excluir arquivo localmente"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </td>
@@ -497,7 +581,21 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     return (
       <div 
         key={arquivo.drive_file_id}
-        className={`bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-4 relative transition-all hover:border-primary/30 ${
+        draggable={true}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', arquivo.drive_file_id)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const draggedId = e.dataTransfer.getData('text/plain')
+          if (draggedId && draggedId !== arquivo.drive_file_id) {
+            lidarComReordenacaoManual(draggedId, arquivo.drive_file_id)
+          }
+        }}
+        className={`bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-4 relative transition-all hover:border-primary/30 cursor-grab active:cursor-grabbing ${
           arquivo.is_ignored ? 'opacity-50 bg-muted/10' : ''
         }`}
       >
@@ -589,15 +687,14 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
           <span className="text-[9px] font-bold text-muted-foreground order-2 sm:order-1">
             Sinc: {formatarData(arquivo.sync_at)}
           </span>
-
           <div className="flex items-center gap-1.5 order-1 sm:order-2">
-            {isReallyDownloaded && (
+            {!arquivo.drive_file_id.startsWith('local_') && (
               <button
-                onClick={() => gerenciarAberturaLocal(arquivo)}
-                className="hidden lg:inline-flex p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                title="Abrir arquivo localmente"
+                onClick={() => lidarComPreVisualizacao(arquivo)}
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors cursor-pointer"
+                title="Pré-visualizar"
               >
-                <Laptop className="w-3.5 h-3.5" />
+                <Eye className="w-3.5 h-3.5" />
               </button>
             )}
 
@@ -614,40 +711,44 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
             </button>
 
             {!arquivo.drive_file_id.startsWith('local_') && (
-              <>
-                <button
-                  onClick={() => setPreviewFile(arquivo)}
-                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                  title="Pré-visualizar"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                </button>
+              <a
+                href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
+                title="Ver no Google Drive"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
 
-                <a
-                  href={`https://drive.google.com/file/d/${arquivo.drive_file_id}/view?usp=drivesdk`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors"
-                  title="Ver no Google Drive"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-
-                {!isReallyDownloaded && (
-                  <button
-                    onClick={() => gerenciarDownload(arquivo)}
-                    disabled={estaBaixando}
-                    className="hidden lg:flex items-center gap-1 h-8 px-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50"
-                  >
-                    {estaBaixando ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                    Baixar
-                  </button>
+            {!arquivo.drive_file_id.startsWith('local_') && !isReallyDownloaded && (
+              <button
+                onClick={() => gerenciarDownload(arquivo)}
+                disabled={estaBaixando}
+                className="hidden lg:flex items-center gap-1 h-8 px-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border border-primary/20 bg-primary text-primary-foreground hover:opacity-90 shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                {estaBaixando ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3" />
                 )}
-              </>
+                Baixar
+              </button>
+            )}
+
+            {isReallyDownloaded && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  gerenciarExclusaoLocal(arquivo)
+                }}
+                className="p-2 border border-border bg-background hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-colors cursor-pointer"
+                title="Excluir arquivo localmente"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </div>
@@ -1136,6 +1237,40 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {arquivoParaExcluir && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-backdrop">
+          <div className="bg-card border border-border w-full max-w-sm flex flex-col rounded-3xl shadow-2xl p-6 gap-4 animate-scale-modal">
+            <div className="p-3 bg-destructive/10 text-destructive border border-destructive/10 rounded-full w-fit mx-auto">
+              <AlertTriangle className="w-6 h-6 animate-pulse" />
+            </div>
+            
+            <div className="space-y-1.5 text-center">
+              <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
+                Excluir arquivo offline?
+              </h3>
+              <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">
+                Esta ação apagará fisicamente o arquivo do seu computador local. Você poderá baixá-lo novamente do Google Drive quando precisar.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={() => setArquivoParaExcluir(null)}
+                className="flex-1 h-9 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarExclusaoFisica}
+                className="flex-1 h-9 bg-destructive hover:bg-destructive/90 text-xs font-bold text-white rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Excluir</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
