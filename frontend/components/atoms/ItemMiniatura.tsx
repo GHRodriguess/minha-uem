@@ -67,8 +67,8 @@ export function ItemMiniatura({
       onClick={onClick}
       className={`${styleBase} ${styleEstado}`}
     >
-      <div className="relative border border-border/20 rounded-md overflow-hidden bg-background flex items-center justify-center min-w-[70px] min-h-[90px] shadow-sm">
-        <canvas ref={canvasRef} className={`w-full max-w-[80px] object-contain ${loading ? 'opacity-0' : 'opacity-100'}`} />
+      <div className="relative border border-border/20 rounded-md overflow-hidden bg-background flex items-center justify-center min-w-17.5 min-h-22.5 shadow-sm">
+        <canvas ref={canvasRef} className={`w-full max-w-20 object-contain ${loading ? 'opacity-0' : 'opacity-100'}`} />
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
             <span className="w-4 h-4 rounded-full border border-primary border-t-transparent animate-spin" />
