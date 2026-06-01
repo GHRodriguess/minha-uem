@@ -1296,6 +1296,58 @@ def obter_primeira_data_dia(data_inicio, dia_alvo):
         current += timedelta(days=1)
     return data_inicio
 
+def mesclar_aulas_consecutivas(schedules):
+    if not schedules:
+        return []
+    groups = {}
+    for schedule in schedules:
+        key = (schedule.dia, schedule.materia.id, schedule.data_inicio, schedule.data_termino)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(schedule)
+    merged_schedules = []
+    for key, group_list in groups.items():
+        group_list.sort(key=lambda s: s.inicio)
+        current = None
+        for schedule in group_list:
+            if current is None:
+                current = {
+                    'id': schedule.id,
+                    'materia': schedule.materia,
+                    'turma': schedule.turma,
+                    'departamento': schedule.departamento,
+                    'periodo': schedule.periodo,
+                    'data_inicio': schedule.data_inicio,
+                    'data_termino': schedule.data_termino,
+                    'bloco': schedule.bloco,
+                    'dia': schedule.dia,
+                    'inicio': schedule.inicio,
+                    'fim': schedule.fim,
+                    'sala': schedule.sala,
+                }
+            else:
+                if schedule.inicio == current['fim']:
+                    current['fim'] = schedule.fim
+                else:
+                    merged_schedules.append(current)
+                    current = {
+                        'id': schedule.id,
+                        'materia': schedule.materia,
+                        'turma': schedule.turma,
+                        'departamento': schedule.departamento,
+                        'periodo': schedule.periodo,
+                        'data_inicio': schedule.data_inicio,
+                        'data_termino': schedule.data_termino,
+                        'bloco': schedule.bloco,
+                        'dia': schedule.dia,
+                        'inicio': schedule.inicio,
+                        'fim': schedule.fim,
+                        'sala': schedule.sala,
+                    }
+        if current:
+            merged_schedules.append(current)
+    return merged_schedules
+
 class ObterInfoAgendaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1345,6 +1397,8 @@ class FeedAgendaView(View):
             Q(anoletivo__perfil=profile) | Q(perfilacademico=profile)
         ).select_related('materia').distinct()
 
+        merged_schedules = mesclar_aulas_consecutivas(horarios)
+
         avaliacoes = Avaliacao.objects.filter(
             configuracao__perfil=profile
         ).select_related('configuracao__materia')
@@ -1359,34 +1413,34 @@ class FeedAgendaView(View):
             7: "SU"
         }
 
-        for horario in horarios:
-            first_date = obter_primeira_data_dia(horario.data_inicio, horario.dia)
-            start_str = f"{first_date.strftime('%Y%m%d')}T{horario.inicio.strftime('%H%M%S')}"
-            end_str = f"{first_date.strftime('%Y%m%d')}T{horario.fim.strftime('%H%M%S')}"
-            until_str = f"{horario.data_termino.strftime('%Y%m%d')}T235959Z"
+        for horario in merged_schedules:
+            first_date = obter_primeira_data_dia(horario['data_inicio'], horario['dia'])
+            start_str = f"{first_date.strftime('%Y%m%d')}T{horario['inicio'].strftime('%H%M%S')}"
+            end_str = f"{first_date.strftime('%Y%m%d')}T{horario['fim'].strftime('%H%M%S')}"
+            until_str = f"{horario['data_termino'].strftime('%Y%m%d')}T235959Z"
 
-            subject_name = horario.materia.nome
+            subject_name = horario['materia'].nome
             event_title = subject_name
 
             desc_lines = []
-            desc_lines.append(f"Materia: {subject_name} ({horario.materia.codigo})")
-            desc_lines.append(f"Bloco: {horario.bloco}")
-            desc_lines.append(f"Sala: {horario.sala}")
-            desc_lines.append(f"Turma: {horario.turma}")
-            desc_lines.append(f"Departamento: {horario.departamento}")
-            desc_lines.append(f"Periodo: {horario.periodo}")
+            desc_lines.append(f"Materia: {subject_name} ({horario['materia'].codigo})")
+            desc_lines.append(f"Bloco: {horario['bloco']}")
+            desc_lines.append(f"Sala: {horario['sala']}")
+            desc_lines.append(f"Turma: {horario['turma']}")
+            desc_lines.append(f"Departamento: {horario['departamento']}")
+            desc_lines.append(f"Periodo: {horario['periodo']}")
             event_desc = "\\n".join(desc_lines)
 
-            day_code = byday_map.get(horario.dia, "MO")
+            day_code = byday_map.get(horario['dia'], "MO")
 
             lines.append("BEGIN:VEVENT")
-            lines.append(f"UID:class_{horario.id}_{profile.id}@minhauem.com.br")
+            lines.append(f"UID:class_{horario['id']}_{profile.id}@minhauem.com.br")
             lines.append(f"DTSTAMP:{now().strftime('%Y%m%dT%H%M%SZ')}")
             lines.append(f"DTSTART;TZID=America/Sao_Paulo:{start_str}")
             lines.append(f"DTEND;TZID=America/Sao_Paulo:{end_str}")
             lines.append(f"RRULE:FREQ=WEEKLY;BYDAY={day_code};UNTIL={until_str}")
             lines.append(f"SUMMARY:{event_title}")
-            lines.append(f"LOCATION:Bloco {horario.bloco} - Sala {horario.sala}")
+            lines.append(f"LOCATION:Bloco {horario['bloco']} - Sala {horario['sala']}")
             lines.append(f"DESCRIPTION:{event_desc}")
             lines.append("END:VEVENT")
 
