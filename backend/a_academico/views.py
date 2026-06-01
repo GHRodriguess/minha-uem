@@ -1483,6 +1483,9 @@ class FeedAgendaView(View):
         ics_content = "\r\n".join(lines)
         response = HttpResponse(ics_content, content_type="text/calendar; charset=utf-8")
         response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
         return response
 
 
