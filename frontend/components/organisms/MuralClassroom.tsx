@@ -23,6 +23,20 @@ import { useClassroom } from '../providers/ProvedorClassroom'
 import Esqueleto from '@/components/atoms/Esqueleto'
 import EsqueletoCardMensagemMural from '@/components/atoms/EsqueletoCardMensagemMural'
 
+function adicionarUsuarioAutenticadoGoogle(url: string, email: string): string {
+  if (!url || !email) return url
+  try {
+    const urlObj = new URL(url)
+    if (urlObj.hostname.includes('google.com') || urlObj.hostname.includes('googleapis.com')) {
+      urlObj.searchParams.set('authuser', email)
+      return urlObj.toString()
+    }
+  } catch {
+    return url
+  }
+  return url
+}
+
 interface MuralClassroomProps {
   materiaId: number
   anoId: number
@@ -86,6 +100,8 @@ function BookIconeCustomizado() {
 }
 
 function CardMensagemMural({ post }: { post: PostMuralClassroom }) {
+  const { data: session } = useSession()
+  const userEmail = session?.user?.email || ''
   const [isExpanded, setIsExpanded] = useState(false)
   const styles = obterEstiloPost(post.tipo)
   const dateObj = new Date(post.data_criacao)
@@ -112,13 +128,41 @@ function CardMensagemMural({ post }: { post: PostMuralClassroom }) {
       })
     : null
 
+  const processedLink = userEmail ? adicionarUsuarioAutenticadoGoogle(post.link, userEmail) : post.link
+
+  const tratarCliqueCard = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('a') || target.closest('button')) {
+      return
+    }
+    if (processedLink) {
+      window.open(processedLink, '_blank', 'noopener,noreferrer')
+    }
+  }
+
   return (
-    <div className={`bg-card rounded-3xl border ${styles.cardBorder} p-6 md:p-8 shadow-sm transition-all duration-300 hover:shadow-md hover:border-border/80 relative`}>
-      {post.nao_lido && (
-        <span className="absolute top-6 right-6 flex h-6 px-3 items-center justify-center rounded-full bg-destructive text-[10px] font-black text-destructive-foreground uppercase tracking-widest animate-pulse">
-          Novo
-        </span>
-      )}
+    <div 
+      onClick={tratarCliqueCard}
+      className={`bg-card rounded-3xl border ${styles.cardBorder} p-6 md:p-8 shadow-sm transition-all duration-300 hover:shadow-md hover:border-border/80 relative ${processedLink ? 'cursor-pointer hover:border-primary/30' : ''}`}
+    >
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        {post.nao_lido && (
+          <span className="flex h-6 px-3 items-center justify-center rounded-full bg-destructive text-[10px] font-black text-destructive-foreground uppercase tracking-widest animate-pulse">
+            Novo
+          </span>
+        )}
+        {processedLink && (
+          <a
+            href={processedLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir no Google Classroom"
+            className="p-1.5 rounded-xl bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary border border-border/40 hover:border-primary/20 transition-all duration-300"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        )}
+      </div>
 
       <div className="flex items-start gap-4 mb-4">
         <div className="bg-muted p-3 rounded-2xl shrink-0">
@@ -180,28 +224,31 @@ function CardMensagemMural({ post }: { post: PostMuralClassroom }) {
             Anexos e Links ({post.materiais.length})
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {post.materiais.map((anexo, idx) => (
-              <a
-                href={anexo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                key={idx}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-muted/40 hover:bg-muted border border-border/40 hover:border-border transition-all group min-w-0"
-              >
-                <div className="bg-card p-2 rounded-xl shrink-0 border border-border/20 shadow-sm">
-                  {obterIconeAnexo(anexo.tipo)}
-                </div>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                    {anexo.titulo}
-                  </p>
-                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider block">
-                    {anexo.tipo === 'drive' ? 'Google Drive' : anexo.tipo === 'youtube' ? 'YouTube' : anexo.tipo === 'form' ? 'Google Forms' : 'Link Externo'}
-                  </span>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-            ))}
+            {post.materiais.map((anexo, idx) => {
+              const processedAttachmentUrl = userEmail ? adicionarUsuarioAutenticadoGoogle(anexo.url, userEmail) : anexo.url
+              return (
+                <a
+                  href={processedAttachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  key={idx}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-muted/40 hover:bg-muted border border-border/40 hover:border-border transition-all group min-w-0"
+                >
+                  <div className="bg-card p-2 rounded-xl shrink-0 border border-border/20 shadow-sm">
+                    {obterIconeAnexo(anexo.tipo)}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                      {anexo.titulo}
+                    </p>
+                    <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider block">
+                      {anexo.tipo === 'drive' ? 'Google Drive' : anexo.tipo === 'youtube' ? 'YouTube' : anexo.tipo === 'form' ? 'Google Forms' : 'Link Externo'}
+                    </span>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </a>
+              )
+            })}
           </div>
         </div>
       )}
