@@ -34,7 +34,7 @@ export function BarraBuscaInterna({
   }
 
   return (
-    <div className="flex items-center bg-transparent justify-between gap-3 px-4 py-2  backdrop-blur-[1px] border-border animate-in slide-in-from-top duration-150 shrink-0 select-none">
+    <div className="flex items-center bg-transparent justify-between gap-3 px-4 py-2  backdrop-blur-[0.8px] border-border animate-in slide-in-from-top duration-150 shrink-0 select-none">
       <div className="flex items-center gap-2.5 flex-1 max-w-sm">
         <div className="w-full h-8 flex items-center border border-border/90 bg-background/50 backdrop-blur-xl rounded-xl focus-within:bg-background/70 transition-all duration-200 overflow-hidden">
           <input
