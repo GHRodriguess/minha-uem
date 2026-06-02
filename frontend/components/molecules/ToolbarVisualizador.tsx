@@ -42,15 +42,15 @@ export function ToolbarVisualizador({
   canClose = false
 }: ToolbarVisualizadorProps) {
   return (
-    <div className="flex items-center justify-between gap-4 p-3 bg-linear-to-b from-background to-transparent backdrop-blur-[0.8px] sticky top-0 z-20 shrink-0 select-none">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 p-2 sm:p-3 bg-linear-to-b from-background to-transparent backdrop-blur-[0.8px] sticky top-0 z-20 shrink-0 select-none">
+      <div className="flex items-center gap-1 sm:gap-1.5">
         <BotaoVisualizador
           icon={Sidebar}
           onClick={onToggleSidebarMiniatures}
           title={sidebarMiniaturesOpen ? 'Ocultar miniaturas' : 'Mostrar miniaturas'}
           isActive={sidebarMiniaturesOpen}
         />
-        <div className="w-px h-6 bg-border/40 mx-1 hidden sm:block" />
+        <div className="w-px h-5 sm:h-6 bg-border/40 mx-0.5 sm:mx-1 hidden sm:block" />
         <IndicadorPagina
           currentPage={currentPage}
           totalPages={totalPages}
@@ -58,7 +58,7 @@ export function ToolbarVisualizador({
         />
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1 sm:gap-1.5">
         <BotaoVisualizador
           icon={ZoomOut}
           onClick={onZoomOut}
@@ -69,7 +69,7 @@ export function ToolbarVisualizador({
           onClick={onZoomIn}
           title="Aumentar zoom"
         />
-        <div className="w-px h-6 bg-border/40 mx-1" />
+        <div className="w-px h-5 sm:h-6 bg-border/40 mx-0.5 sm:mx-1" />
         <BotaoVisualizador
           icon={RotateCw}
           onClick={onRotate}
@@ -83,7 +83,7 @@ export function ToolbarVisualizador({
         />
         {canClose && onClose && (
           <>
-            <div className="w-px h-6 bg-border/40 mx-1" />
+            <div className="w-px h-5 sm:h-6 bg-border/40 mx-0.5 sm:mx-1" />
             <BotaoVisualizador
               icon={X}
               onClick={onClose}
