@@ -2,6 +2,18 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { googleTokenExpirado, renovarGoogleAccessToken } from "@/lib/service/renovarGoogleToken"
 
+function obterExpiracaoJwt(token: string): number {
+  try {
+    const payload = token.split(".")[1]
+    const dados = JSON.parse(
+      Buffer.from(payload, "base64").toString("utf-8")
+    )
+    return dados.exp * 1000
+  } catch {
+    return Date.now() + 24 * 60 * 60 * 1000
+  }
+}
+
 async function renovarTokenAcesso(token: any) {
   try {
     const urlApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -25,7 +37,7 @@ async function renovarTokenAcesso(token: any) {
     return {
       ...token,
       accessToken: dados.access,
-      accessTokenExpires: Date.now() + 60 * 60 * 1000,
+      accessTokenExpires: obterExpiracaoJwt(dados.access),
       refreshToken: dados.refresh ?? token.refreshToken,
     }
   } catch {
@@ -84,7 +96,7 @@ const tratador = NextAuth({
             const dados = await resposta.json()
             token.accessToken = dados.access
             token.refreshToken = dados.refresh
-            token.accessTokenExpires = Date.now() + 60 * 60 * 1000
+            token.accessTokenExpires = obterExpiracaoJwt(dados.access)
           }
         } catch (error) {
           console.error("Erro na autenticação com o backend:", error)
@@ -92,7 +104,7 @@ const tratador = NextAuth({
         return token
       }
 
-      if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
+      if (token.accessTokenExpires && Date.now() < token.accessTokenExpires - 10000) {
         if (googleTokenExpirado(token)) {
           return renovarGoogleAccessToken(token)
         }
