@@ -42,7 +42,7 @@ export function ToolbarVisualizador({
   canClose = false
 }: ToolbarVisualizadorProps) {
   return (
-    <div className="flex items-center justify-between gap-4 p-3 bg-card/20 backdrop-blur-xs sticky top-0 z-20 shrink-0 select-none">
+    <div className="flex items-center justify-between gap-4 p-3 bg-linear-to-b from-background to-transparent backdrop-blur-[0.8px] sticky top-0 z-20 shrink-0 select-none">
       <div className="flex items-center gap-1.5">
         <BotaoVisualizador
           icon={Sidebar}
