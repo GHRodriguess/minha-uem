@@ -1,4 +1,4 @@
-import { signOut } from "next-auth/react";
+import { getSession, signOut } from "next-auth/react";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -102,6 +102,12 @@ export async function requisitar<T>(
   const response = await fetch(url, fetchOptions);
 
   if (response.status === 401) {
+    const session = await getSession();
+    const new_token = session?.accessToken;
+    if (new_token && new_token !== token) {
+      const new_options = { ...options, token: new_token };
+      return requisitar<T>(path, new_options);
+    }
     tratarNaoAutorizado();
     throw new ErroApi(401, "Não autorizado");
   }
