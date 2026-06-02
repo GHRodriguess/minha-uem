@@ -43,16 +43,16 @@ export function IndicadorPagina({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-background border border-border rounded-xl text-xs font-semibold text-muted-foreground select-none shrink-0 shadow-sm">
+    <div className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-background/60 border border-border/40 backdrop-blur-md rounded-xl text-xs font-semibold text-foreground select-none shrink-0 transition-all duration-200 hover:bg-background/80">
       <input
         type="text"
         value={inputValue}
         onChange={lidarComMudanca}
         onBlur={confirmarMudanca}
         onKeyDown={tratarTeclas}
-        className="w-8 h-5 text-center bg-muted border border-border rounded-md font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="w-7 sm:w-8 h-4 sm:h-5 text-center bg-transparent border border-transparent rounded-md font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
       />
-      <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-wider">de</span>
+      <span className="text-[10px] font-black uppercase tracking-wider text-foreground/60">de</span>
       <span className="font-bold text-foreground">{totalPages || 1}</span>
     </div>
   )

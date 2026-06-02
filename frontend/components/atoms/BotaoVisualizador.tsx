@@ -18,10 +18,10 @@ export function BotaoVisualizador({
   isActive = false,
   isDisabled = false
 }: BotaoVisualizadorProps) {
-  const baseStyle = 'p-2 rounded-xl transition-all duration-200 shrink-0 border'
+  const baseStyle = 'p-1.5 sm:p-2 rounded-xl transition-all duration-200 shrink-0 border backdrop-blur-md'
   const activeStyle = isActive
-    ? 'bg-primary/10 text-primary border-primary/25 shadow-sm'
-    : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border'
+    ? 'bg-primary/20 text-primary border-primary/30 shadow-sm'
+    : 'bg-background/60 hover:bg-background/80 text-foreground border-border/40'
   const disabledStyle = isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'
 
   return (
