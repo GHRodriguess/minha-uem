@@ -525,6 +525,7 @@ class ArquivosMateriaClassroomView(APIView):
                     'curso_nome': curso_nome,
                     'ano_letivo': ano_letivo,
                     'materia_nome': materia_nome,
+                    'custom_folders': connection.custom_folders,
                     'arquivos': arquivos_mesclados
                 })
             else:
@@ -537,6 +538,7 @@ class ArquivosMateriaClassroomView(APIView):
                     'curso_nome': curso_nome,
                     'ano_letivo': ano_letivo,
                     'materia_nome': materia_nome,
+                    'custom_folders': connection.custom_folders,
                     'arquivos': serializer.data
                 })
         except PermissionError as e:
@@ -623,7 +625,7 @@ class ArquivosMateriaClassroomView(APIView):
                     'custom_name': None,
                     'selected_folder': 'documentos',
                     'local_path': None,
-                    'is_ignored': False,
+                    'is_ignored': title.startswith('.'),
                     'sync_at': None
                 })
 
@@ -641,6 +643,49 @@ class ArquivosMateriaClassroomView(APIView):
                 })
 
         return resultado
+
+
+class AtualizarCategoriasVinculoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        materia_id = request.data.get('materia_id')
+        ano_id = request.data.get('ano_id')
+        custom_folders = request.data.get('custom_folders', '')
+        redistributions = request.data.get('redistribuicoes', [])
+
+        if not materia_id or not ano_id:
+            return Response({'erro': 'materia_id e ano_id são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile, _ = obter_perfil_ativo(request)
+            connection = VinculoGoogleClassroom.objects.get(
+                subject_config__perfil=profile,
+                subject_config__materia_id=materia_id,
+                subject_config__ano_letivo_id=ano_id
+            )
+
+            connection.custom_folders = custom_folders
+            connection.save()
+
+            if redistributions:
+                for item in redistributions:
+                    file_id = item.get('drive_file_id')
+                    new_folder = item.get('new_folder')
+                    if file_id and new_folder:
+                        ArquivoMateriaClassroom.objects.filter(
+                            classroom_connection=connection,
+                            drive_file_id=file_id
+                        ).update(selected_folder=new_folder)
+
+            return Response({
+                'sucesso': True,
+                'custom_folders': connection.custom_folders
+            })
+        except VinculoGoogleClassroom.DoesNotExist:
+            return Response({'erro': 'Vínculo do Classroom não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AtualizarArquivoClassroomView(APIView):

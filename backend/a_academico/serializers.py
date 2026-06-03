@@ -496,7 +496,7 @@ class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VinculoGoogleClassroom
-        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'arquivos']
+        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'custom_folders', 'arquivos']
 
 
 class MensagemChamadoSerializer(serializers.ModelSerializer):

@@ -124,6 +124,7 @@ class VinculoGoogleClassroom(models.Model):
     classroom_course_id = models.CharField(max_length=100)
     classroom_course_name = models.CharField(max_length=255)
     ultimo_acesso_mural = models.DateTimeField(null=True, blank=True)
+    custom_folders = models.CharField(max_length=500, default="", blank=True)
 
     def __str__(self):
         return f"Vinculo {self.subject_config.materia.nome} -> {self.classroom_course_name}"
@@ -138,6 +139,11 @@ class ArquivoMateriaClassroom(models.Model):
     is_ignored = models.BooleanField(default=False)
     local_path = models.CharField(max_length=500, null=True, blank=True)
     sync_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.original_name and self.original_name.startswith('.'):
+            self.is_ignored = True
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.custom_name or self.original_name} ({self.classroom_connection.subject_config.materia.nome})"

@@ -14,6 +14,8 @@ interface SplitterVisualizacaoProps {
   onDropLocalFile?: (file: File, side: 'left' | 'right') => void
   isDraggingGlobal: boolean
   onCancelDrag: () => void
+  isLeftLoading?: boolean
+  isRightLoading?: boolean
 }
 
 export function SplitterVisualizacao({
@@ -25,7 +27,9 @@ export function SplitterVisualizacao({
   onDropFile,
   onDropLocalFile,
   isDraggingGlobal,
-  onCancelDrag
+  onCancelDrag,
+  isLeftLoading = false,
+  isRightLoading = false
 }: SplitterVisualizacaoProps) {
   const [leftWidth, setLeftWidth] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -149,6 +153,7 @@ export function SplitterVisualizacao({
           side="left"
           canClose={leftFileUrl !== null}
           onClose={onCloseLeft}
+          isLoading={isLeftLoading}
         />
         {renderizarZonasDeDrop()}
       </div>
@@ -166,6 +171,7 @@ export function SplitterVisualizacao({
           side="left"
           canClose={leftFileUrl !== null}
           onClose={onCloseLeft}
+          isLoading={isLeftLoading}
         />
       </div>
 
@@ -181,6 +187,7 @@ export function SplitterVisualizacao({
           side="right"
           canClose={rightFileUrl !== null}
           onClose={onCloseRight}
+          isLoading={isRightLoading}
         />
       </div>
 
