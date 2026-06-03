@@ -76,33 +76,74 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const prevCountRef = React.useRef<number>(0)
+
   React.useEffect(() => {
     if (unreadNotifications) {
       setNotificationsCount(unreadNotifications.total_nao_lidos)
+      prevCountRef.current = unreadNotifications.total_nao_lidos
     } else {
       setNotificationsCount(0)
+      prevCountRef.current = 0
     }
   }, [unreadNotifications])
 
   React.useEffect(() => {
-    if (session?.accessToken && anoAtivoId) {
-      obterNotificacoesGerais(anoAtivoId)
-      const verificarERepetir = () => {
-        if (document.visibilityState === 'visible') {
-          obterNotificacoesGerais(anoAtivoId)
+    const accessToken = session?.accessToken
+    if (!accessToken || !anoAtivoId) return
+
+    let timeoutId: NodeJS.Timeout
+    let delay = 30000
+
+    const buscarNovidades = async () => {
+      if (document.visibilityState !== 'visible') {
+        timeoutId = setTimeout(buscarNovidades, delay)
+        return
+      }
+
+      try {
+        const googleToken = session?.googleAccessToken || null
+        const data = await classroom_service.obterNotificacoes(accessToken, googleToken, anoAtivoId)
+        
+        const prevCount = prevCountRef.current
+        setUnreadNotifications(data)
+        setNotificationsCount(data.total_nao_lidos)
+
+        if (data.total_nao_lidos > prevCount) {
+          delay = 30000
+        } else {
+          delay = Math.min(delay * 2, 300000)
         }
+      } catch (error) {
+        console.error(error)
       }
-      const interval = setInterval(verificarERepetir, 30000)
-      const lidarMudancaVisibilidade = () => {
-        if (document.visibilityState === 'visible') {
-          obterNotificacoesGerais(anoAtivoId)
-        }
+
+      timeoutId = setTimeout(buscarNovidades, delay)
+    }
+
+    obterNotificacoesGerais(anoAtivoId)
+    timeoutId = setTimeout(buscarNovidades, delay)
+
+    const lidarInteracao = () => {
+      delay = 30000
+    }
+
+    const lidarMudancaVisibilidade = () => {
+      if (document.visibilityState === 'visible') {
+        delay = 30000
+        obterNotificacoesGerais(anoAtivoId)
       }
-      document.addEventListener('visibilitychange', lidarMudancaVisibilidade)
-      return () => {
-        clearInterval(interval)
-        document.removeEventListener('visibilitychange', lidarMudancaVisibilidade)
-      }
+    }
+
+    document.addEventListener('visibilitychange', lidarMudancaVisibilidade)
+    document.addEventListener('click', lidarInteracao)
+    document.addEventListener('keydown', lidarInteracao)
+
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', lidarMudancaVisibilidade)
+      document.removeEventListener('click', lidarInteracao)
+      document.removeEventListener('keydown', lidarInteracao)
     }
   }, [session, anoAtivoId, obterNotificacoesGerais])
   
