@@ -336,6 +336,60 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     }
   }
 
+  const allFilesActiveOrder = useMemo(() => {
+    if (!dadosVinculo?.arquivos) return []
+    if (ordemManualVersao < 0) return []
+    return [...dadosVinculo.arquivos].sort((a, b) => {
+      if (sortField === 'manual') {
+        const storedOrder = localStorage.getItem(`minha_uem_visualizador_ordem_${materiaId}`)
+        if (storedOrder) {
+          try {
+            const orderedIds: string[] = JSON.parse(storedOrder)
+            const idxA = orderedIds.indexOf(a.drive_file_id)
+            const idxB = orderedIds.indexOf(b.drive_file_id)
+            if (idxA !== -1 && idxB !== -1) {
+              return sortDirection === 'asc' ? idxA - idxB : idxB - idxA
+            }
+            if (idxA !== -1) return sortDirection === 'asc' ? -1 : 1
+            if (idxB !== -1) return sortDirection === 'asc' ? 1 : -1
+          } catch (e) {
+            console.error(e)
+          }
+        }
+        const nameA = (a.custom_name || a.original_name).toLowerCase()
+        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        return nameA.localeCompare(nameB, 'pt-BR')
+      }
+
+      if (sortField === 'nome') {
+        const nameA = (a.custom_name || a.original_name).toLowerCase()
+        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        return sortDirection === 'asc'
+          ? nameA.localeCompare(nameB, 'pt-BR')
+          : nameB.localeCompare(nameA, 'pt-BR')
+      } else if (sortField === 'sincronizacao') {
+        const dataA = a.sync_at ? new Date(a.sync_at).getTime() : 0
+        const dataB = b.sync_at ? new Date(b.sync_at).getTime() : 0
+        return sortDirection === 'asc' ? dataA - dataB : dataB - dataA
+      }
+      return 0
+    })
+  }, [dadosVinculo?.arquivos, sortField, sortDirection, materiaId, ordemManualVersao])
+
+  useEffect(() => {
+    if (allFilesActiveOrder.length === 0) return
+    const orderedIds = allFilesActiveOrder.map(f => f.drive_file_id)
+    const currentJson = JSON.stringify(orderedIds)
+    const storedOrder = localStorage.getItem(`minha_uem_visualizador_ordem_${materiaId}`)
+    if (storedOrder !== currentJson) {
+      localStorage.setItem(`minha_uem_visualizador_ordem_${materiaId}`, currentJson)
+      if (!storedOrder) {
+        setOrdemManualVersao(v => v + 1)
+      }
+    }
+  }, [allFilesActiveOrder, materiaId])
+
+
   const arquivosFiltrados = dadosVinculo.arquivos.filter(arquivo => {
     const nomeCompara = (arquivo.custom_name || arquivo.original_name).toLowerCase()
     const originalCompara = arquivo.original_name.toLowerCase()
