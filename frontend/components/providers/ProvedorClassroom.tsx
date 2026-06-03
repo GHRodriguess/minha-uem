@@ -87,10 +87,22 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (session?.accessToken && anoAtivoId) {
       obterNotificacoesGerais(anoAtivoId)
-      const interval = setInterval(() => {
-        obterNotificacoesGerais(anoAtivoId)
-      }, 300000)
-      return () => clearInterval(interval)
+      const verificarERepetir = () => {
+        if (document.visibilityState === 'visible') {
+          obterNotificacoesGerais(anoAtivoId)
+        }
+      }
+      const interval = setInterval(verificarERepetir, 30000)
+      const lidarMudancaVisibilidade = () => {
+        if (document.visibilityState === 'visible') {
+          obterNotificacoesGerais(anoAtivoId)
+        }
+      }
+      document.addEventListener('visibilitychange', lidarMudancaVisibilidade)
+      return () => {
+        clearInterval(interval)
+        document.removeEventListener('visibilitychange', lidarMudancaVisibilidade)
+      }
     }
   }, [session, anoAtivoId, obterNotificacoesGerais])
   

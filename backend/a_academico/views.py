@@ -1,5 +1,6 @@
 from django.views import View
 from django.db.models import Q
+from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -373,6 +374,8 @@ class VincularCursoClassroomView(APIView):
             )
             
             serializer = VinculoGoogleClassroomSerializer(connection)
+            cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
+            cache.delete(cache_key)
             return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -391,6 +394,8 @@ class VincularCursoClassroomView(APIView):
                 subject_config__ano_letivo_id=ano_id
             )
             connection.delete()
+            cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
+            cache.delete(cache_key)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1101,6 +1106,9 @@ class MuralClassroomView(APIView):
             connection.ultimo_acesso_mural = timezone.now()
             connection.save()
 
+            cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
+            cache.delete(cache_key)
+
             next_tokens = {
                 'announcements': ann_data.get('nextPageToken'),
                 'courseWork': cw_data.get('nextPageToken'),
@@ -1148,6 +1156,8 @@ class MarcarMuralLidoView(APIView):
             if connection:
                 connection.ultimo_acesso_mural = timezone.now()
                 connection.save()
+                cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
+                cache.delete(cache_key)
                 return Response({'sucesso': True})
             return Response({'erro': 'Vínculo do Classroom não encontrado'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -1169,6 +1179,11 @@ class NotificacoesClassroomView(APIView):
 
         try:
             profile, _ = obter_perfil_ativo(request)
+            cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return Response(cached_data)
+
             connections = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
                 subject_config__ano_letivo_id=ano_id
@@ -1272,10 +1287,13 @@ class NotificacoesClassroomView(APIView):
                         'mensagens': unread_items
                     })
 
-            return Response({
+            response_data = {
                 'total_nao_lidos': global_unread_count,
                 'atualizacoes': subject_updates
-            })
+            }
+            cache.set(cache_key, response_data, 120)
+
+            return Response(response_data)
 
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
