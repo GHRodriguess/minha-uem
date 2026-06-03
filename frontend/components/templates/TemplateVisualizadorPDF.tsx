@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Files, Upload, Loader2 } from 'lucide-react'
+import { ArrowLeft, Files, Upload } from 'lucide-react'
 import { SidebarArquivosMateria } from '@/components/molecules/SidebarArquivosMateria'
 import { SplitterVisualizacao } from '@/components/organisms/SplitterVisualizacao'
 import { obterBlobGoogleDrive } from '@/lib/utils/googleDrive'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { ModalAcessoPasta } from '@/components/molecules/ModalAcessoPasta'
 
 interface TemplateVisualizadorPDFProps {
   materiaId: number
@@ -25,11 +26,14 @@ export function TemplateVisualizadorPDF({
   initialRightFileId
 }: TemplateVisualizadorPDFProps) {
   const { data: session } = useSession()
-  const { directoryHandle, hasFolderPermission, alternarOcultarArquivo } = useClassroom()
+  const { directoryHandle, hasFolderPermission, alternarOcultarArquivo, filesCache, loadingStates, solicitarAcessoPasta } = useClassroom()
   const { anoAtivoId } = useAcademico()
+  const customFolders = filesCache[materiaId]?.custom_folders || ''
+  const isCargandoSidebar = loadingStates[materiaId]
 
   const [leftFileId, setLeftFileId] = useState<string | null>(initialLeftFileId)
   const [rightFileId, setRightFileId] = useState<string | null>(initialRightFileId)
+  const [showPermissionModal, definirExibicaoModal] = useState(false)
 
   const [orderedFiles, setOrderedFiles] = useState<any[]>(files)
 
@@ -84,16 +88,13 @@ export function TemplateVisualizadorPDF({
 
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [sidebarFilesOpen, setSidebarFilesOpen] = useState(true)
-  const [loadingFileId, setLoadingFileId] = useState<string | null>(null)
 
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false)
   const dragCounterRef = useRef(0)
-  const carregamentoInicialRealizadoRef = useRef(false)
 
   const carregarPdfDoDrive = useCallback(async (fileId: string) => {
     if (fileUrls[fileId]) return fileUrls[fileId]
 
-    setLoadingFileId(fileId)
     try {
       const fileItem = files.find(f => f.drive_file_id === fileId)
       if (fileItem && fileItem.local_path && directoryHandle && hasFolderPermission) {
@@ -109,6 +110,9 @@ export function TemplateVisualizadorPDF({
         }
       }
 
+      if (fileId.startsWith('local_')) {
+        return null
+      }
       if (!session?.googleAccessToken) return null
       const blob = await obterBlobGoogleDrive(fileId, session.googleAccessToken)
       const url = URL.createObjectURL(blob)
@@ -117,14 +121,10 @@ export function TemplateVisualizadorPDF({
     } catch (err) {
       console.error(err)
       return null
-    } finally {
-      setLoadingFileId(null)
     }
   }, [session?.googleAccessToken, fileUrls, files, directoryHandle, hasFolderPermission])
 
-  const lidarComAberturaArquivo = useCallback(async (fileId: string, side: 'left' | 'right') => {
-    const url = await carregarPdfDoDrive(fileId)
-    if (!url) return
+  const lidarComAberturaArquivo = useCallback((fileId: string, side: 'left' | 'right') => {
     if (side === 'left') {
       if (leftFileId && !rightFileId && leftFileId !== fileId) {
         setRightFileId(leftFileId)
@@ -136,7 +136,7 @@ export function TemplateVisualizadorPDF({
       }
       setRightFileId(fileId)
     }
-  }, [carregarPdfDoDrive, leftFileId, rightFileId])
+  }, [leftFileId, rightFileId])
 
   const lidarComDragEnterGlobal = (e: React.DragEvent) => {
     e.preventDefault()
@@ -217,16 +217,35 @@ export function TemplateVisualizadorPDF({
   }
 
   useEffect(() => {
-    if (carregamentoInicialRealizadoRef.current) return
-    carregamentoInicialRealizadoRef.current = true
+    if (leftFileId && !fileUrls[leftFileId]) {
+      const fileItem = files.find(f => f.drive_file_id === leftFileId)
+      if (fileItem || !leftFileId.startsWith('local_')) {
+        carregarPdfDoDrive(leftFileId)
+      }
+    }
+  }, [leftFileId, files, fileUrls, carregarPdfDoDrive])
 
-    if (initialLeftFileId) {
-      lidarComAberturaArquivo(initialLeftFileId, 'left')
+  useEffect(() => {
+    if (rightFileId && !fileUrls[rightFileId]) {
+      const fileItem = files.find(f => f.drive_file_id === rightFileId)
+      if (fileItem || !rightFileId.startsWith('local_')) {
+        carregarPdfDoDrive(rightFileId)
+      }
     }
-    if (initialRightFileId) {
-      lidarComAberturaArquivo(initialRightFileId, 'right')
+  }, [rightFileId, files, fileUrls, carregarPdfDoDrive])
+
+  useEffect(() => {
+    const hasLocalWithoutPermission =
+      !hasFolderPermission &&
+      ((leftFileId?.startsWith('local_') && files.some(f => f.drive_file_id === leftFileId)) ||
+       (rightFileId?.startsWith('local_') && files.some(f => f.drive_file_id === rightFileId)))
+
+    if (hasLocalWithoutPermission) {
+      definirExibicaoModal(true)
+    } else {
+      definirExibicaoModal(false)
     }
-  }, [initialLeftFileId, initialRightFileId, lidarComAberturaArquivo])
+  }, [leftFileId, rightFileId, files, hasFolderPermission])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -266,12 +285,7 @@ export function TemplateVisualizadorPDF({
         </h1>
 
         <div className="flex items-center gap-2">
-          {loadingFileId && (
-            <div className="flex items-center gap-1.5 text-primary text-[10px] font-black uppercase tracking-wider animate-pulse">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Carregando PDF...</span>
-            </div>
-          )}
+
 
           <label className="flex items-center justify-center gap-1.5 h-9 px-3 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl cursor-pointer transition-colors shadow-sm active:scale-95">
             <Upload className="w-3.5 h-3.5" />
@@ -316,6 +330,8 @@ export function TemplateVisualizadorPDF({
           onClose={() => setSidebarFilesOpen(false)}
           onToggleOcultar={lidarComOcultarArquivo}
           onReorder={lidarComReordenacaoManual}
+          customFolders={customFolders}
+          loading={isCargandoSidebar}
         />
 
         <SplitterVisualizacao
@@ -328,8 +344,16 @@ export function TemplateVisualizadorPDF({
           onDropLocalFile={lidarComDropLocal}
           isDraggingGlobal={isDraggingGlobal}
           onCancelDrag={() => setIsDraggingGlobal(false)}
+          isLeftLoading={leftFileId !== null && !fileUrls[leftFileId]}
+          isRightLoading={rightFileId !== null && !fileUrls[rightFileId]}
         />
       </div>
+
+      <ModalAcessoPasta
+        isOpen={showPermissionModal}
+        onClose={() => definirExibicaoModal(false)}
+        onGrantAccess={solicitarAcessoPasta}
+      />
     </div>
   )
 }

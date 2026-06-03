@@ -83,6 +83,7 @@ export interface StatusVinculoClassroom {
     curso_nome?: string;
     ano_letivo?: string;
     materia_nome?: string;
+    custom_folders?: string;
     arquivos: ArquivoClassroom[];
 }
 
@@ -443,4 +444,23 @@ export const classroom_service = {
             googleToken,
         );
     },
+
+    atualizarCategoriasMateria(
+        token: string,
+        materiaId: number,
+        anoId: number,
+        customFolders: string,
+        redistributions: Array<{ drive_file_id: string; new_folder: string }>
+    ) {
+        return api_client.postar<{ sucesso: boolean; custom_folders: string }>(
+            `${base_path}/vincular/categorias/`,
+            {
+                materia_id: materiaId,
+                ano_id: anoId,
+                custom_folders: customFolders,
+                redistribuicoes: redistributions
+            },
+            token
+        );
+    }
 };

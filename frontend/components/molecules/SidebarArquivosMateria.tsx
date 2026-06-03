@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { X, Search, Eye, EyeOff } from 'lucide-react'
+import { X, Search, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { ItemArquivoSidebar } from '@/components/atoms/ItemArquivoSidebar'
 
 interface ArquivoMateriaSimples {
@@ -21,6 +21,8 @@ interface SidebarArquivosMateriaProps {
   onClose: () => void
   onToggleOcultar?: (fileId: string, isIgnored: boolean) => void
   onReorder?: (draggedId: string, targetId: string) => void
+  customFolders?: string
+  loading?: boolean
 }
 
 export function SidebarArquivosMateria({
@@ -31,7 +33,9 @@ export function SidebarArquivosMateria({
   rightFileId,
   onClose,
   onToggleOcultar,
-  onReorder
+  onReorder,
+  customFolders,
+  loading
 }: SidebarArquivosMateriaProps) {
   const [termoPesquisa, setTermoPesquisa] = useState('')
   const [mostrarOcultados, setMostrarOcultados] = useState(false)
@@ -45,10 +49,21 @@ export function SidebarArquivosMateria({
     return bateNome && bateOculto
   })
 
+  const customFoldersList = customFolders
+    ? customFolders.split(',').map(c => c.trim()).filter(Boolean)
+    : []
+  const listaCategorias = ['documentos', 'exercicios', ...customFoldersList]
+
+  const formatarNomeTipo = (tipo: string) => {
+    if (tipo === 'documentos') return 'Documentos'
+    if (tipo === 'exercicios') return 'Exercícios'
+    return tipo.charAt(0).toUpperCase() + tipo.slice(1)
+  }
+
   const renderizarGrupo = (titulo: string, folderKey: string) => {
     const list = pdfsFiltrados.filter(f => {
       if (folderKey === 'outros') {
-        return f.selected_folder !== 'documentos' && f.selected_folder !== 'exercicios'
+        return !listaCategorias.includes(f.selected_folder)
       }
       return f.selected_folder === folderKey
     })
@@ -56,7 +71,7 @@ export function SidebarArquivosMateria({
     if (list.length === 0) return null
 
     return (
-      <div className="flex flex-col gap-2">
+      <div key={folderKey} className="flex flex-col gap-2">
         <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded-full w-fit">
           {titulo}
         </span>
@@ -115,12 +130,16 @@ export function SidebarArquivosMateria({
       </div>
 
       <div className="flex flex-col gap-4 overflow-y-auto pr-0.5">
-        {pdfsFiltrados.length === 0 ? (
+        {loading && pdfsFiltrados.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-primary">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Sincronizando...</span>
+          </div>
+        ) : pdfsFiltrados.length === 0 ? (
           <p className="text-[10px] text-muted-foreground text-center py-6 font-medium">Nenhum PDF encontrado.</p>
         ) : (
           <>
-            {renderizarGrupo('Documentos', 'documentos')}
-            {renderizarGrupo('Exercícios', 'exercicios')}
+            {listaCategorias.map(cat => renderizarGrupo(formatarNomeTipo(cat), cat))}
             {renderizarGrupo('Outros', 'outros')}
           </>
         )}

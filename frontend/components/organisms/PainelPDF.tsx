@@ -14,6 +14,7 @@ interface PainelPDFProps {
   onDropFile?: (fileId: string, clientX: number, rect: DOMRect) => void
   onDropLocalFile?: (file: File, clientX: number, rect: DOMRect) => void
   side?: 'left' | 'right'
+  isLoading?: boolean
 }
 
 export function PainelPDF({
@@ -22,7 +23,8 @@ export function PainelPDF({
   canClose = false,
   onDropFile,
   onDropLocalFile,
-  side = 'left'
+  side = 'left',
+  isLoading = false
 }: PainelPDFProps) {
   const containerDePaginasRef = useRef<HTMLDivElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -44,6 +46,8 @@ export function PainelPDF({
     proximoMatch,
     matchAnterior
   } = usePdfRenderer()
+
+  const showLoading = loading || isLoading
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -163,15 +167,15 @@ export function PainelPDF({
             dragOver ? 'bg-primary/5 ring-2 ring-primary ring-inset' : ''
           }`}
         >
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-3 animate-pulse">
+          {showLoading ? (
+            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-[300px] gap-3 animate-pulse">
               <span className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 Carregando Documento...
               </span>
             </div>
           ) : !fileUrl ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center select-none pt-14">
+            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-[300px] text-center select-none">
               <p className="text-xs font-bold text-muted-foreground">Nenhum PDF selecionado</p>
               <p className="text-[10px] text-muted-foreground/80 mt-1">
                 Arraste um PDF aqui ou use a barra lateral para carregar.

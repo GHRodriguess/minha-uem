@@ -20,6 +20,8 @@ import { Materia } from '@/types/academico'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { TabelaArquivos } from '@/components/organisms/TabelaArquivos'
+import { ModalGerenciarCategorias } from '@/components/molecules/ModalGerenciarCategorias'
+import { ModalConfirmarExclusaoCategoria } from '@/components/molecules/ModalConfirmarExclusaoCategoria'
 
 interface TemplateArquivosProps {
   materiaId: number
@@ -33,11 +35,64 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
     filesCache,
     loadingStates,
     syncingStates,
-    obterArquivos
+    obterArquivos,
+    atualizarCategoriasMateria
   } = useClassroom()
 
   const [materia, setMateria] = useState<Materia | null>(null)
   const [loadingMateria, setLoadingMateria] = useState(true)
+  const [gerenciarModalAberto, setGerenciarModalAberto] = useState(false)
+  const [exclusaoModalAberto, setExclusaoModalAberto] = useState(false)
+  const [categoriaExcluir, setCategoriaExcluir] = useState('')
+
+  const lidarComAdicaoCategoria = async (novaCat: string) => {
+    if (!dadosVinculo) return
+    const atuais = dadosVinculo.custom_folders
+      ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+      : []
+    if (!atuais.includes(novaCat)) {
+      const novas = [...atuais, novaCat].join(',')
+      await atualizarCategoriasMateria(materiaId, anoAtivoId || 0, novas, [])
+    }
+  }
+
+  const lidarComExclusaoCategoria = (nomeCat: string) => {
+    if (!dadosVinculo) return
+    const arquivosNaPasta = dadosVinculo.arquivos.filter(a => a.selected_folder === nomeCat)
+    if (arquivosNaPasta.length > 0) {
+      setCategoriaExcluir(nomeCat)
+      setExclusaoModalAberto(true)
+    } else {
+      executarExclusaoSemArquivos(nomeCat)
+    }
+  }
+
+  const executarExclusaoSemArquivos = async (nomeCat: string) => {
+    if (!dadosVinculo) return
+    const atuais = dadosVinculo.custom_folders
+      ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+      : []
+    const novas = atuais.filter(c => c !== nomeCat).join(',')
+    await atualizarCategoriasMateria(materiaId, anoAtivoId || 0, novas, [])
+  }
+
+  const lidarComConfirmacaoExclusao = async (destino: string) => {
+    if (!dadosVinculo || !categoriaExcluir) return
+    const atuais = dadosVinculo.custom_folders
+      ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+      : []
+    const novas = atuais.filter(c => c !== categoriaExcluir).join(',')
+
+    const arquivosNaPasta = dadosVinculo.arquivos.filter(a => a.selected_folder === categoriaExcluir)
+    const redistributions = arquivosNaPasta.map(a => ({
+      drive_file_id: a.drive_file_id,
+      new_folder: destino
+    }))
+
+    await atualizarCategoriasMateria(materiaId, anoAtivoId || 0, novas, redistributions)
+    setExclusaoModalAberto(false)
+    setCategoriaExcluir('')
+  }
 
   const buscarDadosMateria = useCallback(async () => {
     if (!session?.accessToken || !anoAtivoId) return
@@ -152,14 +207,23 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
           </div>
 
           {isVinculado && (
-            <button
-              onClick={dispararSincronizacao}
-              disabled={isSyncing}
-              className="flex items-center justify-center gap-2 h-10 px-5 bg-card border border-border hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Arquivos'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGerenciarModalAberto(true)}
+                className="flex items-center justify-center gap-2 h-10 px-5 bg-card border border-border hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors"
+              >
+                <Folder className="w-3.5 h-3.5 text-primary" />
+                Gerenciar Categorias
+              </button>
+              <button
+                onClick={dispararSincronizacao}
+                disabled={isSyncing}
+                className="flex items-center justify-center gap-2 h-10 px-5 bg-card border border-border hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Sincronizando...' : 'Sincronizar Arquivos'}
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -222,6 +286,38 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
             dadosVinculo={dadosVinculo}
           />
         </div>
+      )}
+
+      {gerenciarModalAberto && dadosVinculo && (
+        <ModalGerenciarCategorias
+          isOpen={gerenciarModalAberto}
+          onClose={() => setGerenciarModalAberto(false)}
+          customFolders={
+            dadosVinculo.custom_folders
+              ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+              : []
+          }
+          onAddCategoria={lidarComAdicaoCategoria}
+          onDeleteCategoria={lidarComExclusaoCategoria}
+        />
+      )}
+
+      {exclusaoModalAberto && dadosVinculo && (
+        <ModalConfirmarExclusaoCategoria
+          isOpen={exclusaoModalAberto}
+          onClose={() => {
+            setExclusaoModalAberto(false)
+            setCategoriaExcluir('')
+          }}
+          categoriaNome={categoriaExcluir}
+          categoriasDestino={
+            ['documentos', 'exercicios', ...(dadosVinculo.custom_folders
+              ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+              : [])
+            ].filter(c => c !== categoriaExcluir)
+          }
+          onConfirm={lidarComConfirmacaoExclusao}
+        />
       )}
     </div>
   )

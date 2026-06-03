@@ -42,7 +42,6 @@ interface TabelaArquivosProps {
 export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivosProps) {
   const router = useRouter()
   const { 
-    classroomConfig,
     baixarItem,
     salvarNomePersonalizado,
     salvarPastaDestino,
@@ -161,9 +160,10 @@ export function TabelaArquivos({ materiaId, anoId, dadosVinculo }: TabelaArquivo
     }
   }
 
-  const listaCategorias = (classroomConfig?.folder_options
-    ? classroomConfig.folder_options.split(',').map(c => c.trim()).filter(Boolean)
-    : ['documentos', 'exercicios']).map(c => c === 'docs' ? 'documentos' : c)
+  const customFoldersList = dadosVinculo?.custom_folders
+    ? dadosVinculo.custom_folders.split(',').map(c => c.trim()).filter(Boolean)
+    : []
+  const listaCategorias = ['documentos', 'exercicios', ...customFoldersList]
 
   const obterExtensao = (filename: string) => {
     return filename.split('.').pop()?.toLowerCase() || ''

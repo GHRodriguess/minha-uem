@@ -36,6 +36,7 @@ interface ContextoClassroomData {
   enviarArquivoLocal: (materiaId: number, anoId: number, folderCategory: string, file: File) => Promise<void>
   obterNotificacoesGerais: (anoId: number, forcar?: boolean) => Promise<void>
   marcarMateriaLidaLocal: (materiaId: number) => void
+  atualizarCategoriasMateria: (materiaId: number, anoId: number, customFolders: string, redistributions: Array<{ drive_file_id: string; new_folder: string }>) => Promise<void>
 }
 
 const ContextoClassroom = createContext<ContextoClassroomData>({} as ContextoClassroomData)
@@ -303,32 +304,64 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const googleToken = session.googleAccessToken || null
-      const connectionData = await classroom_service.obterArquivos(
-        session.accessToken, 
-        googleToken, 
-        materiaId, 
-        anoId
-      )
+      let connectionData: StatusVinculoClassroom | null = null
 
-      if (connectionData && connectionData.arquivos) {
-        connectionData.arquivos = connectionData.arquivos.map(fileItem => ({
-          ...fileItem,
-          selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
-        }))
+      try {
+        connectionData = await classroom_service.obterArquivos(
+          session.accessToken,
+          null,
+          materiaId,
+          anoId
+        )
+
+        if (connectionData && connectionData.arquivos) {
+          connectionData.arquivos = connectionData.arquivos.map(fileItem => ({
+            ...fileItem,
+            selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
+          }))
+          
+          setFilesCache(prev => ({ ...prev, [materiaId]: connectionData! }))
+
+          if (directoryHandle && hasFolderPermission) {
+            escanearPastaLocal(materiaId, anoId)
+          }
+        }
+      } catch (localError) {
+        console.error(localError)
       }
 
-      setFilesCache(prev => ({ ...prev, [materiaId]: connectionData }))
+      if (session.googleAccessToken) {
+        classroom_service.obterArquivos(
+          session.accessToken,
+          session.googleAccessToken,
+          materiaId,
+          anoId
+        ).then(syncData => {
+          if (syncData) {
+            if (syncData.arquivos) {
+              syncData.arquivos = syncData.arquivos.map(fileItem => ({
+                ...fileItem,
+                selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
+              }))
+            }
+            setFilesCache(prev => ({ ...prev, [materiaId]: syncData }))
+            if (directoryHandle && hasFolderPermission) {
+              escanearPastaLocal(materiaId, anoId)
+            }
+          }
+        }).catch(syncError => {
+          console.error(syncError)
+        }).finally(() => {
+          setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
+        })
+      } else {
+        setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
+      }
 
       if (!classroomConfig) {
-        const configData = await classroom_service.obterConfiguracao(session.accessToken)
-        setClassroomConfig(configData)
-      }
-
-      if (directoryHandle && hasFolderPermission) {
-        setTimeout(() => {
-          escanearPastaLocal(materiaId, anoId)
-        }, 100)
+        classroom_service.obterConfiguracao(session.accessToken)
+          .then(configData => setClassroomConfig(configData))
+          .catch(err => console.error(err))
       }
 
       return connectionData
@@ -638,6 +671,50 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     }
   }, [session, directoryHandle, hasFolderPermission])
 
+  const atualizarCategoriasMateria = useCallback(async (
+    materiaId: number,
+    anoId: number,
+    customFolders: string,
+    redistributions: Array<{ drive_file_id: string; new_folder: string }>
+  ) => {
+    if (!session?.accessToken) return
+
+    try {
+      await classroom_service.atualizarCategoriasMateria(
+        session.accessToken,
+        materiaId,
+        anoId,
+        customFolders,
+        redistributions
+      )
+
+      setFilesCache(prev => {
+        const existing = prev[materiaId]
+        if (!existing) return prev
+
+        const updatedFiles = existing.arquivos.map(fileItem => {
+          const matchingRedist = redistributions.find(r => r.drive_file_id === fileItem.drive_file_id)
+          if (matchingRedist) {
+            return { ...fileItem, selected_folder: matchingRedist.new_folder }
+          }
+          return fileItem
+        })
+
+        return {
+          ...prev,
+          [materiaId]: {
+            ...existing,
+            custom_folders: customFolders,
+            arquivos: updatedFiles
+          }
+        }
+      })
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }, [session])
+
   return (
     <ContextoClassroom.Provider value={{
       filesCache,
@@ -662,7 +739,8 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       alternarOcultarArquivo,
       enviarArquivoLocal,
       obterNotificacoesGerais,
-      marcarMateriaLidaLocal
+      marcarMateriaLidaLocal,
+      atualizarCategoriasMateria
     }}>
       {children}
     </ContextoClassroom.Provider>
