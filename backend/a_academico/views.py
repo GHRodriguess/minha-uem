@@ -1464,6 +1464,16 @@ class RegenerarTokenAgendaView(APIView):
 
 class FeedAgendaView(View):
     def get(self, request, token):
+        cache_key = f"agenda_ical_{token}"
+        cached_ics = cache.get(cache_key)
+        if cached_ics is not None:
+            response = HttpResponse(cached_ics, content_type="text/calendar; charset=utf-8")
+            response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+            return response
+
         try:
             profile = PerfilAcademico.objects.get(calendar_token=token)
         except PerfilAcademico.DoesNotExist:
@@ -1566,6 +1576,7 @@ class FeedAgendaView(View):
         lines.append("END:VCALENDAR")
 
         ics_content = "\r\n".join(lines)
+        cache.set(cache_key, ics_content, 604800)
         response = HttpResponse(ics_content, content_type="text/calendar; charset=utf-8")
         response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
