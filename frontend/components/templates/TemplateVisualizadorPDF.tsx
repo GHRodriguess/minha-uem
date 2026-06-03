@@ -36,16 +36,26 @@ export function TemplateVisualizadorPDF({
   const obterArquivosOrdenados = useCallback((baseFiles: any[]) => {
     if (typeof window === 'undefined') return baseFiles
     const storedOrder = localStorage.getItem(`minha_uem_visualizador_ordem_${materiaId}`)
-    if (!storedOrder) return baseFiles
+    if (!storedOrder) {
+      return [...baseFiles].sort((a, b) => {
+        const nameA = (a.custom_name || a.original_name).toLowerCase()
+        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        return nameA.localeCompare(nameB, 'pt-BR')
+      })
+    }
     try {
       const orderedIds: string[] = JSON.parse(storedOrder)
       return [...baseFiles].sort((a, b) => {
         const idxA = orderedIds.indexOf(a.drive_file_id)
         const idxB = orderedIds.indexOf(b.drive_file_id)
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1 && idxB !== -1) {
+          return idxA - idxB
+        }
         if (idxA !== -1) return -1
         if (idxB !== -1) return 1
-        return 0
+        const nameA = (a.custom_name || a.original_name).toLowerCase()
+        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        return nameA.localeCompare(nameB, 'pt-BR')
       })
     } catch {
       return baseFiles
