@@ -42,11 +42,11 @@ export default function AvatarProfessor({ name, email, photoUrl }: AvatarProfess
       </div>
 
       <div className="flex flex-col min-w-0 pr-1">
-        <span className="text-[11px] font-bold text-foreground truncate max-w-[200px] leading-tight">
+        <span className="text-[11px] font-bold text-foreground truncate max-w-50 leading-tight">
           {name}
         </span>
         {email && (
-          <span className="text-[9px] text-muted-foreground truncate max-w-[200px]">
+          <span className="text-[9px] text-muted-foreground truncate max-w-50">
             {email}
           </span>
         )}
