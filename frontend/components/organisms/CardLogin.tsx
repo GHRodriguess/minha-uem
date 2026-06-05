@@ -11,6 +11,7 @@ interface PropriedadesCardLogin {
 export default function CardLogin({ error }: PropriedadesCardLogin) {
   const is_access_denied = error === 'AccessDenied'
   const is_server_error = error === 'BackendError'
+  const is_permissions_error = error === 'PermissionsError'
 
   return (
     <div className="p-6 sm:p-10 bg-background shadow-2xl rounded-3xl max-w-md w-full border border-border flex flex-col items-center">
@@ -21,6 +22,10 @@ export default function CardLogin({ error }: PropriedadesCardLogin) {
       
       {is_access_denied && (
         <AlertaErroDominio mensagem="Você deve utilizar um e-mail institucional @uem.br para acessar esta plataforma." />
+      )}
+
+      {is_permissions_error && (
+        <AlertaErroDominio mensagem="Para utilizar o Minha UEM, você precisa marcar todas as caixas de permissões do Google Classroom." />
       )}
 
       {is_server_error && (

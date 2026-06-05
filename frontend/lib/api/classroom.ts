@@ -58,6 +58,14 @@ export interface CursoClassroom {
     name: string;
 }
 
+export interface ProfessorClassroom {
+    id?: number;
+    google_user_id: string;
+    name: string;
+    email: string;
+    photo_url: string | null;
+}
+
 export interface ConfiguracaoClassroom {
     id?: number;
     download_dir: string;
@@ -84,6 +92,8 @@ export interface StatusVinculoClassroom {
     ano_letivo?: string;
     materia_nome?: string;
     custom_folders?: string;
+    classroom_alternate_link?: string;
+    professores?: ProfessorClassroom[];
     arquivos: ArquivoClassroom[];
 }
 
@@ -197,22 +207,28 @@ export const classroom_service = {
 
     vincularCurso(
         token: string,
+        googleToken: string,
         materiaId: number,
         anoId: number,
         courseId: string,
         courseName: string,
         signal?: AbortSignal,
     ) {
-        return api_client.postar<StatusVinculoClassroom>(
-            `${base_path}/vincular/`,
-            {
-                materia_id: materiaId,
-                ano_id: anoId,
-                classroom_course_id: courseId,
-                classroom_course_name: courseName,
-            },
-            token,
-            signal,
+        return executarComRenovacaoGoogle(
+            (tokenGoogleUsar) =>
+                api_client.postar<StatusVinculoClassroom>(
+                    `${base_path}/vincular/`,
+                    {
+                        materia_id: materiaId,
+                        ano_id: anoId,
+                        classroom_course_id: courseId,
+                        classroom_course_name: courseName,
+                    },
+                    token,
+                    signal,
+                    { "X-Google-Access-Token": tokenGoogleUsar },
+                ),
+            googleToken,
         );
     },
 
