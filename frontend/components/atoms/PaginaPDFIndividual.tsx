@@ -292,7 +292,23 @@ export function PaginaPDFIndividual({
           cursor: text !important;
           transform-origin: 0% 0% !important;
           line-height: 1.0 !important;
-          font-family: sans-serif !important;
+        }
+        .pdf-text-layer {
+          --min-font-size: 1;
+          --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+          --min-font-size-inv: calc(1 / var(--min-font-size));
+        }
+        .pdf-text-layer > :not(.markedContent),
+        .pdf-text-layer .markedContent span:not(.markedContent) {
+          z-index: 1;
+          --font-height: 0;
+          font-size: calc(var(--text-scale-factor) * var(--font-height)) !important;
+          --scale-x: 1;
+          --rotate: 0deg;
+          transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)) !important;
+        }
+        .pdf-text-layer .markedContent {
+          display: contents;
         }
         .pdf-text-layer ::selection {
           background: rgba(59, 130, 246, 0.3) !important;
