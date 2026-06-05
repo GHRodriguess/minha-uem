@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import * as pdfjs from 'pdfjs-dist'
+import { normalizarTexto, agruparItensTexto } from '@/lib/utils'
 
 interface PaginaPDFIndividualProps {
   pdfDocument: any
@@ -147,16 +148,18 @@ export function PaginaPDFIndividual({
         const viewport = page.getViewport({ scale, rotation })
         const list: any[] = []
 
-        for (const item of content.items as any[]) {
-          const str = item.str
-          const lowerStr = str.toLowerCase()
-          const lowerTerm = searchTerm.toLowerCase()
+        const normalizedTerm = normalizarTexto(searchTerm)
+        const groupedItems = agruparItensTexto(content.items)
 
-          let startIndex = lowerStr.indexOf(lowerTerm)
+        for (const item of groupedItems) {
+          const str = item.str
+          const normalizedStr = normalizarTexto(str)
+
+          let startIndex = normalizedStr.indexOf(normalizedTerm)
           while (startIndex !== -1) {
             const charWidth = item.width / str.length
             const xOffset = startIndex * charWidth
-            const wordWidth = lowerTerm.length * charWidth
+            const wordWidth = normalizedTerm.length * charWidth
 
             const transform = item.transform
             const x = transform[4] + xOffset
@@ -172,10 +175,10 @@ export function PaginaPDFIndividual({
               top: Math.min(pt1[1], pt2[1]),
               width: Math.abs(pt2[0] - pt1[0]),
               height: Math.abs(pt2[1] - pt1[1]),
-              text: str.substring(startIndex, startIndex + lowerTerm.length)
+              text: str.substring(startIndex, startIndex + normalizedTerm.length)
             })
 
-            startIndex = lowerStr.indexOf(lowerTerm, startIndex + lowerTerm.length)
+            startIndex = normalizedStr.indexOf(normalizedTerm, startIndex + normalizedTerm.length)
           }
         }
 
@@ -257,7 +260,6 @@ export function PaginaPDFIndividual({
           cursor: text !important;
           transform-origin: 0 0 !important;
           line-height: 1.0 !important;
-          font-family: sans-serif !important;
         }
         .pdf-text-layer ::selection {
           background: rgba(59, 130, 246, 0.3) !important;
