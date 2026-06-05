@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia, ProfessorClassroom
 from django.db.models import Sum, F
 from django.contrib.auth.models import User
 
@@ -491,12 +491,19 @@ class ArquivoMateriaClassroomSerializer(serializers.ModelSerializer):
         fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'local_path', 'sync_at', 'is_ignored']
 
 
+class ProfessorClassroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfessorClassroom
+        fields = ['id', 'google_user_id', 'name', 'email', 'photo_url']
+
+
 class VinculoGoogleClassroomSerializer(serializers.ModelSerializer):
     arquivos = ArquivoMateriaClassroomSerializer(many=True, read_only=True)
+    professores = ProfessorClassroomSerializer(many=True, read_only=True)
 
     class Meta:
         model = VinculoGoogleClassroom
-        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'custom_folders', 'arquivos']
+        fields = ['id', 'classroom_course_id', 'classroom_course_name', 'ultimo_acesso_mural', 'custom_folders', 'classroom_alternate_link', 'professores', 'arquivos']
 
 
 class MensagemChamadoSerializer(serializers.ModelSerializer):

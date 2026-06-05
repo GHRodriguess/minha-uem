@@ -55,7 +55,7 @@ const tratador = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/drive.readonly",
+          scope: "openid email profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.rosters.readonly https://www.googleapis.com/auth/classroom.profile.emails https://www.googleapis.com/auth/classroom.profile.photos https://www.googleapis.com/auth/drive.readonly",
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
@@ -64,8 +64,18 @@ const tratador = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ profile }) {
+    async signIn({ profile, account }) {
       if (profile?.email?.endsWith("@uem.br")) {
+        const scopes = account?.scope?.split(" ") || []
+        const requiredScopes = [
+          "https://www.googleapis.com/auth/classroom.rosters.readonly",
+          "https://www.googleapis.com/auth/classroom.profile.emails",
+          "https://www.googleapis.com/auth/classroom.profile.photos"
+        ]
+        const hasAll = requiredScopes.every(s => scopes.includes(s))
+        if (!hasAll) {
+          return "/login?error=PermissionsError"
+        }
         return true
       }
       return false

@@ -5,8 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.contrib.auth.models import User
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia
-from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer, NoticiaSerializer
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia, ProfessorClassroom
+from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer, NoticiaSerializer, ProfessorClassroomSerializer
 from .services import ServicoExtracaoHorario
 import requests
 import re
@@ -343,6 +343,48 @@ class ListarCursosClassroomView(APIView):
         return Response(courses)
 
 
+def sincronizar_dados_adicionais_classroom(connection, google_token):
+    headers = {'Authorization': f'Bearer {google_token}'}
+    course_id = connection.classroom_course_id
+    
+    course_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}', headers=headers)
+    if course_res.status_code == 200:
+        course_data = course_res.json()
+        connection.classroom_alternate_link = course_data.get('alternateLink')
+        connection.save()
+
+    teachers_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/teachers', headers=headers)
+    if teachers_res.status_code == 200:
+        teachers_data = teachers_res.json().get('teachers', [])
+        existing_ids = []
+        
+        for teacher in teachers_data:
+            profile = teacher.get('profile', {})
+            user_id = teacher.get('userId')
+            if not user_id:
+                continue
+            
+            name = profile.get('name', {}).get('fullName', 'Sem Nome')
+            email = profile.get('emailAddress', '')
+            photo_url = profile.get('photoUrl')
+            
+            if photo_url and photo_url.startswith('//'):
+                photo_url = 'https:' + photo_url
+                
+            prof_obj, _ = ProfessorClassroom.objects.update_or_create(
+                classroom_connection=connection,
+                google_user_id=user_id,
+                defaults={
+                    'name': name,
+                    'email': email,
+                    'photo_url': photo_url
+                }
+            )
+            existing_ids.append(prof_obj.id)
+            
+        connection.professores.exclude(id__in=existing_ids).delete()
+
+
 class VincularCursoClassroomView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -372,6 +414,13 @@ class VincularCursoClassroomView(APIView):
                     'classroom_course_name': classroom_course_name
                 }
             )
+            
+            google_token = request.headers.get('X-Google-Access-Token')
+            if google_token:
+                try:
+                    sincronizar_dados_adicionais_classroom(connection, google_token)
+                except Exception:
+                    pass
             
             serializer = VinculoGoogleClassroomSerializer(connection)
             cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
@@ -508,6 +557,13 @@ class ArquivosMateriaClassroomView(APIView):
             if not connection:
                 return Response({'vinculado': False, 'arquivos': []})
 
+            if google_token:
+                if not connection.classroom_alternate_link or not connection.professores.exists() or connection.professores.filter(email='').exists():
+                    try:
+                        sincronizar_dados_adicionais_classroom(connection, google_token)
+                    except Exception:
+                        pass
+
             def limpar_nome_pasta(nome):
                 import re
                 return re.sub(r'[\/\\:\*\?"<>\|]', '', nome).strip()
@@ -526,6 +582,8 @@ class ArquivosMateriaClassroomView(APIView):
                     'ano_letivo': ano_letivo,
                     'materia_nome': materia_nome,
                     'custom_folders': connection.custom_folders,
+                    'classroom_alternate_link': connection.classroom_alternate_link,
+                    'professores': ProfessorClassroomSerializer(connection.professores.all(), many=True).data,
                     'arquivos': arquivos_mesclados
                 })
             else:
@@ -539,6 +597,8 @@ class ArquivosMateriaClassroomView(APIView):
                     'ano_letivo': ano_letivo,
                     'materia_nome': materia_nome,
                     'custom_folders': connection.custom_folders,
+                    'classroom_alternate_link': connection.classroom_alternate_link,
+                    'professores': ProfessorClassroomSerializer(connection.professores.all(), many=True).data,
                     'arquivos': serializer.data
                 })
         except PermissionError as e:

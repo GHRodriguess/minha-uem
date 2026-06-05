@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useEffect, useState, useCallback, use } from 'react'
+import { useEffect, useState, useCallback, use, useRef } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
 import { AlertTriangle, ArrowLeft, GraduationCap, FileText } from 'lucide-react'
@@ -16,6 +16,7 @@ import { CardFrequenciaDisciplina } from '@/components/organisms/CardFrequenciaD
 import { CardHorariosDisciplina } from '@/components/organisms/CardHorariosDisciplina'
 import { CardPrazosDisciplina } from '@/components/organisms/CardPrazosDisciplina'
 import { CardAnotacoesMateria } from '@/components/organisms/CardAnotacoesMateria'
+import BannerClassroom from '@/components/molecules/BannerClassroom'
 
 interface PaginaDisciplinaProps {
   params: Promise<{ id: string }>
@@ -28,11 +29,17 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const [materia, setMateria] = useState<Materia | null>(null)
   const [loading, setLoading] = useState(true)
   const { preCarregarArquivos, filesCache } = useClassroom()
+  const requisitadoRef = useRef<{ id: string; anoId: number | null } | null>(null)
 
   const buscarDados = useCallback(async (silencioso = false) => {
     if (!session?.accessToken || !anoAtivoId) return
 
+    if (!silencioso && requisitadoRef.current?.id === id && requisitadoRef.current?.anoId === anoAtivoId) {
+      return
+    }
+
     if (!silencioso) {
+      requisitadoRef.current = { id, anoId: anoAtivoId }
       setLoading(true)
     }
     try {
@@ -102,6 +109,8 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
           </div>
         </div>
       </section>
+
+      <BannerClassroom materiaId={materia.id} />
 
       <div className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

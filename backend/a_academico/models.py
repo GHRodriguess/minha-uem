@@ -125,9 +125,22 @@ class VinculoGoogleClassroom(models.Model):
     classroom_course_name = models.CharField(max_length=255)
     ultimo_acesso_mural = models.DateTimeField(null=True, blank=True)
     custom_folders = models.CharField(max_length=500, default="", blank=True)
+    classroom_alternate_link = models.URLField(max_length=500, null=True, blank=True)
 
     def __str__(self):
         return f"Vinculo {self.subject_config.materia.nome} -> {self.classroom_course_name}"
+
+
+class ProfessorClassroom(models.Model):
+    classroom_connection = models.ForeignKey(VinculoGoogleClassroom, on_delete=models.CASCADE, related_name='professores')
+    google_user_id = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    photo_url = models.URLField(max_length=500, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.classroom_connection.classroom_course_name})"
+
 
 
 class ArquivoMateriaClassroom(models.Model):
