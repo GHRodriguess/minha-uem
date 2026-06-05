@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import * as pdfjs from 'pdfjs-dist'
-import { normalizarTexto, agruparItensTexto } from '@/lib/utils'
+import { normalizarTexto, agruparItensTexto, corrigirTextoCopiado } from '@/lib/utils'
 
 interface PaginaPDFIndividualProps {
   pdfDocument: any
@@ -106,6 +106,16 @@ export function PaginaPDFIndividual({
               viewport: page.getViewport({ scale, rotation })
             })
             await textLayer.render()
+
+            const spans = textLayerDiv.querySelectorAll('span')
+            const accentRegex = /^[\u00a8\u00b4\u00b8\u02c0-\u02ff\u0300-\u036f\u200b-\u200d\uFEFF\s]+$/
+            spans.forEach(span => {
+              if (accentRegex.test(span.textContent || '')) {
+                span.style.userSelect = 'none'
+                span.style.webkitUserSelect = 'none'
+                span.style.pointerEvents = 'none'
+              }
+            })
           } catch (layerErr) {
             console.error(layerErr)
           }
@@ -224,6 +234,29 @@ export function PaginaPDFIndividual({
     }
   }, [pageNumber, onVisible, containerDeScrollRef])
 
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+
+    const tratarCopia = (e: ClipboardEvent) => {
+      const selection = window.getSelection()
+      if (!selection) return
+      const selectedText = selection.toString()
+      if (!selectedText) return
+
+      const correctedText = corrigirTextoCopiado(selectedText)
+      if (correctedText !== selectedText) {
+        e.clipboardData?.setData('text/plain', correctedText)
+        e.preventDefault()
+      }
+    }
+
+    element.addEventListener('copy', tratarCopia)
+    return () => {
+      element.removeEventListener('copy', tratarCopia)
+    }
+  }, [])
+
   const widthEst = dimensions ? dimensions.width : scale * 595
   const heightEst = dimensions ? dimensions.height : scale * 842
 
@@ -238,28 +271,28 @@ export function PaginaPDFIndividual({
     >
       <style>{`
         .pdf-text-layer {
+          color-scheme: only light;
           position: absolute;
-          left: 0;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          overflow: hidden;
+          text-align: initial;
+          inset: 0;
+          overflow: clip;
           opacity: 1;
           line-height: 1.0 !important;
+          letter-spacing: normal;
+          word-spacing: normal;
           text-size-adjust: none !important;
           forced-color-adjust: none !important;
           transform-origin: 0 0;
           z-index: 2;
-          pointer-events: auto;
-          text-align: initial !important;
         }
-        .pdf-text-layer span {
+        .pdf-text-layer :is(span, br) {
           color: transparent !important;
           position: absolute;
           white-space: pre !important;
           cursor: text !important;
-          transform-origin: 0 0 !important;
+          transform-origin: 0% 0% !important;
           line-height: 1.0 !important;
+          font-family: sans-serif !important;
         }
         .pdf-text-layer ::selection {
           background: rgba(59, 130, 246, 0.3) !important;
@@ -269,7 +302,11 @@ export function PaginaPDFIndividual({
       {hasBeenVisible ? (
         <>
           <canvas ref={canvasRef} />
-          <div ref={textLayerRef} className="pdf-text-layer" />
+          <div
+            ref={textLayerRef}
+            className="pdf-text-layer"
+            style={{ '--total-scale-factor': scale } as React.CSSProperties}
+          />
           {highlights.map((hl, idx) => (
             <div
               key={idx}
