@@ -167,3 +167,5 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-google-access-token",
     "x-impersonate-user",
 ]
+
+CLASSROOM_CACHE_TTL = 30

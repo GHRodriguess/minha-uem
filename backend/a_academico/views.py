@@ -1230,7 +1230,9 @@ class NotificacoesClassroomView(APIView):
             cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
             cached_data = cache.get(cache_key)
             if cached_data is not None:
-                return Response(cached_data)
+                response_copy = dict(cached_data)
+                response_copy['cached'] = True
+                return Response(response_copy)
 
             connections = VinculoGoogleClassroom.objects.filter(
                 subject_config__perfil=profile,
@@ -1258,79 +1260,31 @@ class NotificacoesClassroomView(APIView):
 
             sub_responses = {}
             if sub_requests:
-                chunk_size = 40
-                chunks = [sub_requests[i:i + chunk_size] for i in range(0, len(sub_requests), chunk_size)]
+                def executar_requisicao(req_info):
+                    headers = {'Authorization': f'Bearer {google_token}'}
+                    url = f"https://classroom.googleapis.com{req_info['relative_url']}"
+                    try:
+                        res = requests.get(url, headers=headers)
+                        if res.status_code == 401:
+                            return req_info, 401, {}
+                        if res.status_code == 200:
+                            return req_info, 200, res.json()
+                        return req_info, res.status_code, {}
+                    except Exception:
+                        return req_info, 500, {}
+
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=15) as executor:
+                    results = list(executor.map(executar_requisicao, sub_requests))
                 
-                for chunk in chunks:
-                    boundary = f"batch_{uuid.uuid4().hex}"
-                    body_parts = []
-                    chunk_mapping = {}
-                    
-                    for idx, req_info in enumerate(chunk):
-                        part_id = f"item_{uuid.uuid4().hex}"
-                        chunk_mapping[part_id] = req_info
-                        
-                        part_str = (
-                            f"--{boundary}\r\n"
-                            f"Content-Type: application/http\r\n"
-                            f"Content-ID: <{part_id}>\r\n\r\n"
-                            f"GET {req_info['relative_url']} HTTP/1.1\r\n\r\n"
-                        )
-                        body_parts.append(part_str.encode('utf-8'))
-                    
-                    body_parts.append(f"--{boundary}--\r\n".encode('utf-8'))
-                    body_bytes = b"".join(body_parts)
-                    
-                    batch_headers = {
-                        'Authorization': f'Bearer {google_token}',
-                        'Content-Type': f'multipart/mixed; boundary={boundary}'
-                    }
-                    
-                    batch_url = 'https://classroom.googleapis.com/batch/classroom/v1'
-                    response = requests.post(batch_url, headers=batch_headers, data=body_bytes)
-                    
-                    if response.status_code == 401:
+                for req_info, status_code, data in results:
+                    if status_code == 401:
                         raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
-                    
-                    raw_content = response.content
-                    content_type = response.headers.get('Content-Type', '')
-                    msg = message_from_bytes(f"Content-Type: {content_type}\n\n".encode() + raw_content)
-                    
-                    if msg.is_multipart():
-                        for part in msg.walk():
-                            if part.get_content_type() == 'multipart/mixed':
-                                continue
-                            content_id = part.get('Content-ID')
-                            if content_id:
-                                content_id_clean = content_id.strip('<>')
-                                payload = part.get_payload(decode=True)
-                                if payload:
-                                    parts_split = payload.split(b'\r\n\r\n', 1)
-                                    if len(parts_split) < 2:
-                                        parts_split = payload.split(b'\n\n', 1)
-                                    
-                                    if len(parts_split) == 2:
-                                        headers_part, body_part = parts_split
-                                        first_line = headers_part.split(b'\r\n')[0].decode('utf-8')
-                                        try:
-                                            status_code = int(first_line.split(' ')[1])
-                                        except Exception:
-                                            status_code = 500
-                                        
-                                        try:
-                                            data = json.loads(body_part.decode('utf-8'))
-                                        except Exception:
-                                            data = {}
-                                        
-                                        req_info = chunk_mapping.get(content_id_clean)
-                                        if req_info:
-                                            if status_code == 401:
-                                                raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
-                                            
-                                            conn_id = req_info['conn'].id
-                                            if conn_id not in sub_responses:
-                                                sub_responses[conn_id] = {}
-                                            sub_responses[conn_id][req_info['type']] = data if status_code == 200 else {}
+                    if status_code == 200:
+                        conn_id = req_info['conn'].id
+                        if conn_id not in sub_responses:
+                            sub_responses[conn_id] = {}
+                        sub_responses[conn_id][req_info['type']] = data
 
             global_unread_count = 0
             subject_updates = []
@@ -1395,13 +1349,19 @@ class NotificacoesClassroomView(APIView):
                         'mensagens': unread_items
                     })
 
+            from django.conf import settings
+            cache_ttl = getattr(settings, 'CLASSROOM_CACHE_TTL', 60)
+
             response_data = {
                 'total_nao_lidos': global_unread_count,
-                'atualizacoes': subject_updates
+                'atualizacoes': subject_updates,
+                'atualizado_em': timezone.now().isoformat()
             }
-            cache.set(cache_key, response_data, 120)
+            cache.set(cache_key, response_data, cache_ttl)
 
-            return Response(response_data)
+            response_copy = dict(response_data)
+            response_copy['cached'] = False
+            return Response(response_copy)
 
         except PermissionError as e:
             if str(e) == 'GOOGLE_TOKEN_EXPIRADO':
