@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import * as pdfjs from 'pdfjs-dist'
+import { normalizarTexto, agruparItensTexto } from '@/lib/utils'
 
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
@@ -68,21 +69,24 @@ export function usePdfRenderer() {
       return
     }
 
+    const normalizedTerm = normalizarTexto(term)
+
     try {
       const occurrences: { page: number }[] = []
       for (let i = 1; i <= totalPages; i++) {
         const page = await pdfDocument.getPage(i)
         const content = await page.getTextContent()
 
-        for (const item of content.items as any[]) {
-          const str = item.str
-          const lowerStr = str.toLowerCase()
-          const lowerTerm = term.toLowerCase()
+        const groupedItems = agruparItensTexto(content.items)
 
-          let index = lowerStr.indexOf(lowerTerm)
+        for (const item of groupedItems) {
+          const str = item.str
+          const normalizedStr = normalizarTexto(str)
+
+          let index = normalizedStr.indexOf(normalizedTerm)
           while (index !== -1) {
             occurrences.push({ page: i })
-            index = lowerStr.indexOf(lowerTerm, index + lowerTerm.length)
+            index = normalizedStr.indexOf(normalizedTerm, index + normalizedTerm.length)
           }
         }
       }
