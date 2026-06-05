@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import * as pdfjs from 'pdfjs-dist'
+import { normalizarTexto, agruparItensTexto, corrigirTextoCopiado } from '@/lib/utils'
 
 interface PaginaPDFIndividualProps {
   pdfDocument: any
@@ -105,6 +106,16 @@ export function PaginaPDFIndividual({
               viewport: page.getViewport({ scale, rotation })
             })
             await textLayer.render()
+
+            const spans = textLayerDiv.querySelectorAll('span')
+            const accentRegex = /^[\u00a8\u00b4\u00b8\u02c0-\u02ff\u0300-\u036f\u200b-\u200d\uFEFF\s]+$/
+            spans.forEach(span => {
+              if (accentRegex.test(span.textContent || '')) {
+                span.style.userSelect = 'none'
+                span.style.webkitUserSelect = 'none'
+                span.style.pointerEvents = 'none'
+              }
+            })
           } catch (layerErr) {
             console.error(layerErr)
           }
@@ -147,16 +158,18 @@ export function PaginaPDFIndividual({
         const viewport = page.getViewport({ scale, rotation })
         const list: any[] = []
 
-        for (const item of content.items as any[]) {
-          const str = item.str
-          const lowerStr = str.toLowerCase()
-          const lowerTerm = searchTerm.toLowerCase()
+        const normalizedTerm = normalizarTexto(searchTerm)
+        const groupedItems = agruparItensTexto(content.items)
 
-          let startIndex = lowerStr.indexOf(lowerTerm)
+        for (const item of groupedItems) {
+          const str = item.str
+          const normalizedStr = normalizarTexto(str)
+
+          let startIndex = normalizedStr.indexOf(normalizedTerm)
           while (startIndex !== -1) {
             const charWidth = item.width / str.length
             const xOffset = startIndex * charWidth
-            const wordWidth = lowerTerm.length * charWidth
+            const wordWidth = normalizedTerm.length * charWidth
 
             const transform = item.transform
             const x = transform[4] + xOffset
@@ -172,10 +185,10 @@ export function PaginaPDFIndividual({
               top: Math.min(pt1[1], pt2[1]),
               width: Math.abs(pt2[0] - pt1[0]),
               height: Math.abs(pt2[1] - pt1[1]),
-              text: str.substring(startIndex, startIndex + lowerTerm.length)
+              text: str.substring(startIndex, startIndex + normalizedTerm.length)
             })
 
-            startIndex = lowerStr.indexOf(lowerTerm, startIndex + lowerTerm.length)
+            startIndex = normalizedStr.indexOf(normalizedTerm, startIndex + normalizedTerm.length)
           }
         }
 
@@ -221,6 +234,29 @@ export function PaginaPDFIndividual({
     }
   }, [pageNumber, onVisible, containerDeScrollRef])
 
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+
+    const tratarCopia = (e: ClipboardEvent) => {
+      const selection = window.getSelection()
+      if (!selection) return
+      const selectedText = selection.toString()
+      if (!selectedText) return
+
+      const correctedText = corrigirTextoCopiado(selectedText)
+      if (correctedText !== selectedText) {
+        e.clipboardData?.setData('text/plain', correctedText)
+        e.preventDefault()
+      }
+    }
+
+    element.addEventListener('copy', tratarCopia)
+    return () => {
+      element.removeEventListener('copy', tratarCopia)
+    }
+  }, [])
+
   const widthEst = dimensions ? dimensions.width : scale * 595
   const heightEst = dimensions ? dimensions.height : scale * 842
 
@@ -235,29 +271,44 @@ export function PaginaPDFIndividual({
     >
       <style>{`
         .pdf-text-layer {
+          color-scheme: only light;
           position: absolute;
-          left: 0;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          overflow: hidden;
+          text-align: initial;
+          inset: 0;
+          overflow: clip;
           opacity: 1;
           line-height: 1.0 !important;
+          letter-spacing: normal;
+          word-spacing: normal;
           text-size-adjust: none !important;
           forced-color-adjust: none !important;
           transform-origin: 0 0;
           z-index: 2;
-          pointer-events: auto;
-          text-align: initial !important;
         }
-        .pdf-text-layer span {
+        .pdf-text-layer :is(span, br) {
           color: transparent !important;
           position: absolute;
           white-space: pre !important;
           cursor: text !important;
-          transform-origin: 0 0 !important;
+          transform-origin: 0% 0% !important;
           line-height: 1.0 !important;
-          font-family: sans-serif !important;
+        }
+        .pdf-text-layer {
+          --min-font-size: 1;
+          --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+          --min-font-size-inv: calc(1 / var(--min-font-size));
+        }
+        .pdf-text-layer > :not(.markedContent),
+        .pdf-text-layer .markedContent span:not(.markedContent) {
+          z-index: 1;
+          --font-height: 0;
+          font-size: calc(var(--text-scale-factor) * var(--font-height)) !important;
+          --scale-x: 1;
+          --rotate: 0deg;
+          transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)) !important;
+        }
+        .pdf-text-layer .markedContent {
+          display: contents;
         }
         .pdf-text-layer ::selection {
           background: rgba(59, 130, 246, 0.3) !important;
@@ -267,7 +318,11 @@ export function PaginaPDFIndividual({
       {hasBeenVisible ? (
         <>
           <canvas ref={canvasRef} />
-          <div ref={textLayerRef} className="pdf-text-layer" />
+          <div
+            ref={textLayerRef}
+            className="pdf-text-layer"
+            style={{ '--total-scale-factor': scale } as React.CSSProperties}
+          />
           {highlights.map((hl, idx) => (
             <div
               key={idx}
