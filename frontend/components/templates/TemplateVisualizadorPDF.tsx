@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Files, Upload } from 'lucide-react'
+import { ArrowLeft, Files, Upload, Brain } from 'lucide-react'
 import { SidebarArquivosMateria } from '@/components/molecules/SidebarArquivosMateria'
 import { SplitterVisualizacao } from '@/components/organisms/SplitterVisualizacao'
 import { obterBlobGoogleDrive } from '@/lib/utils/googleDrive'
@@ -11,6 +11,8 @@ import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 import { ModalAcessoPasta } from '@/components/molecules/ModalAcessoPasta'
+import SidebarChatIA from '@/components/organisms/SidebarChatIA'
+import { useSincronizarUrlVisualizador } from '@/lib/hooks/useSincronizarUrlVisualizador'
 
 interface TemplateVisualizadorPDFProps {
   materiaId: number
@@ -34,6 +36,8 @@ export function TemplateVisualizadorPDF({
   const [leftFileId, setLeftFileId] = useState<string | null>(initialLeftFileId)
   const [rightFileId, setRightFileId] = useState<string | null>(initialRightFileId)
   const [showPermissionModal, definirExibicaoModal] = useState(false)
+
+  useSincronizarUrlVisualizador(leftFileId, rightFileId)
 
   const [orderedFiles, setOrderedFiles] = useState<any[]>(files)
 
@@ -88,6 +92,7 @@ export function TemplateVisualizadorPDF({
 
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [sidebarFilesOpen, setSidebarFilesOpen] = useState(true)
+  const [chatIAOpen, setChatIAOpen] = useState(false)
 
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false)
   const dragCounterRef = useRef(0)
@@ -304,6 +309,18 @@ export function TemplateVisualizadorPDF({
             <Files className="w-3.5 h-3.5" />
             <span>Arquivos</span>
           </button>
+
+          <button
+            onClick={() => setChatIAOpen(prev => !prev)}
+            className={`flex items-center justify-center gap-1.5 h-9 px-3 border rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
+              chatIAOpen
+                ? 'bg-primary/10 border-primary/25 text-primary font-black'
+                : 'bg-background border-border hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5" />
+            <span>Assistente IA</span>
+          </button>
         </div>
       </header>
 
@@ -347,6 +364,8 @@ export function TemplateVisualizadorPDF({
           isLeftLoading={leftFileId !== null && !fileUrls[leftFileId]}
           isRightLoading={rightFileId !== null && !fileUrls[rightFileId]}
         />
+
+        <SidebarChatIA isOpen={chatIAOpen} onClose={() => setChatIAOpen(false)} layoutMode="integrated" fileUrls={fileUrls} />
       </div>
 
       <ModalAcessoPasta

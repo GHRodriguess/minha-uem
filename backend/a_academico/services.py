@@ -1,7 +1,11 @@
 import pdfplumber
 import re
+import base64
+import hashlib
 from datetime import datetime
+from django.conf import settings
 from django.db import transaction
+from cryptography.fernet import Fernet
 from .models import Curso, Materia, Horario, PerfilAcademico, AnoLetivo
 
 class ServicoExtracaoHorario:
@@ -307,3 +311,22 @@ class ServicoExtracaoHorario:
             ano_letivo.save()
             
             return perfil
+
+
+class ServicoCriptografia:
+    @staticmethod
+    def obter_fernet():
+        key_bytes = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+        fernet_key = base64.urlsafe_b64encode(key_bytes)
+        return Fernet(fernet_key)
+
+    @classmethod
+    def criptografar_dado(cls, valor: str) -> str:
+        fernet = cls.obter_fernet()
+        return fernet.encrypt(valor.encode()).decode()
+
+    @classmethod
+    def descriptografar_dado(cls, valor_criptografado: str) -> str:
+        fernet = cls.obter_fernet()
+        return fernet.decrypt(valor_criptografado.encode()).decode()
+

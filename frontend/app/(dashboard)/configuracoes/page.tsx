@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { CardPerfilUsuario } from '@/components/organisms/CardPerfilUsuario'
 import { CardSincronizacaoLocal } from '@/components/organisms/CardSincronizacaoLocal'
 import { CardSincronizacaoAgenda } from '@/components/organisms/CardSincronizacaoAgenda'
+import { CardIAConfig } from '@/components/organisms/CardIAConfig'
 
 export default function ConfiguracoesPage() {
   return (
@@ -24,7 +25,9 @@ export default function ConfiguracoesPage() {
           <CardSincronizacaoLocal />
         </div>
         <CardSincronizacaoAgenda />
+        <CardIAConfig />
       </div>
     </div>
   )
 }
+

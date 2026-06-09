@@ -5,9 +5,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.contrib.auth.models import User
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia, ProfessorClassroom
+from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia, ProfessorClassroom, ChaveApiGemini
 from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer, NoticiaSerializer, ProfessorClassroomSerializer
-from .services import ServicoExtracaoHorario
+from .services import ServicoExtracaoHorario, ServicoCriptografia
 import requests
 import re
 import unicodedata
@@ -1903,4 +1903,374 @@ class DetalheNoticiaView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ConfiguracaoIAView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        has_key = hasattr(profile, 'chave_gemini')
+        model_name = profile.chave_gemini.model_name if has_key else "gemini-3.5-flash"
+
+        from django.utils import timezone
+        from django.db.models import Count, Sum
+        from .models import HistoricoUsoIA
+
+        today = timezone.now().date()
+        usage_today = []
+
+        if has_key:
+            resumes = HistoricoUsoIA.objects.filter(
+                profile=profile,
+                created_at__date=today
+            ).values('model_name').annotate(
+                requests=Count('id'),
+                tokens=Sum('total_tokens')
+            )
+            for r in resumes:
+                usage_today.append({
+                    'model_name': r['model_name'],
+                    'requisicoes': r['requests'],
+                    'total_tokens': r['tokens']
+                })
+
+        return Response({
+            'possui_chave': has_key,
+            'model_name': model_name,
+            'uso_hoje': usage_today
+        })
+
+    def post(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        api_key = request.data.get('api_key')
+        model_name = request.data.get('model_name')
+
+        if api_key:
+            is_valid = self.validar_chave_gemini(api_key, model_name or "gemini-3.5-flash")
+            if not is_valid:
+                return Response({'erro': 'Chave de API do Gemini invalida.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            encrypted_api_key = ServicoCriptografia.criptografar_dado(api_key)
+            chave_obj, _ = ChaveApiGemini.objects.update_or_create(
+                profile=profile,
+                defaults={'encrypted_api_key': encrypted_api_key}
+            )
+            if model_name:
+                chave_obj.model_name = model_name
+                chave_obj.save()
+            return Response({'sucesso': True})
+        elif model_name:
+            if not hasattr(profile, 'chave_gemini'):
+                return Response({'erro': 'Adicione uma chave de API antes de selecionar o modelo.'}, status=status.HTTP_400_BAD_REQUEST)
+            profile.chave_gemini.model_name = model_name
+            profile.chave_gemini.save()
+            return Response({'sucesso': True})
+        else:
+            return Response({'erro': 'Nenhum dado para atualizar.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        if hasattr(profile, 'chave_gemini'):
+            profile.chave_gemini.delete()
+        return Response({'sucesso': True})
+
+    def validar_chave_gemini(self, api_key: str, model_name: str) -> bool:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": "Ping"}
+                    ]
+                }
+            ]
+        }
+        headers = {
+            "Content-Type": "application/json"
+        }
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            if response.status_code != 200:
+                print(f"DEBUG VALIDADOR GEMINI - Falha na API do Google. Status Code: {response.status_code}")
+                print(f"DEBUG VALIDADOR GEMINI - Resposta: {response.text}")
+            return response.status_code == 200
+        except Exception as e:
+            import traceback
+            print(f"DEBUG VALIDADOR GEMINI - Erro de conexao: {str(e)}")
+            traceback.print_exc()
+            return False
+
+
+class ChatIAView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        if not hasattr(profile, 'chave_gemini'):
+            return Response({'erro': 'Configure sua chave de API nas configuracoes antes de usar a IA.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        message = request.data.get('mensagem')
+        if not message:
+            return Response({'erro': 'Mensagem nao fornecida.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        materia_id = request.data.get('materia_id')
+        drive_file_id = request.data.get('arquivo_aberto_id')
+        selected_file_ids = request.data.get('arquivos_selecionados_ids', [])
+        local_files = request.data.get('arquivos_locais', [])
+
+        encrypted_api_key = profile.chave_gemini.encrypted_api_key
+        api_key = ServicoCriptografia.descriptografar_dado(encrypted_api_key)
+        model_name = profile.chave_gemini.model_name
+
+        context_prompt = self.construir_contexto(profile, materia_id)
+
+        contents = []
+
+        google_token = request.headers.get('X-Google-Access-Token')
+
+        files_to_send = []
+        if drive_file_id:
+            if isinstance(drive_file_id, list):
+                files_to_send.extend(drive_file_id)
+            elif isinstance(drive_file_id, str) and ',' in drive_file_id:
+                files_to_send.extend([fid.strip() for fid in drive_file_id.split(',') if fid.strip()])
+            else:
+                files_to_send.append(drive_file_id)
+        if selected_file_ids:
+            files_to_send.extend(selected_file_ids)
+
+        files_to_send = list(dict.fromkeys(files_to_send))
+
+        parts = []
+
+        for file_id in files_to_send:
+            file_data = self.obter_dados_arquivo(profile, file_id, google_token)
+            if file_data:
+                parts.append({
+                    "inlineData": {
+                        "mimeType": file_data["mime_type"],
+                        "data": file_data["base64_data"]
+                    }
+                })
+
+        for f in local_files:
+            if 'mime_type' in f and 'base64_data' in f:
+                parts.append({
+                    "inlineData": {
+                        "mimeType": f["mime_type"],
+                        "data": f["base64_data"]
+                    }
+                })
+
+        parts.append({"text": message})
+
+        contents.append({
+            "role": "user",
+            "parts": parts
+        })
+
+        system_instruction = (
+            "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel e concisa.\n"
+            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n\n"
+            f"Contexto academico atual do usuario:\n{context_prompt}"
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}"
+        payload = {
+            "contents": contents,
+            "systemInstruction": {
+                "parts": [
+                    {"text": system_instruction}
+                ]
+            }
+        }
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
+            if response.status_code != 200:
+                return Response({'erro': f'Erro na API do Gemini: {response.text}', 'codigo_erro': response.status_code}, status=response.status_code)
+
+            def gerar_stream():
+                buffer = ""
+                bracket_count = 0
+                start_idx = -1
+                in_string = False
+                escape = False
+                prompt_tokens = 0
+                candidate_tokens = 0
+                total_tokens = 0
+                i = 0
+
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        buffer += chunk.decode('utf-8', errors='ignore')
+                    while i < len(buffer):
+                        char = buffer[i]
+                        if escape:
+                            escape = False
+                        elif char == '\\':
+                            escape = True
+                        elif char == '"':
+                            in_string = not in_string
+                        elif not in_string:
+                            if char == '{':
+                                if bracket_count == 0:
+                                    start_idx = i
+                                bracket_count += 1
+                            elif char == '}':
+                                bracket_count -= 1
+                                if bracket_count == 0 and start_idx != -1:
+                                    obj_str = buffer[start_idx:i+1]
+                                    try:
+                                        obj = json.loads(obj_str)
+                                        usage = obj.get('usageMetadata', {})
+                                        if usage:
+                                            prompt_tokens = usage.get('promptTokenCount', prompt_tokens)
+                                            candidate_tokens = usage.get('candidatesTokenCount', candidate_tokens)
+                                            total_tokens = usage.get('totalTokenCount', total_tokens)
+
+                                        parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
+                                        text = parts[0].get('text', '')
+                                        if text:
+                                            yield text
+                                    except Exception:
+                                        pass
+                                    buffer = buffer[i+1:]
+                                    i = -1
+                                    start_idx = -1
+                                    in_string = False
+                                    escape = False
+                        i += 1
+
+                try:
+                    from .models import HistoricoUsoIA
+                    HistoricoUsoIA.objects.create(
+                        profile=profile,
+                        model_name=model_name,
+                        prompt_tokens=prompt_tokens,
+                        candidate_tokens=candidate_tokens,
+                        total_tokens=total_tokens
+                    )
+                except Exception:
+                    pass
+
+            from django.http import StreamingHttpResponse
+            return StreamingHttpResponse(gerar_stream(), content_type='text/plain')
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def construir_contexto(self, profile, materia_id=None) -> str:
+        from django.utils import timezone
+        from django.db.models import Sum
+        from .models import Avaliacao, ConfiguracaoMateria
+
+        now = timezone.now()
+        today = now.date()
+        weekday_map = {0: "Segunda-feira", 1: "Terca-feira", 2: "Quarta-feira", 3: "Quinta-feira", 4: "Sexta-feira", 5: "Sabado", 6: "Domingo"}
+        current_date_str = f"Hoje e {weekday_map[today.weekday()]}, {today.strftime('%d/%m/%Y')} as {now.strftime('%H:%M')}."
+
+        context = [current_date_str]
+
+        ano_letivo = profile.anos.order_by('-ano').first()
+        if not ano_letivo:
+            return "\n".join(context)
+
+        if materia_id:
+            materia = ano_letivo.materias.filter(id=materia_id).first()
+            if materia:
+                context.append(f"Disciplina ativa: {materia.codigo} - {materia.nome}")
+                config = ConfiguracaoMateria.objects.filter(materia=materia, perfil=profile, ano_letivo=ano_letivo).first()
+                if config:
+                    context.append(f"Media minima para aprovacao nesta materia: {config.media_minima}")
+
+                    avaliacoes = config.avaliacoes.all()
+                    avaliacoes_com_nota = avaliacoes.filter(nota__isnull=False)
+                    if avaliacoes_com_nota.exists():
+                        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
+                        soma_pesos = sum(a.peso for a in avaliacoes)
+                        if soma_pesos > 0:
+                            media_atual = round(float(soma_ponderada / soma_pesos), 2)
+                            context.append(f"Media atual do usuario nesta materia: {media_atual}")
+
+                    total_faltas = profile.registros_falta.filter(materia=materia, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
+                    horarios = ano_letivo.horarios.filter(materia=materia)
+                    max_faltas = horarios.first().maximo_faltas if horarios.exists() else 0
+                    context.append(f"Faltas registradas nesta materia: {total_faltas} (Limite maximo permitido: {max_faltas})")
+
+                    provas = config.avaliacoes.filter(data__isnull=False).order_by('data')
+                    if provas.exists():
+                        context.append("Avaliacoes agendadas para esta materia:")
+                        for p in provas:
+                            status_nota = f" - Nota: {p.nota}" if p.nota is not None else " - Nota: Nao lancada"
+                            context.append(f"  - {p.nome} ({p.tipo}) em {p.data.strftime('%d/%m/%Y')}{status_nota}")
+
+                vinculo = ConfiguracaoMateria.objects.filter(materia=materia, perfil=profile, ano_letivo=ano_letivo).first()
+                if vinculo and hasattr(vinculo, 'vinculo_classroom'):
+                    arquivos = vinculo.vinculo_classroom.arquivos.all()
+                    if arquivos.exists():
+                        context.append("Arquivos de materiais de aula postados no Google Classroom desta materia:")
+                        for arq in arquivos:
+                            context.append(f"  * Nome do arquivo: {arq.custom_name or arq.original_name} (ID no Drive: {arq.drive_file_id})")
+        else:
+            context.append("Disciplinas matriculadas no ano letivo atual:")
+            materias = ano_letivo.materias.all()
+            for m in materias:
+                total_faltas = profile.registros_falta.filter(materia=m, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
+                horarios = ano_letivo.horarios.filter(materia=m)
+                max_faltas = horarios.first().maximo_faltas if horarios.exists() else 0
+                context.append(f" - {m.codigo} - {m.nome} (Faltas: {total_faltas}/{max_faltas})")
+
+            config_ids = profile.configuracoes_materias.filter(ano_letivo=ano_letivo).values_list('id', flat=True)
+            provas_futuras = Avaliacao.objects.filter(
+                configuracao_id__in=config_ids,
+                data__gte=today
+            ).order_by('data')
+
+            if provas_futuras.exists():
+                context.append("Proximas avaliacoes agendadas em todas as disciplinas:")
+                for p in provas_futuras:
+                    context.append(f" - {p.nome} ({p.tipo}) de {p.configuracao.materia.nome} no dia {p.data.strftime('%d/%m/%Y')}")
+
+        return "\n".join(context)
+
+    def obter_dados_arquivo(self, profile, file_id: str, google_token: str | None) -> dict | None:
+        import mimetypes
+        import base64
+        import requests
+        from .models import ArquivoMateriaClassroom
+
+        if file_id.startswith('local_'):
+            return None
+        else:
+            if not google_token:
+                return None
+
+            arquivo = ArquivoMateriaClassroom.objects.filter(
+                classroom_connection__subject_config__perfil=profile,
+                drive_file_id=file_id
+            ).first()
+
+            nome_arquivo = arquivo.original_name if arquivo else "documento"
+            mime_type, _ = mimetypes.guess_type(nome_arquivo)
+            mime_type = mime_type or 'application/pdf'
+
+            try:
+                headers = {'Authorization': f'Bearer {google_token}'}
+                drive_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
+                drive_res = requests.get(drive_url, headers=headers, timeout=20)
+
+                if drive_res.status_code == 200:
+                    content_type = drive_res.headers.get('Content-Type', mime_type)
+                    base64_data = base64.b64encode(drive_res.content).decode('utf-8')
+                    return {
+                        "mime_type": content_type,
+                        "base64_data": base64_data
+                    }
+                else:
+                    print(f"DEBUG GOOGLE DRIVE - Erro no download do arquivo {file_id}. Status: {drive_res.status_code}, Resposta: {drive_res.text[:200]}")
+            except Exception as e:
+                print(f"DEBUG GOOGLE DRIVE - Excecao ao baixar arquivo {file_id}: {str(e)}")
+                return None
+        return None
