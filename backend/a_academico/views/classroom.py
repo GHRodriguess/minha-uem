@@ -482,9 +482,9 @@ class AtualizarArquivoClassroomView(APIView):
             original_name = request.data.get('original_name', 'Arquivo Sem Nome')
             
             file_obj, created = ArquivoMateriaClassroom.objects.get_or_create(
+                classroom_connection=connection,
                 drive_file_id=drive_file_id,
                 defaults={
-                    'classroom_connection': connection,
                     'original_name': original_name,
                     'selected_folder': 'documentos'
                 }
@@ -558,9 +558,9 @@ class BaixarArquivoClassroomView(APIView):
                 return Response({'erro': 'Vínculo do Classroom não encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
             file_obj, created = ArquivoMateriaClassroom.objects.get_or_create(
+                classroom_connection=connection,
                 drive_file_id=drive_file_id,
                 defaults={
-                    'classroom_connection': connection,
                     'original_name': original_name,
                     'selected_folder': selected_folder
                 }
