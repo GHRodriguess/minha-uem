@@ -41,11 +41,13 @@ export default function DashboardLayout({
     return null
   }
 
+  const isIAPage = pathname === '/ia'
+
   return (
     <div className="flex min-h-screen bg-background text-foreground relative">
-      <Sidebar className="hidden lg:flex" />
+      {!isIAPage && <Sidebar className="hidden lg:flex" />}
 
-      {isSidebarOpen && (
+      {!isIAPage && isSidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden flex">
           <div 
             className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300"
@@ -69,13 +71,13 @@ export default function DashboardLayout({
             </button>
           </div>
         )}
-        <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 md:p-8">
+        {!isIAPage && <Topbar onMenuClick={() => setIsSidebarOpen(true)} />}
+        <main className={isIAPage ? "flex-1 h-screen overflow-hidden" : "flex-1 p-4 sm:p-6 md:p-8"}>
           {children}
         </main>
       </div>
 
-      {pathname !== null && !pathname.includes('/arquivos/visualizador') && (
+      {!isIAPage && pathname !== null && !pathname.includes('/arquivos/visualizador') && (
         <>
           <BotaoFlutuanteIA onClick={() => setIsChatOpen(!isChatOpen)} isOpen={isChatOpen} />
           <SidebarChatIA isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />

@@ -25,9 +25,19 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
   } = useConversasIA(isOpen, materiaId)
 
   const {
-    messages, input, setInput, sending, hasKey, selectedFileIds,
+    messages, input, setInput, sending, hasKey, loadingKey, selectedFileIds,
     chatEndRef, arquivosMateria, arquivosAbertos, alternarArquivo, enviarMensagem
   } = useChatIA(isOpen, fileUrls, conversaAtiva, criarNovaConversa)
+
+  const lidarComKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (!sending && input.trim()) {
+        const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+        enviarMensagem(fakeEvent)
+      }
+    }
+  }
 
   if (!isOpen) return null
   const containerClass = `${layoutMode === 'integrated' ? 'relative h-full w-105 bg-card shrink-0' : 'fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl'} border-l border-border flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300`
@@ -55,9 +65,13 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
         </button>
       </div>
 
-      {hasKey && !isHistoryView && <SeletorModeloChatIA modelName={modelName} onChangeModel={alterarModelo} />}
+      {hasKey && !isHistoryView && !loadingKey && <SeletorModeloChatIA modelName={modelName} onChangeModel={alterarModelo} />}
 
-      {!hasKey ? (
+      {loadingKey ? (
+        <div className="flex-1 flex items-center justify-center bg-muted/5">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : !hasKey ? (
         <FeedbackIADesativada />
       ) : isHistoryView ? (
         <ListaConversasIA
@@ -110,14 +124,15 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
             {materiaId && (
               <SeletorArquivosIA files={arquivosMateria} selectedIds={selectedFileIds} onToggle={alternarArquivo} />
             )}
-            <form onSubmit={enviarMensagem} className="flex gap-2">
-              <input
-                type="text"
+            <form onSubmit={enviarMensagem} className="flex gap-2 items-end">
+              <textarea
                 placeholder={arquivosAbertos.length > 0 ? "Perguntar sobre os arquivos abertos..." : "Digite sua mensagem..."}
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                onKeyDown={lidarComKeyDown}
                 disabled={sending}
-                className="flex-1 h-11 px-4 rounded-xl bg-muted/30 border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50"
+                rows={1}
+                className="flex-1 min-h-11 max-h-32 py-3 px-4 rounded-xl bg-muted/30 border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50 resize-none whitespace-pre-wrap overflow-y-auto"
               />
               <Button type="submit" disabled={sending || !input.trim()} className="h-11 w-11 p-0 rounded-xl shrink-0">
                 <Send className="w-4 h-4 text-primary-foreground" />

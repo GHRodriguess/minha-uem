@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, BookOpen, Calendar, LogOut, PlusCircle, Settings, X, LifeBuoy, Shield, Newspaper } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Calendar, LogOut, PlusCircle, Settings, X, LifeBuoy, Shield, Newspaper, Sparkles } from 'lucide-react'
 import Logo from '../atoms/Logo'
 import ItemNavegacao from '../molecules/ItemNavegacao'
 import { signOut, useSession } from 'next-auth/react'
@@ -53,6 +53,7 @@ export default function Sidebar({ className, isMobile, onClose }: SidebarProps) 
   const links = [
     { href: '/', icon: LayoutDashboard, label: 'Início' },
     { href: '/disciplinas', icon: BookOpen, label: 'Disciplinas' },
+    { href: '/ia', icon: Sparkles, label: 'Assistente IA' },
     { href: '/horarios', icon: Calendar, label: 'Calendário' },
     { href: '/noticias', icon: Newspaper, label: 'Notícias' },
     { href: '/suporte', icon: LifeBuoy, label: 'Suporte' },

@@ -33,12 +33,13 @@ export function useConversasIA(isOpen: boolean, materiaId?: number) {
     }
   }, [session, isOpen])
 
-  const criarNovaConversa = async (mensagemInicial?: string) => {
+  const criarNovaConversa = async (mensagemInicial?: any) => {
     if (!session?.accessToken) return null
     setLoading(true)
     try {
-      const title = mensagemInicial
-        ? mensagemInicial.slice(0, 30) + (mensagemInicial.length > 30 ? '...' : '')
+      const msgStr = typeof mensagemInicial === 'string' ? mensagemInicial : ''
+      const title = msgStr
+        ? msgStr.slice(0, 30) + (msgStr.length > 30 ? '...' : '')
         : 'Nova conversa'
       const nova = await ia_service.criarConversa(session.accessToken, title, materiaId)
       await carregarConversas()

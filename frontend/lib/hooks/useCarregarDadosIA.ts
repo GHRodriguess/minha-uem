@@ -9,18 +9,23 @@ export function useCarregarDadosIA(
   filesCache: any,
   obterArquivos: (materiaId: number, anoId: number) => Promise<any>,
   setHasKey: (v: boolean) => void,
-  setModelName: (v: string) => void
+  setModelName: (v: string) => void,
+  setLoadingKey?: (v: boolean) => void
 ) {
   useEffect(() => {
     if (session?.accessToken && isOpen) {
+      if (setLoadingKey) setLoadingKey(true)
       ia_service.obterConfig(session.accessToken)
         .then(res => {
           setHasKey(res.possui_chave)
           if (res.model_name) setModelName(res.model_name)
         })
         .catch(console.error)
+        .finally(() => {
+          if (setLoadingKey) setLoadingKey(false)
+        })
     }
-  }, [session, isOpen, setHasKey, setModelName])
+  }, [session, isOpen, setHasKey, setModelName, setLoadingKey])
 
   useEffect(() => {
     if (materiaId && anoAtivoId && isOpen && !filesCache[materiaId]) {
