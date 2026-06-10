@@ -27,14 +27,24 @@ export function useChatIA(
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [hasKey, setHasKey] = useState(false)
+  const [loadingKey, setLoadingKey] = useState(true)
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
+  const [localUploads, setLocalUploads] = useState<Array<{ name: string; mime_type: string; base64_data: string }>>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
   const carregadaIdRef = useRef<number | null>(null)
+
+  const adicionarUploadLocal = (file: { name: string; mime_type: string; base64_data: string }) => {
+    setLocalUploads(p => [...p, file])
+  }
+
+  const removerUploadLocal = (index: number) => {
+    setLocalUploads(p => p.filter((_, i) => i !== index))
+  }
 
   const materiaId = pathname?.includes('/disciplinas/') ? Number(pathname.split('/disciplinas/')[1]?.split('/')[0]) : undefined
   const arquivoAbertoIds = [searchParams.get('fileId'), searchParams.get('rightFileId')].filter(Boolean) as string[]
 
-  useCarregarDadosIA(session, isOpen, materiaId, anoAtivoId, filesCache, obterArquivos, setHasKey, emptyCallback)
+  useCarregarDadosIA(session, isOpen, materiaId, anoAtivoId, filesCache, obterArquivos, setHasKey, emptyCallback, setLoadingKey)
 
   useEffect(() => {
     if (session?.accessToken && conversaAtiva?.id) {
@@ -66,9 +76,13 @@ export function useChatIA(
       if (!activeConversa && criarNovaConversa) activeConversa = await criarNovaConversa(userMsg)
       if (!activeConversa) throw new Error('Não foi possível criar uma nova conversa.')
       const activeFileIds = Array.from(new Set([...arquivoAbertoIds, ...selectedFileIds]))
-      const localFilesData = await obterArquivosBase64(
+      const classroomFilesData = await obterArquivosBase64(
         activeFileIds, fileUrls, arquivosMateria, directoryHandle, hasFolderPermission, session.googleAccessToken || null
       )
+      const allFiles = [
+        ...classroomFilesData,
+        ...localUploads.map(f => ({ mime_type: f.mime_type, base64_data: f.base64_data }))
+      ]
       await ia_service.enviarMensagemConversa(
         session.accessToken, session.googleAccessToken || null, activeConversa.id, userMsg,
         arquivoAbertoIds.join(',') || undefined, selectedFileIds,
@@ -81,8 +95,9 @@ export function useChatIA(
           })
         },
         undefined,
-        localFilesData
+        allFiles
       )
+      setLocalUploads([])
     } catch (err: any) {
       setMessages(prev => [...prev.slice(0, -1), { text: obterMensagemErroIA(err), isUser: false }])
     } finally {
@@ -94,8 +109,9 @@ export function useChatIA(
   const arquivosAbertos = arquivosMateria.filter(f => arquivoAbertoIds.includes(f.drive_file_id))
 
   return {
-    messages, input, setInput, sending, hasKey,
+    messages, input, setInput, sending, hasKey, loadingKey,
     selectedFileIds, chatEndRef, materiaId, arquivosMateria,
-    arquivosAbertos, alternarArquivo, enviarMensagem
+    arquivosAbertos, alternarArquivo, enviarMensagem,
+    localUploads, adicionarUploadLocal, removerUploadLocal
   }
 }

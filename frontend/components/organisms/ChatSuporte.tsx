@@ -37,6 +37,16 @@ export default function ChatSuporte({ chamado, usuarioEmail, onEnviarMensagem, o
     }
   }
 
+  const lidarComKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (!enviando && novaMensagem.trim()) {
+        const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+        handleEnviar(fakeEvent)
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-280px)] bg-card border border-border rounded-2xl overflow-hidden">
       <div className="p-4 bg-muted/40 border-b border-border flex justify-between items-center shrink-0">
@@ -79,13 +89,14 @@ export default function ChatSuporte({ chamado, usuarioEmail, onEnviarMensagem, o
       </div>
 
       {chamado.status === 'ABERTO' ? (
-        <form onSubmit={handleEnviar} className="p-3 bg-muted/20 border-t border-border flex gap-2 shrink-0">
-          <input
-            type="text"
+        <form onSubmit={handleEnviar} className="p-3 bg-muted/20 border-t border-border flex gap-2 items-end shrink-0">
+          <textarea
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
+            onKeyDown={lidarComKeyDown}
             placeholder="Digite sua resposta..."
-            className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-xs focus:outline-none focus:border-primary transition-all duration-200"
+            rows={1}
+            className="flex-1 min-h-9.5 max-h-32 py-2 px-4 rounded-xl border border-border bg-card text-foreground text-xs focus:outline-none focus:border-primary transition-all duration-200 resize-none whitespace-pre-wrap overflow-y-auto"
             disabled={enviando}
             required
           />
