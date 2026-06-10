@@ -1,346 +1,34 @@
-from django.views import View
-from django.db.models import Q
+import os
+import re
+import json
+import base64
+import uuid
+import requests
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from django.core.cache import cache
+from django.utils import timezone
+from django.http import StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from django.contrib.auth.models import User
-from .models import PerfilAcademico, RegistroFalta, Materia, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, Horario, AnotacaoMateria, ChamadoSuporte, MensagemChamado, Curso, Noticia, ProfessorClassroom
-from .serializers import PerfilAcademicoSerializer, ConfiguracaoMateriaSerializer, AvaliacaoSerializer, ConfiguracaoGeralClassroomSerializer, VinculoGoogleClassroomSerializer, ArquivoMateriaClassroomSerializer, AnotacaoMateriaSerializer, MateriaSerializer, ChamadoSuporteSerializer, MensagemChamadoSerializer, UsuarioAdminSerializer, NoticiaSerializer, ProfessorClassroomSerializer
-from .services import ServicoExtracaoHorario
-import requests
-import re
-import unicodedata
 
-def obter_perfil_ativo(request):
-    user = request.user
-    impersonate_email = request.headers.get('X-Impersonate-User')
-    if impersonate_email and (user.is_staff or user.is_superuser):
-        try:
-            impersonated_user = User.objects.get(email=impersonate_email)
-            perfil, _ = PerfilAcademico.objects.get_or_create(user=impersonated_user)
-            return perfil, impersonated_user
-        except User.DoesNotExist:
-            pass
-    perfil, _ = PerfilAcademico.objects.get_or_create(user=user)
-    return perfil, user
-
-def normalizar_para_busca(text):
-    text_lower = text.lower()
-    text_normalized = unicodedata.normalize('NFKD', text_lower)
-    text_ascii = ''.join(c for c in text_normalized if not unicodedata.combining(c))
-    return re.findall(r'\b\w+\b', text_ascii)
-
-def nomes_sao_compativeis(subject_name, course_name):
-    subject_words = normalizar_para_busca(subject_name)
-    course_words = normalizar_para_busca(course_name)
-    
-    if not subject_words or not course_words:
-        return False
-        
-    if subject_words == course_words:
-        return True
-        
-    def eh_subsequencia(sub_seq, main_seq):
-        len_sub, len_main = len(sub_seq), len(main_seq)
-        for index in range(len_main - len_sub + 1):
-            if main_seq[index:index+len_sub] == sub_seq:
-                return True
-        return False
-        
-    return eh_subsequencia(subject_words, course_words) or eh_subsequencia(course_words, subject_words)
-
-class PerfilAcademicoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        perfil, _ = obter_perfil_ativo(request)
-        ano_id = request.query_params.get('ano_id')
-        resumido = request.query_params.get('resumido', 'true') == 'true'
-        incluir_avaliacoes = request.query_params.get('incluir_avaliacoes') == 'true'
-        serializer = PerfilAcademicoSerializer(
-            perfil, 
-            context={
-                'perfil': perfil, 
-                'ano_id': ano_id, 
-                'resumido': resumido,
-                'incluir_avaliacoes': incluir_avaliacoes
-            }
-        )
-        return Response(serializer.data)
-
-
-class MateriaDetalheView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, materia_id):
-        try:
-            perfil, _ = obter_perfil_ativo(request)
-            ano_id = request.query_params.get('ano_id')
-            
-            if ano_id:
-                ano_letivo = perfil.anos.filter(id=ano_id).first()
-            else:
-                ano_letivo = perfil.anos.order_by('-ano').first()
-                
-            if not ano_letivo:
-                return Response({"erro": "Nenhum ano letivo configurado."}, status=status.HTTP_400_BAD_REQUEST)
-                
-            materia = ano_letivo.materias.get(id=materia_id)
-            serializer = MateriaSerializer(
-                materia, 
-                context={'perfil': perfil, 'ano_letivo': ano_letivo}
-            )
-            return Response(serializer.data)
-        except Materia.DoesNotExist:
-            return Response({"erro": "Materia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-class UploadHorarioView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        if 'file' not in request.FILES:
-            return Response({"erro": "Nenhum arquivo enviado."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        pdf_file = request.FILES['file']
-        confirmar = request.data.get('confirmar') == 'true'
-        perfil, user_ativo = obter_perfil_ativo(request)
-        servico = ServicoExtracaoHorario(pdf_file, user_ativo)
-        
-        try:
-            
-            if not confirmar:
-                analise = servico.processar(apenas_analisar=True)
-                ano_detectado = analise.get("ano")
-                
-                if ano_detectado and AnoLetivo.objects.filter(perfil=perfil, ano=ano_detectado).exists():
-                    return Response({
-                        "conflito": True,
-                        "ano": ano_detectado,
-                        "mensagem": f"Já existem dados para o ano {ano_detectado}. Deseja sobrescrever?"
-                    }, status=status.HTTP_200_OK)
-
-            perfil_atualizado = servico.processar()
-            serializer = PerfilAcademicoSerializer(perfil_atualizado, context={'perfil': perfil_atualizado})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({"erro": f"Erro ao processar PDF: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class ControleFaltaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        materia_id = request.data.get('materia_id')
-        data_falta = request.data.get('data')
-        aula_num = request.data.get('aula')
-        quantidade = request.data.get('faltas')
-        ano_id = request.data.get('ano_id')
-
-        if materia_id is None or data_falta is None or aula_num is None or quantidade is None:
-            return Response({"erro": "materia_id, data, aula e faltas são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            perfil, _ = obter_perfil_ativo(request)
-            materia = Materia.objects.get(id=materia_id)
-            
-            from .models import AnoLetivo
-            if ano_id:
-                ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=perfil)
-            else:
-                from datetime import datetime
-                data_dt = datetime.strptime(data_falta, '%Y-%m-%d').date()
-                ano_letivo = perfil.anos.filter(horarios__data_inicio__lte=data_dt, horarios__data_termino__gte=data_dt).first()
-                if not ano_letivo:
-                    ano_letivo = perfil.anos.order_by('-ano').first()
-
-            registro, created = RegistroFalta.objects.get_or_create(
-                perfil=perfil, 
-                materia=materia, 
-                data=data_falta,
-                aula=aula_num,
-                defaults={'ano_letivo': ano_letivo}
-            )
-            
-            if not created:
-                registro.ano_letivo = ano_letivo
-
-            if int(quantidade) <= 0:
-                registro.delete()
-                faltas_result = 0
-            else:
-                registro.faltas = int(quantidade)
-                registro.save()
-                faltas_result = registro.faltas
-
-            return Response({"materia_id": materia.id, "data": data_falta, "aula": aula_num, "faltas": faltas_result})
-        except Exception as e:
-            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-class ConfiguracaoMateriaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_object(self, materia_id, ano_id):
-        perfil, _ = obter_perfil_ativo(self.request)
-        ano_letivo = AnoLetivo.objects.get(id=ano_id, perfil=perfil)
-        materia = Materia.objects.get(id=materia_id)
-        config, _ = ConfiguracaoMateria.objects.get_or_create(
-            perfil=perfil,
-            materia=materia,
-            ano_letivo=ano_letivo
-        )
-        return config
-
-    def get(self, request):
-        materia_id = request.query_params.get('materia_id')
-        ano_id = request.query_params.get('ano_id')
-        if not materia_id or not ano_id:
-            return Response({"erro": "materia_id e ano_id são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            config = self.get_object(materia_id, ano_id)
-            serializer = ConfiguracaoMateriaSerializer(config)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request):
-        materia_id = request.data.get('materia_id')
-        ano_id = request.data.get('ano_id')
-        if not materia_id or not ano_id:
-            return Response({"erro": "materia_id e ano_id são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            config = self.get_object(materia_id, ano_id)
-            serializer = ConfiguracaoMateriaSerializer(config, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"erro": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-class AvaliacaoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        config_id = request.data.get('configuracao_id')
-        if not config_id:
-            return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=active_user)
-            serializer = AvaliacaoSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(configuracao=config)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except ConfiguracaoMateria.DoesNotExist:
-            return Response({"erro": "Configuração não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-    def patch(self, request, pk):
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=active_user)
-            serializer = AvaliacaoSerializer(avaliacao, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Avaliacao.DoesNotExist:
-            return Response({"erro": "Avaliação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-    def delete(self, request, pk):
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            avaliacao = Avaliacao.objects.get(pk=pk, configuracao__perfil__user=active_user)
-            avaliacao.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Avaliacao.DoesNotExist:
-            return Response({"erro": "Avaliação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-
-class AnotacaoMateriaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        config_id = request.data.get('configuracao_id')
-        if not config_id:
-            return Response({"erro": "configuracao_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            config = ConfiguracaoMateria.objects.get(id=config_id, perfil__user=active_user)
-            serializer = AnotacaoMateriaSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(subject_config=config)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except ConfiguracaoMateria.DoesNotExist:
-            return Response({"erro": "Configuração não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-    def patch(self, request, pk):
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=active_user)
-            serializer = AnotacaoMateriaSerializer(note, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except AnotacaoMateria.DoesNotExist:
-            return Response({"erro": "Anotação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-    def delete(self, request, pk):
-        try:
-            _, active_user = obter_perfil_ativo(request)
-            note = AnotacaoMateria.objects.get(pk=pk, subject_config__perfil__user=active_user)
-            note.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except AnotacaoMateria.DoesNotExist:
-            return Response({"erro": "Anotação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-
-
-class ConfiguracaoClassroomView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        profile, _ = obter_perfil_ativo(request)
-        config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
-        serializer = ConfiguracaoGeralClassroomSerializer(config)
-        return Response(serializer.data)
-
-    def patch(self, request):
-        profile, _ = obter_perfil_ativo(request)
-        config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
-        serializer = ConfiguracaoGeralClassroomSerializer(config, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ListarCursosClassroomView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        google_token = request.headers.get('X-Google-Access-Token')
-        if not google_token:
-            return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
-
-        headers = {'Authorization': f'Bearer {google_token}'}
-        response = requests.get('https://classroom.googleapis.com/v1/courses', headers=headers)
-        if response.status_code == 401:
-            return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
-        if response.status_code != 200:
-            return Response({'erro': 'Erro ao buscar turmas do Google Classroom', 'detalhe': response.text}, status=response.status_code)
-
-        data = response.json()
-        courses = data.get('courses', [])
-        return Response(courses)
+from a_academico.models import (
+    ConfiguracaoGeralClassroom,
+    VinculoGoogleClassroom,
+    ProfessorClassroom,
+    Materia,
+    AnoLetivo,
+    ConfiguracaoMateria,
+    ArquivoMateriaClassroom
+)
+from a_academico.serializers import (
+    ConfiguracaoGeralClassroomSerializer,
+    VinculoGoogleClassroomSerializer,
+    ProfessorClassroomSerializer,
+    ArquivoMateriaClassroomSerializer
+)
+from .base import obter_perfil_ativo, nomes_sao_compativeis
 
 
 def sincronizar_dados_adicionais_classroom(connection, google_token):
@@ -383,6 +71,126 @@ def sincronizar_dados_adicionais_classroom(connection, google_token):
             existing_ids.append(prof_obj.id)
             
         connection.professores.exclude(id__in=existing_ids).delete()
+
+
+def obter_arquivos_classroom_em_tempo_real(connection, token):
+    headers = {'Authorization': f'Bearer {token}'}
+    course_id = connection.classroom_course_id
+
+    materials_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials', headers=headers)
+    work_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork', headers=headers)
+    announcements_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements', headers=headers)
+
+    if materials_res.status_code == 401 or work_res.status_code == 401 or announcements_res.status_code == 401:
+        raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
+
+    drive_files = []
+
+    if materials_res.status_code == 200:
+        materials_data = materials_res.json().get('courseWorkMaterial', [])
+        for material in materials_data:
+            for item in material.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+
+    if work_res.status_code == 200:
+        work_data = work_res.json().get('courseWork', [])
+        for work in work_data:
+            for item in work.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+
+    if announcements_res.status_code == 200:
+        announcements_data = announcements_res.json().get('announcements', [])
+        for announcement in announcements_data:
+            for item in announcement.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+                elif 'link' in item:
+                    url = item['link'].get('url', '')
+                    title = item['link'].get('title', 'Arquivo do Drive')
+                    match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
+                    if not match:
+                        match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+                    
+                    if match:
+                        drive_id = match.group(1)
+                        drive_files.append({
+                            'id': drive_id,
+                            'title': title
+                        })
+
+    current_drive_ids = set()
+    for file_info in drive_files:
+        file_id = file_info.get('id')
+        title = file_info.get('title')
+        if not file_id or not title:
+            continue
+        current_drive_ids.add(file_id)
+
+        file_obj = connection.arquivos.filter(drive_file_id=file_id).first()
+        if file_obj:
+            if file_obj.original_name != title:
+                file_obj.original_name = title
+                file_obj.save()
+        else:
+            ArquivoMateriaClassroom.objects.create(
+                classroom_connection=connection,
+                drive_file_id=file_id,
+                original_name=title,
+                selected_folder='documentos'
+            )
+
+    connection.arquivos.filter(
+        local_path__isnull=True
+    ).exclude(
+        drive_file_id__in=current_drive_ids
+    ).exclude(
+        drive_file_id__startswith='local_'
+    ).delete()
+
+    arquivos = connection.arquivos.all().order_by('-sync_at')
+    serializer = ArquivoMateriaClassroomSerializer(arquivos, many=True)
+    return serializer.data
+
+
+class ConfiguracaoClassroomView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
+        serializer = ConfiguracaoGeralClassroomSerializer(config)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        config, _ = ConfiguracaoGeralClassroom.objects.get_or_create(profile=profile)
+        serializer = ConfiguracaoGeralClassroomSerializer(config, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ListarCursosClassroomView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        google_token = request.headers.get('X-Google-Access-Token')
+        if not google_token:
+            return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        headers = {'Authorization': f'Bearer {google_token}'}
+        response = requests.get('https://classroom.googleapis.com/v1/courses', headers=headers)
+        if response.status_code == 401:
+            return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)
+        if response.status_code != 200:
+            return Response({'erro': 'Erro ao buscar turmas do Google Classroom', 'detalhe': response.text}, status=response.status_code)
+
+        data = response.json()
+        courses = data.get('courses', [])
+        return Response(courses)
 
 
 class VincularCursoClassroomView(APIView):
@@ -450,16 +258,12 @@ class VincularCursoClassroomView(APIView):
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-import os
-from pathlib import Path
-
 class ExploradorDiretoriosView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         path_str = request.query_params.get('path', '')
         
-        # Tenta usar o caminho fornecido, se falhar ou não existir, usa a Home
         try:
             if not path_str:
                 base_path = Path.home()
@@ -565,7 +369,6 @@ class ArquivosMateriaClassroomView(APIView):
                         pass
 
             def limpar_nome_pasta(nome):
-                import re
                 return re.sub(r'[\/\\:\*\?"<>\|]', '', nome).strip()
 
             curso_nome = limpar_nome_pasta(profile.curso.nome if profile.curso else "Sem_Curso")
@@ -609,100 +412,7 @@ class ArquivosMateriaClassroomView(APIView):
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def _obter_arquivos_classroom_em_tempo_real(self, connection, token):
-        headers = {'Authorization': f'Bearer {token}'}
-        course_id = connection.classroom_course_id
-
-        materials_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials', headers=headers)
-        work_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork', headers=headers)
-        announcements_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements', headers=headers)
-
-        if materials_res.status_code == 401 or work_res.status_code == 401 or announcements_res.status_code == 401:
-            raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
-
-        drive_files = []
-
-        if materials_res.status_code == 200:
-            materials_data = materials_res.json().get('courseWorkMaterial', [])
-            for material in materials_data:
-                for item in material.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-
-        if work_res.status_code == 200:
-            work_data = work_res.json().get('courseWork', [])
-            for work in work_data:
-                for item in work.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-
-        if announcements_res.status_code == 200:
-            announcements_data = announcements_res.json().get('announcements', [])
-            for announcement in announcements_data:
-                for item in announcement.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-                    elif 'link' in item:
-                        url = item['link'].get('url', '')
-                        title = item['link'].get('title', 'Arquivo do Drive')
-                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
-                        if not match:
-                            match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
-                        
-                        if match:
-                            drive_id = match.group(1)
-                            drive_files.append({
-                                'id': drive_id,
-                                'title': title
-                            })
-
-        import os
-        arquivos_locais = {arq.drive_file_id: arq for arq in connection.arquivos.all()}
-
-        resultado = []
-        for file_info in drive_files:
-            file_id = file_info.get('id')
-            title = file_info.get('title')
-            if not file_id or not title:
-                continue
-
-            if file_id in arquivos_locais:
-                arq = arquivos_locais[file_id]
-                resultado.append({
-                    'id': arq.id,
-                    'drive_file_id': arq.drive_file_id,
-                    'original_name': arq.original_name,
-                    'custom_name': arq.custom_name,
-                    'selected_folder': arq.selected_folder,
-                    'local_path': arq.local_path,
-                    'is_ignored': arq.is_ignored,
-                    'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
-                })
-            else:
-                resultado.append({
-                    'id': None,
-                    'drive_file_id': file_id,
-                    'original_name': title,
-                    'custom_name': None,
-                    'selected_folder': 'documentos',
-                    'local_path': None,
-                    'is_ignored': title.startswith('.'),
-                    'sync_at': None
-                })
-
-        for local_id, arq in arquivos_locais.items():
-            if local_id.startswith('local_'):
-                resultado.append({
-                    'id': arq.id,
-                    'drive_file_id': arq.drive_file_id,
-                    'original_name': arq.original_name,
-                    'custom_name': arq.custom_name,
-                    'selected_folder': arq.selected_folder,
-                    'local_path': arq.local_path,
-                    'is_ignored': arq.is_ignored,
-                    'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
-                })
-
-        return resultado
+        return obter_arquivos_classroom_em_tempo_real(connection, token)
 
 
 class AtualizarCategoriasVinculoView(APIView):
@@ -798,9 +508,6 @@ class ObterConteudoArquivoDriveView(APIView):
             return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            import requests
-            from django.http import StreamingHttpResponse
-
             headers = {'Authorization': f'Bearer {google_token}'}
             drive_url = f'https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media'
             
@@ -914,7 +621,6 @@ class AdicionarArquivoLocalView(APIView):
                     classroom_course_name='Arquivos Locais'
                 )
                 
-            import uuid
             drive_file_id = f"local_{uuid.uuid4()}"
             
             file_obj = ArquivoMateriaClassroom.objects.create(
@@ -988,7 +694,6 @@ class SincronizarArquivosLocaisView(APIView):
                         arq.local_path = None
                         arq.save()
                 
-            import uuid
             for item in local_files:
                 path_key = item.get('local_path')
                 if path_key and path_key not in caminhos_pareados:
@@ -1008,11 +713,6 @@ class SincronizarArquivosLocaisView(APIView):
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
-from django.utils import timezone
-import json
-import base64
-from concurrent.futures import ThreadPoolExecutor
 
 class MuralClassroomView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1283,9 +983,6 @@ class NotificacoesClassroomView(APIView):
             return Response({'erro': 'Token do Google não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            import uuid
-            from email import message_from_bytes
-            
             profile, _ = obter_perfil_ativo(request)
             cache_key = f"classroom_notificacoes_{profile.id}_{ano_id}"
             cached_data = cache.get(cache_key)
@@ -1333,7 +1030,6 @@ class NotificacoesClassroomView(APIView):
                     except Exception:
                         return req_info, 500, {}
 
-                from concurrent.futures import ThreadPoolExecutor
                 with ThreadPoolExecutor(max_workers=15) as executor:
                     results = list(executor.map(executar_requisicao, sub_requests))
                 
@@ -1429,478 +1125,3 @@ class NotificacoesClassroomView(APIView):
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-from django.urls import reverse
-from django.http import HttpResponse
-from django.utils.timezone import now
-from datetime import timedelta
-import uuid
-
-def obter_primeira_data_dia(data_inicio, dia_alvo):
-    weekday_alvo = dia_alvo - 1
-    current = data_inicio
-    for _ in range(7):
-        if current.weekday() == weekday_alvo:
-            return current
-        current += timedelta(days=1)
-    return data_inicio
-
-def mesclar_aulas_consecutivas(schedules):
-    if not schedules:
-        return []
-    groups = {}
-    for schedule in schedules:
-        key = (schedule.dia, schedule.materia.id, schedule.data_inicio, schedule.data_termino)
-        if key not in groups:
-            groups[key] = []
-        groups[key].append(schedule)
-    merged_schedules = []
-    for key, group_list in groups.items():
-        group_list.sort(key=lambda s: s.inicio)
-        current = None
-        for schedule in group_list:
-            if current is None:
-                current = {
-                    'id': schedule.id,
-                    'materia': schedule.materia,
-                    'turma': schedule.turma,
-                    'departamento': schedule.departamento,
-                    'periodo': schedule.periodo,
-                    'data_inicio': schedule.data_inicio,
-                    'data_termino': schedule.data_termino,
-                    'bloco': schedule.bloco,
-                    'dia': schedule.dia,
-                    'inicio': schedule.inicio,
-                    'fim': schedule.fim,
-                    'sala': schedule.sala,
-                }
-            else:
-                if schedule.inicio == current['fim']:
-                    current['fim'] = schedule.fim
-                else:
-                    merged_schedules.append(current)
-                    current = {
-                        'id': schedule.id,
-                        'materia': schedule.materia,
-                        'turma': schedule.turma,
-                        'departamento': schedule.departamento,
-                        'periodo': schedule.periodo,
-                        'data_inicio': schedule.data_inicio,
-                        'data_termino': schedule.data_termino,
-                        'bloco': schedule.bloco,
-                        'dia': schedule.dia,
-                        'inicio': schedule.inicio,
-                        'fim': schedule.fim,
-                        'sala': schedule.sala,
-                    }
-        if current:
-            merged_schedules.append(current)
-    return merged_schedules
-
-class ObterInfoAgendaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        profile, _ = obter_perfil_ativo(request)
-        if not profile.calendar_token:
-            profile.calendar_token = uuid.uuid4()
-            profile.save()
-        feed_url = request.build_absolute_uri(
-            reverse('agenda_feed', kwargs={'token': profile.calendar_token})
-        )
-        return Response({
-            'feed_url': feed_url
-        })
-
-class RegenerarTokenAgendaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        profile, _ = obter_perfil_ativo(request)
-        profile.calendar_token = uuid.uuid4()
-        profile.save()
-        feed_url = request.build_absolute_uri(
-            reverse('agenda_feed', kwargs={'token': profile.calendar_token})
-        )
-        return Response({
-            'feed_url': feed_url
-        })
-
-class FeedAgendaView(View):
-    def get(self, request, token):
-        cache_key = f"agenda_ical_{token}"
-        cached_ics = cache.get(cache_key)
-        if cached_ics is not None:
-            response = HttpResponse(cached_ics, content_type="text/calendar; charset=utf-8")
-            response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
-            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response['Pragma'] = 'no-cache'
-            response['Expires'] = '0'
-            return response
-
-        try:
-            profile = PerfilAcademico.objects.get(calendar_token=token)
-        except PerfilAcademico.DoesNotExist:
-            return HttpResponse("Agenda nao encontrada.", status=404, content_type="text/plain")
-
-        lines = []
-        lines.append("BEGIN:VCALENDAR")
-        lines.append("VERSION:2.0")
-        lines.append("PRODID:-//Minha UEM//Agenda Academica//PT")
-        lines.append("CALSCALE:GREGORIAN")
-        lines.append("METHOD:PUBLISH")
-        lines.append("X-WR-CALNAME:Minha UEM - Agenda")
-        lines.append("X-WR-TIMEZONE:America/Sao_Paulo")
-
-        horarios = Horario.objects.filter(
-            Q(anoletivo__perfil=profile) | Q(perfilacademico=profile)
-        ).select_related('materia').distinct()
-
-        merged_schedules = mesclar_aulas_consecutivas(horarios)
-
-        avaliacoes = Avaliacao.objects.filter(
-            configuracao__perfil=profile
-        ).select_related('configuracao__materia')
-
-        byday_map = {
-            1: "MO",
-            2: "TU",
-            3: "WE",
-            4: "TH",
-            5: "FR",
-            6: "SA",
-            7: "SU"
-        }
-
-        for horario in merged_schedules:
-            first_date = obter_primeira_data_dia(horario['data_inicio'], horario['dia'])
-            start_str = f"{first_date.strftime('%Y%m%d')}T{horario['inicio'].strftime('%H%M%S')}"
-            end_str = f"{first_date.strftime('%Y%m%d')}T{horario['fim'].strftime('%H%M%S')}"
-            until_str = f"{horario['data_termino'].strftime('%Y%m%d')}T235959Z"
-
-            subject_name = horario['materia'].nome
-            event_title = subject_name
-
-            desc_lines = []
-            desc_lines.append(f"Materia: {subject_name} ({horario['materia'].codigo})")
-            desc_lines.append(f"Bloco: {horario['bloco']}")
-            desc_lines.append(f"Sala: {horario['sala']}")
-            desc_lines.append(f"Turma: {horario['turma']}")
-            desc_lines.append(f"Departamento: {horario['departamento']}")
-            desc_lines.append(f"Periodo: {horario['periodo']}")
-            event_desc = "\\n".join(desc_lines)
-
-            day_code = byday_map.get(horario['dia'], "MO")
-
-            lines.append("BEGIN:VEVENT")
-            lines.append(f"UID:class_{horario['id']}_{profile.id}@minhauem.com.br")
-            lines.append(f"DTSTAMP:{now().strftime('%Y%m%dT%H%M%SZ')}")
-            lines.append(f"DTSTART;TZID=America/Sao_Paulo:{start_str}")
-            lines.append(f"DTEND;TZID=America/Sao_Paulo:{end_str}")
-            lines.append(f"RRULE:FREQ=WEEKLY;BYDAY={day_code};UNTIL={until_str}")
-            lines.append(f"SUMMARY:{event_title}")
-            lines.append(f"LOCATION:Bloco {horario['bloco']} - Sala {horario['sala']}")
-            lines.append(f"DESCRIPTION:{event_desc}")
-            lines.append("END:VEVENT")
-
-        for avaliacao in avaliacoes:
-            if not avaliacao.data:
-                continue
-
-            next_date = avaliacao.data + timedelta(days=1)
-            start_str = avaliacao.data.strftime('%Y%m%d')
-            end_str = next_date.strftime('%Y%m%d')
-
-            subject_name = avaliacao.configuracao.materia.nome
-            tipo_label = "Prova" if avaliacao.tipo == 'PROVA' else "Trabalho" if avaliacao.tipo == 'TRABALHO' else "Exame" if avaliacao.tipo == 'EXAME' else "Tarefa" if avaliacao.tipo == 'TAREFA' else "Pesquisa" if avaliacao.tipo == 'PESQUISA' else "Outro" if avaliacao.tipo == 'OUTRO' else "Avaliacao"
-            event_title = f"[{tipo_label}] {avaliacao.nome} - {subject_name}"
-
-            desc_lines = []
-            desc_lines.append(f"Materia: {subject_name}")
-            desc_lines.append(f"Tipo: {tipo_label}")
-            desc_lines.append(f"Peso: {avaliacao.peso}")
-            if avaliacao.nota is not None:
-                desc_lines.append(f"Nota Obtida: {avaliacao.nota}")
-            else:
-                desc_lines.append("Nota: Nao lancada")
-
-            status_concl = "Concluida (Nota Lancada)" if avaliacao.nota is not None else "Pendente"
-            desc_lines.append(f"Status: {status_concl}")
-            event_desc = "\\n".join(desc_lines)
-
-            lines.append("BEGIN:VEVENT")
-            lines.append(f"UID:eval_{avaliacao.id}_{profile.id}@minhauem.com.br")
-            lines.append(f"DTSTAMP:{now().strftime('%Y%m%dT%H%M%SZ')}")
-            lines.append(f"DTSTART;VALUE=DATE:{start_str}")
-            lines.append(f"DTEND;VALUE=DATE:{end_str}")
-            lines.append(f"SUMMARY:{event_title}")
-            lines.append(f"DESCRIPTION:{event_desc}")
-            lines.append("END:VEVENT")
-
-        lines.append("END:VCALENDAR")
-
-        ics_content = "\r\n".join(lines)
-        cache.set(cache_key, ics_content, 604800)
-        response = HttpResponse(ics_content, content_type="text/calendar; charset=utf-8")
-        response['Content-Disposition'] = 'inline; filename="agenda_minha_uem.ics"'
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
-        return response
-
-
-from django.contrib.auth.models import User
-
-class ListarCriarChamadoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        is_admin_mode = request.query_params.get('admin', 'false') == 'true'
-        if is_admin_mode and (request.user.is_staff or request.user.is_superuser):
-            chamados = ChamadoSuporte.objects.all().order_by('-updated_at')
-        else:
-            chamados = ChamadoSuporte.objects.filter(user=request.user).order_by('-updated_at')
-        
-        serializer = ChamadoSuporteSerializer(chamados, many=True, context={'list_mode': True})
-        return Response(serializer.data)
-
-    def post(self, request):
-        title = request.data.get('title')
-        category = request.data.get('category', 'OUTRO')
-        message_content = request.data.get('message')
-
-        if not title or not message_content:
-            return Response({"erro": "Titulo e mensagem sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
-
-        chamado = ChamadoSuporte.objects.create(
-            user=request.user,
-            title=title,
-            category=category,
-            status='ABERTO',
-            read_by_user=True,
-            read_by_admin=False
-        )
-
-        MensagemChamado.objects.create(
-            ticket=chamado,
-            sender=request.user,
-            message=message_content
-        )
-
-        serializer = ChamadoSuporteSerializer(chamado)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-class DetalheChamadoSuporteView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, pk):
-        try:
-            chamado = ChamadoSuporte.objects.get(pk=pk)
-        except ChamadoSuporte.DoesNotExist:
-            return Response({"erro": "Chamado nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
-
-        is_admin = request.user.is_staff or request.user.is_superuser
-        if chamado.user != request.user and not is_admin:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        is_admin_mode = request.query_params.get('admin', 'false') == 'true'
-        if is_admin_mode and is_admin:
-            chamado.read_by_admin = True
-        else:
-            chamado.read_by_user = True
-        
-        chamado.save()
-
-        serializer = ChamadoSuporteSerializer(chamado)
-        return Response(serializer.data)
-
-    def post(self, request, pk):
-        try:
-            chamado = ChamadoSuporte.objects.get(pk=pk)
-        except ChamadoSuporte.DoesNotExist:
-            return Response({"erro": "Chamado nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
-
-        is_admin = request.user.is_staff or request.user.is_superuser
-        if chamado.user != request.user and not is_admin:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        message_content = request.data.get('message')
-        if not message_content:
-            return Response({"erro": "Mensagem e obrigatoria."}, status=status.HTTP_400_BAD_REQUEST)
-
-        is_admin_mode = request.query_params.get('admin', 'false') == 'true'
-        
-        if is_admin_mode and is_admin:
-            chamado.read_by_user = False
-            chamado.read_by_admin = True
-        else:
-            chamado.read_by_admin = False
-            chamado.read_by_user = True
-        
-        chamado.save()
-
-        mensagem = MensagemChamado.objects.create(
-            ticket=chamado,
-            sender=request.user,
-            message=message_content
-        )
-
-        serializer = MensagemChamadoSerializer(mensagem)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-class AtualizarStatusChamadoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def patch(self, request, pk):
-        try:
-            chamado = ChamadoSuporte.objects.get(pk=pk)
-        except ChamadoSuporte.DoesNotExist:
-            return Response({"erro": "Chamado nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
-
-        is_admin = request.user.is_staff or request.user.is_superuser
-        if chamado.user != request.user and not is_admin:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        new_status = request.data.get('status')
-        if not new_status or new_status not in ['ABERTO', 'RESOLVIDO']:
-            return Response({"erro": "Status invalido."}, status=status.HTTP_400_BAD_REQUEST)
-
-        chamado.status = new_status
-        chamado.save()
-
-        serializer = ChamadoSuporteSerializer(chamado)
-        return Response(serializer.data)
-
-
-class VisualizarEstatisticasAdminView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        total_users = User.objects.count()
-        active_profiles = PerfilAcademico.objects.count()
-        total_courses = Curso.objects.count()
-        total_subjects = Materia.objects.count()
-        open_tickets = ChamadoSuporte.objects.filter(status='ABERTO').count()
-        resolved_tickets = ChamadoSuporte.objects.filter(status='RESOLVIDO').count()
-
-        return Response({
-            'total_users': total_users,
-            'active_profiles': active_profiles,
-            'total_courses': total_courses,
-            'total_subjects': total_subjects,
-            'open_tickets': open_tickets,
-            'resolved_tickets': resolved_tickets
-        })
-
-
-class ListarUsuariosAdminView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        usuarios = User.objects.all().select_related('perfil_academico', 'perfil_academico__curso').prefetch_related('perfil_academico__materias').order_by('-date_joined')
-        serializer = UsuarioAdminSerializer(usuarios, many=True)
-        return Response(serializer.data)
-
-
-class AlternarAcessoAdminView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def patch(self, request, pk):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            target_user = User.objects.get(pk=pk)
-        except User.DoesNotExist:
-            return Response({"erro": "Usuario nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
-
-        if target_user == request.user:
-            return Response({"erro": "Voce nao pode alterar seus proprios acessos."}, status=status.HTTP_400_BAD_REQUEST)
-
-        target_user.is_staff = not target_user.is_staff
-        target_user.save()
-
-        serializer = UsuarioAdminSerializer(target_user)
-        return Response(serializer.data)
-
-
-class ListarCriarNoticiaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        noticias = Noticia.objects.all().order_by('-created_at')
-        serializer = NoticiaSerializer(noticias, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        title = request.data.get('title')
-        content = request.data.get('content')
-        category = request.data.get('category', 'GERAL')
-
-        if not title or not content:
-            return Response({"erro": "Titulo e conteudo sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
-
-        noticia = Noticia.objects.create(
-            title=title,
-            content=content,
-            category=category,
-            author=request.user
-        )
-
-        serializer = NoticiaSerializer(noticia)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-class DetalheNoticiaView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, pk):
-        try:
-            noticia = Noticia.objects.get(pk=pk)
-        except Noticia.DoesNotExist:
-            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = NoticiaSerializer(noticia)
-        return Response(serializer.data)
-
-    def patch(self, request, pk):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            noticia = Noticia.objects.get(pk=pk)
-        except Noticia.DoesNotExist:
-            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = NoticiaSerializer(noticia, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        if not request.user.is_staff and not request.user.is_superuser:
-            return Response({"erro": "Acesso negado."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            noticia = Noticia.objects.get(pk=pk)
-        except Noticia.DoesNotExist:
-            return Response({"erro": "Noticia nao encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
-        noticia.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-

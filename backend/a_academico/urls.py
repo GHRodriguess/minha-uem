@@ -32,7 +32,12 @@ from .views import (
     ListarUsuariosAdminView,
     AlternarAcessoAdminView,
     ListarCriarNoticiaView,
-    DetalheNoticiaView
+    DetalheNoticiaView,
+    ConfiguracaoIAView,
+    ChatIAView,
+    ConversasIAView,
+    ConversaIADetalheView,
+    EnviarMensagemConversaView
 )
 
 urlpatterns = [
@@ -71,6 +76,11 @@ urlpatterns = [
     path('admin/usuarios/<int:pk>/alternar-staff/', AlternarAcessoAdminView.as_view(), name='alternar_acesso_admin'),
     path('noticias/', ListarCriarNoticiaView.as_view(), name='listar_criar_noticia'),
     path('noticias/<int:pk>/', DetalheNoticiaView.as_view(), name='detalhe_noticia'),
+    path('ia/config/', ConfiguracaoIAView.as_view(), name='ia_config'),
+    path('ia/chat/', ChatIAView.as_view(), name='ia_chat'),
+    path('ia/conversas/', ConversasIAView.as_view(), name='ia_conversas'),
+    path('ia/conversas/<int:pk>/', ConversaIADetalheView.as_view(), name='ia_conversa_detalhe'),
+    path('ia/conversas/<int:pk>/enviar/', EnviarMensagemConversaView.as_view(), name='ia_conversa_enviar'),
 ]
 
 

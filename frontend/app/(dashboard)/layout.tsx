@@ -1,11 +1,13 @@
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from '@/components/organisms/Sidebar'
 import Topbar from '@/components/organisms/Topbar'
 import { useSuporte } from '@/components/providers/ProvedorSuporte'
+import BotaoFlutuanteIA from '@/components/atoms/BotaoFlutuanteIA'
+import SidebarChatIA from '@/components/organisms/SidebarChatIA'
 
 export default function DashboardLayout({
   children,
@@ -14,7 +16,9 @@ export default function DashboardLayout({
 }) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
   const { isImpersonating, impersonatedUserName, encerrarSimulacao } = useSuporte()
 
   useEffect(() => {
@@ -70,6 +74,13 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {pathname !== null && !pathname.includes('/arquivos/visualizador') && (
+        <>
+          <BotaoFlutuanteIA onClick={() => setIsChatOpen(!isChatOpen)} isOpen={isChatOpen} />
+          <SidebarChatIA isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        </>
+      )}
     </div>
   )
 }

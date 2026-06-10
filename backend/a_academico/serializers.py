@@ -49,107 +49,107 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         ]
 
     def get_media_atual(self, obj):
-        avaliacoes = obj.avaliacoes.filter(nota__isnull=False)
-        if not avaliacoes.exists():
+        graded_evaluations = obj.avaliacoes.filter(nota__isnull=False)
+        if not graded_evaluations.exists():
             return 0
         
-        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes)
-        soma_pesos = sum(a.peso for a in obj.avaliacoes.all())
+        weighted_sum = sum(a.nota * a.peso for a in graded_evaluations)
+        weights_sum = sum(a.peso for a in graded_evaluations)
         
-        if soma_pesos == 0:
+        if weights_sum == 0:
             return 0
             
-        return round(float(soma_ponderada / soma_pesos), 2)
+        return round(float(weighted_sum / weights_sum), 2)
 
     def get_quanto_falta(self, obj):
         if not obj.avaliacoes.exists():
             return 0.0
-        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
-        avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
+        assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
+        unassigned_assessments = obj.avaliacoes.filter(nota__isnull=True)
         
-        if not avaliacoes_sem_nota.exists():
-            media = self.get_media_atual(obj)
-            return max(0, float(obj.media_minima) - media) if media < float(obj.media_minima) else 0
+        if not unassigned_assessments.exists():
+            current_average = self.get_media_atual(obj)
+            return max(0, float(obj.media_minima) - current_average) if current_average < float(obj.media_minima) else 0
 
-        soma_ponderada_atual = sum(a.nota * a.peso for a in avaliacoes_com_nota)
-        soma_pesos_total = sum(a.peso for a in obj.avaliacoes.all())
-        soma_pesos_restante = sum(a.peso for a in avaliacoes_sem_nota)
+        current_weighted_sum = sum(a.nota * a.peso for a in assigned_assessments)
+        total_weights_sum = sum(a.peso for a in obj.avaliacoes.all())
+        remaining_weights_sum = sum(a.peso for a in unassigned_assessments)
         
-        if soma_pesos_total == 0:
+        if total_weights_sum == 0:
             return 0
             
-        necessario_total = float(obj.media_minima) * float(soma_pesos_total)
-        falta_pontos = necessario_total - float(soma_ponderada_atual)
+        required_total = float(obj.media_minima) * float(total_weights_sum)
+        missing_points = required_total - float(current_weighted_sum)
         
-        if falta_pontos <= 0:
+        if missing_points <= 0:
             return 0
             
-        media_necessaria_restante = falta_pontos / float(soma_pesos_restante)
-        return round(media_necessaria_restante, 2)
+        required_average_remaining = missing_points / float(remaining_weights_sum)
+        return round(required_average_remaining, 2)
 
     def obter_media_proporcional(self, obj):
-        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
-        if not avaliacoes_com_nota.exists():
+        assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
+        if not assigned_assessments.exists():
             return 0.0
-        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
-        soma_pesos_com_nota = sum(a.peso for a in avaliacoes_com_nota)
-        if soma_pesos_com_nota == 0:
+        weighted_sum = sum(a.nota * a.peso for a in assigned_assessments)
+        weights_sum = sum(a.peso for a in assigned_assessments)
+        if weights_sum == 0:
             return 0.0
-        return round(float(soma_ponderada / soma_pesos_com_nota), 2)
+        return round(float(weighted_sum / weights_sum), 2)
 
     def obter_nota_exame_necessaria(self, obj):
-        media_projetada = self.get_media_atual(obj)
-        if 3.0 <= media_projetada < float(obj.media_minima):
-            nota_necessaria = 10.0 - media_projetada
-            return round(nota_necessaria, 2)
+        projected_average = self.get_media_atual(obj)
+        if 3.0 <= projected_average < float(obj.media_minima):
+            required_grade = 10.0 - projected_average
+            return round(required_grade, 2)
         return 0.0
 
     def obter_status_aprovacao(self, obj):
         if not obj.avaliacoes.exists():
             return 'EM_ANDAMENTO'
-        avaliacoes_sem_nota = obj.avaliacoes.filter(nota__isnull=True)
-        media = self.get_media_atual(obj)
-        if not avaliacoes_sem_nota.exists():
-            if media >= float(obj.media_minima):
+        unassigned_assessments = obj.avaliacoes.filter(nota__isnull=True)
+        current_average = self.get_media_atual(obj)
+        if not unassigned_assessments.exists():
+            if current_average >= float(obj.media_minima):
                 return 'APROVADO'
-            elif media >= 3.0:
+            elif current_average >= 3.0:
                 return 'EXAME'
             else:
                 return 'REPROVADO'
         else:
-            if media >= float(obj.media_minima):
-                return 'APROVADO'
-            avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
-            if not avaliacoes_com_nota.exists():
+            assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
+            if not assigned_assessments.exists():
                 return 'EM_ANDAMENTO'
-            soma_ponderada_atual = float(sum(a.nota * a.peso for a in avaliacoes_com_nota))
-            soma_pesos_total = float(sum(a.peso for a in obj.avaliacoes.all()))
-            soma_pesos_restante = float(sum(a.peso for a in avaliacoes_sem_nota))
-            maximo_soma_ponderada = soma_ponderada_atual + (10.0 * soma_pesos_restante)
-            if soma_pesos_total > 0:
-                maxima_media_possivel = maximo_soma_ponderada / soma_pesos_total
+            current_weighted_sum = float(sum(a.nota * a.peso for a in assigned_assessments))
+            total_weights_sum = float(sum(a.peso for a in obj.avaliacoes.all()))
+            if total_weights_sum > 0 and current_weighted_sum >= float(obj.media_minima) * total_weights_sum:
+                return 'APROVADO'
+            remaining_weights_sum = float(sum(a.peso for a in unassigned_assessments))
+            max_possible_weighted_sum = current_weighted_sum + (10.0 * remaining_weights_sum)
+            if total_weights_sum > 0:
+                max_possible_average = max_possible_weighted_sum / total_weights_sum
             else:
-                maxima_media_possivel = 0.0
-            if maxima_media_possivel < 3.0:
+                max_possible_average = 0.0
+            if max_possible_average < 3.0:
                 return 'REPROVADO'
-            elif maxima_media_possivel < float(obj.media_minima):
+            elif max_possible_average < float(obj.media_minima):
                 return 'EXAME'
             else:
                 return 'EM_ANDAMENTO'
 
     def obter_soma_pesos_total(self, obj):
-        soma_pesos = sum(a.peso for a in obj.avaliacoes.all())
-        return float(soma_pesos)
+        weights_sum = sum(a.peso for a in obj.avaliacoes.all())
+        return float(weights_sum)
 
     def obter_soma_pesos_com_nota(self, obj):
-        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
-        soma_pesos = sum(a.peso for a in avaliacoes_com_nota)
-        return float(soma_pesos)
+        assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
+        weights_sum = sum(a.peso for a in assigned_assessments)
+        return float(weights_sum)
 
     def obter_soma_ponderada_atual(self, obj):
-        avaliacoes_com_nota = obj.avaliacoes.filter(nota__isnull=False)
-        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
-        return float(soma_ponderada)
+        assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
+        weighted_sum = sum(a.nota * a.peso for a in assigned_assessments)
+        return float(weighted_sum)
 
 class MateriaSerializer(serializers.ModelSerializer):
     horarios = serializers.SerializerMethodField()
