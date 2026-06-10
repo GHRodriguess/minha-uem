@@ -2054,14 +2054,14 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
             if config:
                 context.append(f"Media minima para aprovacao: {config.media_minima}")
 
-                avaliacoes = config.avaliacoes.all()
-                avaliacoes_com_nota = avaliacoes.filter(nota__isnull=False)
-                if avaliacoes_com_nota.exists():
-                    soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
-                    soma_pesos = sum(a.peso for a in avaliacoes)
-                    if soma_pesos > 0:
-                        media_atual = round(float(soma_ponderada / soma_pesos), 2)
-                        context.append(f"Media atual calculada: {media_atual}")
+                all_evaluations = config.avaliacoes.all()
+                graded_evaluations = all_evaluations.filter(nota__isnull=False)
+                if graded_evaluations.exists():
+                    weighted_sum = sum(a.nota * a.peso for a in graded_evaluations)
+                    weights_sum = sum(a.peso for a in graded_evaluations)
+                    if weights_sum > 0:
+                        current_average = round(float(weighted_sum / weights_sum), 2)
+                        context.append(f"Media atual calculada: {current_average}")
 
                 provas = config.avaliacoes.all().order_by('data', 'ordem')
                 if provas.exists():
@@ -2490,6 +2490,14 @@ class ConversasIAView(APIView):
             title = 'Nova conversa'
 
         from .models import ConversaIA, Materia
+        limit = 10
+        user_conversations = ConversaIA.objects.filter(profile=profile).order_by('updated_at')
+        count = user_conversations.count()
+        if count >= limit:
+            excess_count = count - limit + 1
+            ids_to_delete = list(user_conversations.values_list('id', flat=True)[:excess_count])
+            ConversaIA.objects.filter(id__in=ids_to_delete).delete()
+
         materia = Materia.objects.filter(id=materia_id).first() if materia_id else None
 
         conversa = ConversaIA.objects.create(

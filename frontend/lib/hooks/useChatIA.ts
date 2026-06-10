@@ -44,7 +44,10 @@ export function useChatIA(
       ia_service.obterMensagensConversa(conversaAtiva.id, session.accessToken)
         .then(res => setMessages(res.messages.map(m => ({ text: m.text, isUser: m.role === 'user' }))))
         .catch(console.error)
-    } else { setMessages([]); carregadaIdRef.current = null }
+    } else {
+      if (!sending) setMessages([])
+      carregadaIdRef.current = null
+    }
   }, [conversaAtiva, session?.accessToken, sending])
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
