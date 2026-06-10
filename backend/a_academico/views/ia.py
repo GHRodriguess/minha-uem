@@ -54,95 +54,75 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
         7: "Domingo"
     }
 
-    if materia_id:
-        materia_ativa = ano_letivo.materias.filter(id=materia_id).first()
-        if materia_ativa:
-            context.append(f"\n--- CONTEXTO DETALHADO DA DISCIPLINA ATIVA: {materia_ativa.codigo} - {materia_ativa.nome} ---")
-            
-            schedules = ano_letivo.horarios.filter(materia=materia_ativa).order_by('dia', 'inicio')
-            if schedules.exists():
-                context.append("Horarios e Aulas:")
-                for s in schedules:
-                    dia_nome = days_map.get(s.dia, f"Dia {s.dia}")
-                    status_ativo = " (Ativa)" if s.data_inicio <= today <= s.data_termino else " (Inativa/Outro Periodo)"
-                    context.append(f"  - {dia_nome} | Sala: {s.sala} | Bloco: {s.bloco} | Horario: {s.inicio.strftime('%H:%M')} - {s.fim.strftime('%H:%M')} | Vigencia: {s.data_inicio.strftime('%d/%m/%Y')} ate {s.data_termino.strftime('%d/%m/%Y')}{status_ativo} | Turma: {s.turma}")
-
-            total_faltas = profile.registros_falta.filter(materia=materia_ativa, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
-            max_faltas = schedules.first().maximo_faltas if schedules.exists() else 0
-            context.append(f"Faltas: {total_faltas}/{max_faltas}")
-
-            config = ConfiguracaoMateria.objects.filter(materia=materia_ativa, perfil=profile, ano_letivo=ano_letivo).first()
-            if config:
-                context.append(f"Media minima para aprovacao: {config.media_minima}")
-
-                all_evaluations = config.avaliacoes.all()
-                graded_evaluations = all_evaluations.filter(nota__isnull=False)
-                total_weights = sum(float(a.peso) for a in all_evaluations)
-                graded_weights = sum(float(a.peso) for a in graded_evaluations)
-                ungraded_weights = sum(float(a.peso) for a in all_evaluations.filter(nota__isnull=True))
-                if graded_evaluations.exists():
-                    weighted_sum = sum(float(a.nota * a.peso) for a in graded_evaluations)
-                    if graded_weights > 0:
-                        current_average = round(weighted_sum / graded_weights, 2)
-                        context.append(f"Media atual calculada (apenas das provas ja realizadas): {current_average}")
-                    if total_weights > 0:
-                        min_final_average = round(weighted_sum / total_weights, 2)
-                        max_final_average = round((weighted_sum + 10.0 * ungraded_weights) / total_weights, 2)
-                        percentage_graded = round((graded_weights / total_weights) * 100, 1)
-                        context.append(f"Progresso da avaliacao: {percentage_graded}% do peso total avaliado")
-                        context.append(f"Media final minima possivel (se tirar zero no restante): {min_final_average}")
-                        context.append(f"Media final maxima possivel (se tirar dez no restante): {max_final_average}")
-                        required_sum = float(config.media_minima) * total_weights
-                        needed_points = required_sum - weighted_sum
-                        if min_final_average >= float(config.media_minima):
-                            context.append("Situacao: Aprovado garantido! Mesmo se tirar zero nas avaliacoes restantes, a media final sera igual ou superior a media minima de aprovacao.")
-                        elif max_final_average < float(config.media_minima):
-                            context.append("Situacao: Reprovado. Matematicamente nao e mais possivel alcancar a media minima de aprovacao, mesmo gabaritando o restante.")
-                        else:
-                            context.append("Situacao: Em andamento. Ainda precisa realizar avaliacoes para atingir a media minima.")
-                            if ungraded_weights > 0:
-                                needed_average = round(needed_points / ungraded_weights, 2)
-                                context.append(f"Nota media necessaria nas avaliacoes restantes: {needed_average}")
-
-                provas = config.avaliacoes.all().order_by('data', 'ordem')
-                if provas.exists():
-                    context.append("Avaliacoes e Eventos (Provas, Trabalhos, etc.):")
-                    for p in provas:
-                        data_str = p.data.strftime('%d/%m/%Y') if p.data else "Sem data"
-                        status_nota = f"Nota: {p.nota}" if p.nota is not None else "Nota nao lancada"
-                        context.append(f"  - {p.nome} ({p.get_tipo_display()}) em {data_str} | Peso: {p.peso} | {status_nota}")
-
-                if hasattr(config, 'vinculo_classroom'):
-                    connection = config.vinculo_classroom
-                    files_list = []
-                    local_files = connection.arquivos.all()
-                    for file_obj in local_files:
-                        if not file_obj.is_ignored:
-                            files_list.append(f"    * {file_obj.custom_name or file_obj.original_name} (ID: {file_obj.drive_file_id})")
-                    if files_list:
-                        context.append("Materiais no Classroom:")
-                        context.extend(files_list)
-
-    context.append(f"\n--- OUTRAS DISCIPLINAS DISPONIVEIS PARA CONSULTA ---")
     materias = ano_letivo.materias.all()
     for m in materias:
-        if materia_id and m.id == int(materia_id):
-            continue
+        is_active = (materia_id is not None and m.id == int(materia_id))
+        label_active = " (SELECIONADA ATUALMENTE)" if is_active else ""
+        context.append(f"\n--- DISCIPLINA: {m.codigo} - {m.nome}{label_active} (ID: {m.id}) ---")
+
         schedules = ano_letivo.horarios.filter(materia=m).order_by('dia', 'inicio')
+        if schedules.exists():
+            context.append("Horarios e Aulas:")
+            for s in schedules:
+                dia_nome = days_map.get(s.dia, f"Dia {s.dia}")
+                status_ativo = " (Ativa)" if s.data_inicio <= today <= s.data_termino else " (Inativa/Outro Periodo)"
+                context.append(f"  - {dia_nome} | Sala: {s.sala} | Bloco: {s.bloco} | Horario: {s.inicio.strftime('%H:%M')} - {s.fim.strftime('%H:%M')} | Vigencia: {s.data_inicio.strftime('%d/%m/%Y')} ate {s.data_termino.strftime('%d/%m/%Y')}{status_ativo} | Turma: {s.turma}")
+
         total_faltas = profile.registros_falta.filter(materia=m, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
         max_faltas = schedules.first().maximo_faltas if schedules.exists() else 0
-        
-        horarios_str = []
-        for s in schedules:
-            dia_nome = days_map.get(s.dia, f"Dia {s.dia}")
-            status_ativo = " (Ativa)" if s.data_inicio <= today <= s.data_termino else " (Inativa)"
-            horarios_str.append(f"{dia_nome} as {s.inicio.strftime('%H:%M')} [Vigencia: {s.data_inicio.strftime('%d/%m/%Y')} ate {s.data_termino.strftime('%d/%m/%Y')}]{status_ativo}")
-        horarios_desc = ", ".join(horarios_str) if horarios_str else "Sem horarios cadastrados"
+        context.append(f"Faltas: {total_faltas}/{max_faltas}")
 
-        context.append(f" - ID: {m.id} | Codigo: {m.codigo} | Nome: {m.nome} (Faltas: {total_faltas}/{max_faltas} | Aulas: {horarios_desc})")
+        config = ConfiguracaoMateria.objects.filter(materia=m, perfil=profile, ano_letivo=ano_letivo).first()
+        if config:
+            context.append(f"Media minima para aprovacao: {config.media_minima}")
 
-    context.append("\nSe precisar de detalhes (como notas, avaliacoes especificas, arquivos) de qualquer uma das outras materias listadas acima, chame a funcao 'obter_contexto_materia' fornecendo o ID correspondente.")
-    
+            all_evaluations = config.avaliacoes.all()
+            graded_evaluations = all_evaluations.filter(nota__isnull=False)
+            total_weights = sum(float(a.peso) for a in all_evaluations)
+            graded_weights = sum(float(a.peso) for a in graded_evaluations)
+            ungraded_weights = sum(float(a.peso) for a in all_evaluations.filter(nota__isnull=True))
+            if graded_evaluations.exists():
+                weighted_sum = sum(float(a.nota * a.peso) for a in graded_evaluations)
+                if graded_weights > 0:
+                    current_average = round(weighted_sum / graded_weights, 2)
+                    context.append(f"Media atual calculada (apenas das provas ja realizadas): {current_average}")
+                if total_weights > 0:
+                    min_final_average = round(weighted_sum / total_weights, 2)
+                    max_final_average = round((weighted_sum + 10.0 * ungraded_weights) / total_weights, 2)
+                    percentage_graded = round((graded_weights / total_weights) * 100, 1)
+                    context.append(f"Progresso da avaliacao: {percentage_graded}% do peso total avaliado")
+                    context.append(f"Media final minima possivel (se tirar zero no restante): {min_final_average}")
+                    context.append(f"Media final maxima possivel (se tirar dez no restante): {max_final_average}")
+                    required_sum = float(config.media_minima) * total_weights
+                    needed_points = required_sum - weighted_sum
+                    if min_final_average >= float(config.media_minima):
+                        context.append("Situacao: Aprovado garantido! Mesmo se tirar zero nas avaliacoes restantes, a media final sera igual ou superior a media minima de aprovacao.")
+                    elif max_final_average < float(config.media_minima):
+                        context.append("Situacao: Reprovado. Matematicamente nao e mais possivel alcancar a media minima de aprovacao, mesmo gabaritando o restante.")
+                    else:
+                        context.append("Situacao: Em andamento. Ainda precisa realizar avaliacoes para atingir a media minima.")
+                        if ungraded_weights > 0:
+                            needed_average = round(needed_points / ungraded_weights, 2)
+                            context.append(f"Nota media necessaria nas avaliacoes restantes: {needed_average}")
+
+            provas = config.avaliacoes.all().order_by('data', 'ordem')
+            if provas.exists():
+                context.append("Avaliacoes e Eventos (Provas, Trabalhos, etc.):")
+                for p in provas:
+                    data_str = p.data.strftime('%d/%m/%Y') if p.data else "Sem data"
+                    status_nota = f"Nota: {p.nota}" if p.nota is not None else "Nota nao lancada"
+                    context.append(f"  - {p.nome} ({p.get_tipo_display()}) em {data_str} | Peso: {p.peso} | {status_nota}")
+
+            if hasattr(config, 'vinculo_classroom'):
+                connection = config.vinculo_classroom
+                files_list = []
+                local_files = connection.arquivos.all()
+                for file_obj in local_files:
+                    if not file_obj.is_ignored:
+                        files_list.append(f"    * {file_obj.custom_name or file_obj.original_name} (ID: {file_obj.drive_file_id})")
+                if files_list:
+                    context.append("Materiais no Classroom:")
+                    context.extend(files_list)
     return "\n".join(context)
 
 
@@ -200,20 +180,6 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
     tools = [
         {
             "functionDeclarations": [
-                {
-                    "name": "obter_contexto_materia",
-                    "description": "Obtem o contexto academico detalhado (notas, faltas, avaliacoes, eventos e arquivos do Classroom) de uma disciplina especifica. Use esta ferramenta se precisar responder a perguntas sobre outra materia que nao seja a materia ativa atual, ou se o usuario perguntar sobre uma materia cujo contexto detalhado ainda nao foi fornecido.",
-                    "parameters": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "materia_id": {
-                                "type": "INTEGER",
-                                "description": "O ID unico da materia no banco de dados."
-                            }
-                        },
-                        "required": ["materia_id"]
-                    }
-                },
                 {
                     "name": "obter_conteudo_arquivo",
                     "description": "Obtem o conteudo em texto ou informacoes internas de um arquivo especifico do Classroom ou local associado a disciplina. Use esta ferramenta sempre que o usuario fizer perguntas sobre o conteudo, regras, requisitos ou detalhes de um arquivo/documento especifico (como trab2.pdf ou outros arquivos) listado nos materiais da disciplina.",
@@ -326,11 +292,7 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
                 function_name = function_call.get("name")
                 args = function_call.get("args", {})
                 result_context = ""
-                if function_name == "obter_contexto_materia":
-                    materia_id = args.get("materia_id")
-                    if materia_id:
-                        result_context = obter_contexto_academico(profile, int(materia_id), google_token)
-                elif function_name == "obter_conteudo_arquivo":
+                if function_name == "obter_conteudo_arquivo":
                     drive_file_id = args.get("drive_file_id")
                     if drive_file_id:
                         result_context = obter_conteudo_arquivo_servidor(profile, drive_file_id, google_token)
@@ -546,7 +508,8 @@ class ChatIAView(APIView):
         system_instruction = (
             "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
             "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n"
-            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n\n"
+            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n"
+            "Voce ja tem acesso aos dados de todas as disciplinas ativas no contexto fornecido (incluindo faltas, notas, avaliacoes/eventos e arquivos). Nao ha necessidade de chamar nenhuma ferramenta para obter contexto de disciplina.\n\n"
             f"Contexto academico atual do usuario:\n{context_prompt}"
         )
 
@@ -776,7 +739,8 @@ class EnviarMensagemConversaView(APIView):
         system_instruction = (
             "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
             "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n"
-            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n\n"
+            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n"
+            "Voce ja tem acesso aos dados de todas as disciplinas ativas no contexto fornecido (incluindo faltas, notas, avaliacoes/eventos e arquivos). Nao ha necessidade de chamar nenhuma ferramenta para obter contexto de disciplina.\n\n"
             f"Contexto academico atual do usuario:\n{context_prompt}"
         )
 
