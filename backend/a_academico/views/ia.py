@@ -387,9 +387,9 @@ class ConfiguracaoIAView(APIView):
         model_name = request.data.get('model_name')
 
         if api_key:
-            is_valid = self.validar_chave_gemini(api_key, model_name or "gemini-3.5-flash")
+            is_valid, error_msg = self.validar_chave_gemini(api_key, model_name or "gemini-3.5-flash")
             if not is_valid:
-                return Response({'erro': 'Chave de API do Gemini invalida.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'erro': error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             encrypted_api_key = ServicoCriptografia.criptografar_dado(api_key)
             chave_obj, _ = ChaveApiGemini.objects.update_or_create(
@@ -415,7 +415,7 @@ class ConfiguracaoIAView(APIView):
             profile.chave_gemini.delete()
         return Response({'sucesso': True})
 
-    def validar_chave_gemini(self, api_key: str, model_name: str) -> bool:
+    def validar_chave_gemini(self, api_key: str, model_name: str) -> tuple[bool, str]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         payload = {
             "contents": [
@@ -432,13 +432,15 @@ class ConfiguracaoIAView(APIView):
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             if response.status_code != 200:
-                print(f"DEBUG VALIDADOR GEMINI - Falha na API do Google. Status Code: {response.status_code}")
-                print(f"DEBUG VALIDADOR GEMINI - Resposta: {response.text}")
-            return response.status_code == 200
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", {}).get("message", response.text)
+                except Exception:
+                    error_msg = response.text
+                return False, f"Erro na API do Google (Status {response.status_code}): {error_msg}"
+            return True, ""
         except Exception as e:
-            print(f"DEBUG VALIDADOR GEMINI - Erro de conexao: {str(e)}")
-            traceback.print_exc()
-            return False
+            return False, f"Erro de conexao com a API do Gemini: {str(e)}"
 
 
 class ChatIAView(APIView):

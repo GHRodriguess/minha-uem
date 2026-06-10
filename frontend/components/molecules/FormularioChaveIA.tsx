@@ -25,7 +25,8 @@ export default function FormularioChaveIA({
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="password"
-            placeholder="Cole sua API Key aqui (começa com AIzaSy...)"
+            placeholder="Indisponível por enquanto..."
+            disabled
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             required
@@ -52,7 +53,7 @@ export default function FormularioChaveIA({
       </div>
       <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
         <p className="text-[10px] text-muted-foreground leading-relaxed font-semibold">
-          Como obter uma chave de API: Acesse o <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">Google AI Studio</a> com sua conta UEM, clique em &quot;Get API key&quot;, crie uma nova chave e cole-a acima. O uso dentro dos limites padrão é totalmente gratuito.
+          Como obter uma chave de API: Acesse o <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">Google AI Studio </a> com sua conta UEM, clique em &quot;Get API key&quot;, crie uma nova chave e cole-a acima. O uso dentro dos limites padrão é totalmente gratuito.
         </p>
       </div>
     </form>
