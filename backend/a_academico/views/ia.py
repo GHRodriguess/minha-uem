@@ -217,13 +217,12 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
         }
         return requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
 
-    try:
-        response = realizar_requisicao(contents)
-        if response.status_code != 200:
-            raise Exception(f"Erro na API do Gemini: {response.text}")
+    def gerar_stream():
+        try:
+            response = realizar_requisicao(contents)
+            if response.status_code != 200:
+                raise Exception(f"Erro na API do Gemini: {response.text}")
 
-        def gerar_stream():
-            nonlocal response
             prompt_tokens = 0
             candidate_tokens = 0
             total_tokens = 0
@@ -347,9 +346,14 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
                 except Exception:
                     pass
 
-        return gerar_stream()
-    except Exception as e:
-        raise e
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower() or "limit" in error_msg.lower() or "resource_exhausted" in error_msg.lower():
+                yield "Desculpe, o limite de requisicoes (quota) da API do Gemini foi atingido. Por favor, aguarde alguns instantes e tente novamente."
+            else:
+                yield f"Desculpe, ocorreu um erro ao processar a resposta da IA. Detalhes: {error_msg}"
+
+    return gerar_stream()
 
 
 class ConfiguracaoIAView(APIView):
