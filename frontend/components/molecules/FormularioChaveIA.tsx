@@ -25,8 +25,7 @@ export default function FormularioChaveIA({
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="password"
-            placeholder="Indisponível por enquanto..."
-            disabled
+            placeholder="Cole sua API Key aqui..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             required
