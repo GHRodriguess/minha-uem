@@ -34,7 +34,10 @@ from .views import (
     ListarCriarNoticiaView,
     DetalheNoticiaView,
     ConfiguracaoIAView,
-    ChatIAView
+    ChatIAView,
+    ConversasIAView,
+    ConversaIADetalheView,
+    EnviarMensagemConversaView
 )
 
 urlpatterns = [
@@ -75,6 +78,9 @@ urlpatterns = [
     path('noticias/<int:pk>/', DetalheNoticiaView.as_view(), name='detalhe_noticia'),
     path('ia/config/', ConfiguracaoIAView.as_view(), name='ia_config'),
     path('ia/chat/', ChatIAView.as_view(), name='ia_chat'),
+    path('ia/conversas/', ConversasIAView.as_view(), name='ia_conversas'),
+    path('ia/conversas/<int:pk>/', ConversaIADetalheView.as_view(), name='ia_conversa_detalhe'),
+    path('ia/conversas/<int:pk>/enviar/', EnviarMensagemConversaView.as_view(), name='ia_conversa_enviar'),
 ]
 
 

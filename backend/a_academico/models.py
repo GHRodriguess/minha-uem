@@ -249,6 +249,27 @@ class HistoricoUsoIA(models.Model):
         return f"Uso de {self.model_name} por {self.profile.user.username} em {self.created_at.strftime('%d/%m/%Y %H:%M')}"
 
 
+class ConversaIA(models.Model):
+    profile = models.ForeignKey(PerfilAcademico, on_delete=models.CASCADE, related_name='conversas_ia')
+    materia = models.ForeignKey(Materia, on_delete=models.SET_NULL, null=True, blank=True, related_name='conversas_ia')
+    title = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} - {self.profile.user.username}"
+
+
+class MensagemConversaIA(models.Model):
+    conversa = models.ForeignKey(ConversaIA, on_delete=models.CASCADE, related_name='messages')
+    role = models.CharField(max_length=10, choices=[('conversa', 'Conversa'), ('user', 'User'), ('model', 'Model')])
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.role}: {self.text[:30]}..."
+
+
 
 
 

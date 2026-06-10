@@ -10,7 +10,14 @@ import { obterMensagemErroIA } from '@/lib/utils/formatadorErroIA'
 
 export interface Mensagem { text: string; isUser: boolean }
 
-export function useChatIA(isOpen: boolean, fileUrls?: Record<string, string>) {
+const emptyCallback = () => {}
+
+export function useChatIA(
+  isOpen: boolean,
+  fileUrls?: Record<string, string>,
+  conversaAtiva?: any,
+  criarNovaConversa?: (msg?: string) => Promise<any>
+) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -20,56 +27,48 @@ export function useChatIA(isOpen: boolean, fileUrls?: Record<string, string>) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [hasKey, setHasKey] = useState(false)
-  const [modelName, setModelName] = useState('gemini-3.5-flash')
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const carregadaIdRef = useRef<number | null>(null)
 
   const materiaId = pathname?.includes('/disciplinas/') ? Number(pathname.split('/disciplinas/')[1]?.split('/')[0]) : undefined
   const arquivoAbertoIds = [searchParams.get('fileId'), searchParams.get('rightFileId')].filter(Boolean) as string[]
 
-  useCarregarDadosIA(session, isOpen, materiaId, anoAtivoId, filesCache, obterArquivos, setHasKey, setModelName)
+  useCarregarDadosIA(session, isOpen, materiaId, anoAtivoId, filesCache, obterArquivos, setHasKey, emptyCallback)
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (session?.accessToken && conversaAtiva?.id) {
+      if (conversaAtiva.id === carregadaIdRef.current) return
+      carregadaIdRef.current = conversaAtiva.id
+      if (sending) return
+      ia_service.obterMensagensConversa(conversaAtiva.id, session.accessToken)
+        .then(res => setMessages(res.messages.map(m => ({ text: m.text, isUser: m.role === 'user' }))))
+        .catch(console.error)
+    } else { setMessages([]); carregadaIdRef.current = null }
+  }, [conversaAtiva, session?.accessToken, sending])
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const alternarArquivo = (id: string) => setSelectedFileIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
-
-  const alterarModelo = (modelo: string) => {
-    if (session?.accessToken) {
-      ia_service.salvarConfig(session.accessToken, undefined, modelo)
-        .then(() => setModelName(modelo))
-        .catch(console.error)
-    }
-  }
 
   const enviarMensagem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !session?.accessToken || sending) return
-
     const userMsg = input
     setInput('')
     setMessages(prev => [...prev, { text: userMsg, isUser: true }, { text: '', isUser: false }])
     setSending(true)
-
     try {
+      let activeConversa = conversaAtiva
+      if (!activeConversa && criarNovaConversa) activeConversa = await criarNovaConversa(userMsg)
+      if (!activeConversa) throw new Error('Não foi possível criar uma nova conversa.')
       const activeFileIds = Array.from(new Set([...arquivoAbertoIds, ...selectedFileIds]))
       const localFilesData = await obterArquivosBase64(
-        activeFileIds,
-        fileUrls,
-        arquivosMateria,
-        directoryHandle,
-        hasFolderPermission,
-        session.googleAccessToken || null
+        activeFileIds, fileUrls, arquivosMateria, directoryHandle, hasFolderPermission, session.googleAccessToken || null
       )
-
-      await ia_service.enviarMensagem(
-        session.accessToken,
-        session.googleAccessToken || null,
-        userMsg,
-        materiaId,
-        arquivoAbertoIds.join(',') || undefined,
-        selectedFileIds,
+      await ia_service.enviarMensagemConversa(
+        session.accessToken, session.googleAccessToken || null, activeConversa.id, userMsg,
+        arquivoAbertoIds.join(',') || undefined, selectedFileIds,
         (chunk) => {
           setMessages(prev => {
             const list = [...prev]
@@ -82,10 +81,7 @@ export function useChatIA(isOpen: boolean, fileUrls?: Record<string, string>) {
         localFilesData
       )
     } catch (err: any) {
-      setMessages(prev => {
-        const list = prev.slice(0, -1)
-        return [...list, { text: obterMensagemErroIA(err), isUser: false }]
-      })
+      setMessages(prev => [...prev.slice(0, -1), { text: obterMensagemErroIA(err), isUser: false }])
     } finally {
       setSending(false)
     }
@@ -95,7 +91,7 @@ export function useChatIA(isOpen: boolean, fileUrls?: Record<string, string>) {
   const arquivosAbertos = arquivosMateria.filter(f => arquivoAbertoIds.includes(f.drive_file_id))
 
   return {
-    messages, input, setInput, sending, hasKey, modelName, alterarModelo,
+    messages, input, setInput, sending, hasKey,
     selectedFileIds, chatEndRef, materiaId, arquivosMateria,
     arquivosAbertos, alternarArquivo, enviarMensagem
   }

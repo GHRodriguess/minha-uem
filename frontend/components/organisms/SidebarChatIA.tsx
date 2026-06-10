@@ -1,43 +1,79 @@
 'use client'
 
-import { X, Send, Loader2, Sparkles, Brain, FileText } from 'lucide-react'
+import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { X, Send, Loader2, Sparkles, Brain, FileText, History, ArrowLeft } from 'lucide-react'
 import { useChatIA } from '@/lib/hooks/useChatIA'
+import { useConversasIA } from '@/lib/hooks/useConversasIA'
 import BalaoMensagemIA from '../atoms/BalaoMensagemIA'
 import SeletorArquivosIA from '../molecules/SeletorArquivosIA'
 import FeedbackIADesativada from '../molecules/FeedbackIADesativada'
 import SeletorModeloChatIA from '../molecules/SeletorModeloChatIA'
+import ListaConversasIA from '../molecules/ListaConversasIA'
 import { Button } from '@/components/ui/button'
 
-interface SidebarChatIAProps { isOpen: boolean; onClose: () => void; layoutMode?: 'fixed' | 'integrated'; fileUrls?: Record<string, string> }
+interface SidebarChatProps { isOpen: boolean; onClose: () => void; layoutMode?: 'fixed' | 'integrated'; fileUrls?: Record<string, string> }
 
-export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', fileUrls }: SidebarChatIAProps) {
+export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', fileUrls }: SidebarChatProps) {
+  const path = usePathname()
+  const materiaId = path?.includes('/disciplinas/') ? Number(path.split('/disciplinas/')[1]?.split('/')[0]) : undefined
+  const [isHistoryView, setIsHistoryView] = useState(false)
+
   const {
-    messages, input, setInput, sending, hasKey, modelName, alterarModelo,
-    selectedFileIds, chatEndRef, materiaId, arquivosMateria,
-    arquivosAbertos, alternarArquivo, enviarMensagem
-  } = useChatIA(isOpen, fileUrls)
+    conversas, conversaAtiva, setConversaAtiva, criarNovaConversa,
+    excluirConversa, modelName, alterarModelo, loading
+  } = useConversasIA(isOpen, materiaId)
+
+  const {
+    messages, input, setInput, sending, hasKey, selectedFileIds,
+    chatEndRef, arquivosMateria, arquivosAbertos, alternarArquivo, enviarMensagem
+  } = useChatIA(isOpen, fileUrls, conversaAtiva, criarNovaConversa)
 
   if (!isOpen) return null
-  const containerClass = layoutMode === 'integrated'
-    ? "relative h-full w-105 bg-card border-l border-border flex flex-col shrink-0 animate-in slide-in-from-right duration-300"
-    : "fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 backdrop-blur-xl border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+  const containerClass = `${layoutMode === 'integrated' ? 'relative h-full w-105 bg-card shrink-0' : 'fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl'} border-l border-border flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300`
 
   return (
     <div className={containerClass}>
       <div className="p-4 border-b border-border flex items-center justify-between bg-muted/10">
         <div className="flex items-center gap-2">
+          {isHistoryView ? (
+            <button onClick={() => setIsHistoryView(false)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+              <ArrowLeft className="w-4 h-4 text-foreground" />
+            </button>
+          ) : (
+            <button onClick={() => setIsHistoryView(true)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+              <History className="w-4 h-4 text-foreground" />
+            </button>
+          )}
           <Brain className="w-5 h-5 text-primary" />
-          <span className="font-bold text-foreground">Assistente Minha UEM</span>
+          <span className="font-bold text-foreground truncate max-w-37.5">
+            {isHistoryView ? 'Histórico de Chats' : (conversaAtiva?.title || 'Assistente Minha UEM')}
+          </span>
         </div>
         <button onClick={onClose} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
           <X className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
 
-      {hasKey && <SeletorModeloChatIA modelName={modelName} onChangeModel={alterarModelo} />}
+      {hasKey && !isHistoryView && <SeletorModeloChatIA modelName={modelName} onChangeModel={alterarModelo} />}
 
       {!hasKey ? (
         <FeedbackIADesativada />
+      ) : isHistoryView ? (
+        <ListaConversasIA
+          conversas={conversas}
+          conversaAtiva={conversaAtiva}
+          onSelecionar={(c) => {
+            setConversaAtiva(c)
+            setIsHistoryView(false)
+          }}
+          onExcluir={excluirConversa}
+          onCriar={async () => {
+            const nova = await criarNovaConversa()
+            if (nova) setIsHistoryView(false)
+          }}
+          loading={loading}
+        />
       ) : (
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/5">
@@ -71,11 +107,9 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
                 ))}
               </div>
             )}
-
             {materiaId && (
               <SeletorArquivosIA files={arquivosMateria} selectedIds={selectedFileIds} onToggle={alternarArquivo} />
             )}
-
             <form onSubmit={enviarMensagem} className="flex gap-2">
               <input
                 type="text"

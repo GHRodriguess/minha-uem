@@ -609,100 +609,7 @@ class ArquivosMateriaClassroomView(APIView):
             return Response({'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def _obter_arquivos_classroom_em_tempo_real(self, connection, token):
-        headers = {'Authorization': f'Bearer {token}'}
-        course_id = connection.classroom_course_id
-
-        materials_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials', headers=headers)
-        work_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork', headers=headers)
-        announcements_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements', headers=headers)
-
-        if materials_res.status_code == 401 or work_res.status_code == 401 or announcements_res.status_code == 401:
-            raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
-
-        drive_files = []
-
-        if materials_res.status_code == 200:
-            materials_data = materials_res.json().get('courseWorkMaterial', [])
-            for material in materials_data:
-                for item in material.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-
-        if work_res.status_code == 200:
-            work_data = work_res.json().get('courseWork', [])
-            for work in work_data:
-                for item in work.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-
-        if announcements_res.status_code == 200:
-            announcements_data = announcements_res.json().get('announcements', [])
-            for announcement in announcements_data:
-                for item in announcement.get('materials', []):
-                    if 'driveFile' in item:
-                        drive_files.append(item['driveFile']['driveFile'])
-                    elif 'link' in item:
-                        url = item['link'].get('url', '')
-                        title = item['link'].get('title', 'Arquivo do Drive')
-                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
-                        if not match:
-                            match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
-                        
-                        if match:
-                            drive_id = match.group(1)
-                            drive_files.append({
-                                'id': drive_id,
-                                'title': title
-                            })
-
-        import os
-        arquivos_locais = {arq.drive_file_id: arq for arq in connection.arquivos.all()}
-
-        resultado = []
-        for file_info in drive_files:
-            file_id = file_info.get('id')
-            title = file_info.get('title')
-            if not file_id or not title:
-                continue
-
-            if file_id in arquivos_locais:
-                arq = arquivos_locais[file_id]
-                resultado.append({
-                    'id': arq.id,
-                    'drive_file_id': arq.drive_file_id,
-                    'original_name': arq.original_name,
-                    'custom_name': arq.custom_name,
-                    'selected_folder': arq.selected_folder,
-                    'local_path': arq.local_path,
-                    'is_ignored': arq.is_ignored,
-                    'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
-                })
-            else:
-                resultado.append({
-                    'id': None,
-                    'drive_file_id': file_id,
-                    'original_name': title,
-                    'custom_name': None,
-                    'selected_folder': 'documentos',
-                    'local_path': None,
-                    'is_ignored': title.startswith('.'),
-                    'sync_at': None
-                })
-
-        for local_id, arq in arquivos_locais.items():
-            if local_id.startswith('local_'):
-                resultado.append({
-                    'id': arq.id,
-                    'drive_file_id': arq.drive_file_id,
-                    'original_name': arq.original_name,
-                    'custom_name': arq.custom_name,
-                    'selected_folder': arq.selected_folder,
-                    'local_path': arq.local_path,
-                    'is_ignored': arq.is_ignored,
-                    'sync_at': arq.sync_at.isoformat() if arq.sync_at else None
-                })
-
-        return resultado
+        return obter_arquivos_classroom_em_tempo_real(connection, token)
 
 
 class AtualizarCategoriasVinculoView(APIView):
@@ -2000,6 +1907,425 @@ class ConfiguracaoIAView(APIView):
             return False
 
 
+def obter_arquivos_classroom_em_tempo_real(connection, token):
+    headers = {'Authorization': f'Bearer {token}'}
+    course_id = connection.classroom_course_id
+
+    materials_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWorkMaterials', headers=headers)
+    work_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/courseWork', headers=headers)
+    announcements_res = requests.get(f'https://classroom.googleapis.com/v1/courses/{course_id}/announcements', headers=headers)
+
+    if materials_res.status_code == 401 or work_res.status_code == 401 or announcements_res.status_code == 401:
+        raise PermissionError("GOOGLE_TOKEN_EXPIRADO")
+
+    drive_files = []
+
+    if materials_res.status_code == 200:
+        materials_data = materials_res.json().get('courseWorkMaterial', [])
+        for material in materials_data:
+            for item in material.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+
+    if work_res.status_code == 200:
+        work_data = work_res.json().get('courseWork', [])
+        for work in work_data:
+            for item in work.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+
+    if announcements_res.status_code == 200:
+        announcements_data = announcements_res.json().get('announcements', [])
+        for announcement in announcements_data:
+            for item in announcement.get('materials', []):
+                if 'driveFile' in item:
+                    drive_files.append(item['driveFile']['driveFile'])
+                elif 'link' in item:
+                    url = item['link'].get('url', '')
+                    title = item['link'].get('title', 'Arquivo do Drive')
+                    match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
+                    if not match:
+                        match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+                    
+                    if match:
+                        drive_id = match.group(1)
+                        drive_files.append({
+                            'id': drive_id,
+                            'title': title
+                        })
+
+    local_files = {file_obj.drive_file_id: file_obj for file_obj in connection.arquivos.all()}
+
+    result_list = []
+    for file_info in drive_files:
+        file_id = file_info.get('id')
+        title = file_info.get('title')
+        if not file_id or not title:
+            continue
+
+        if file_id in local_files:
+            file_obj = local_files[file_id]
+            result_list.append({
+                'id': file_obj.id,
+                'drive_file_id': file_obj.drive_file_id,
+                'original_name': file_obj.original_name,
+                'custom_name': file_obj.custom_name,
+                'selected_folder': file_obj.selected_folder,
+                'local_path': file_obj.local_path,
+                'is_ignored': file_obj.is_ignored,
+                'sync_at': file_obj.sync_at.isoformat() if file_obj.sync_at else None
+            })
+        else:
+            result_list.append({
+                'id': None,
+                'drive_file_id': file_id,
+                'original_name': title,
+                'custom_name': None,
+                'selected_folder': 'documentos',
+                'local_path': None,
+                'is_ignored': title.startswith('.'),
+                'sync_at': None
+            })
+
+    for local_id, file_obj in local_files.items():
+        if local_id.startswith('local_'):
+            result_list.append({
+                'id': file_obj.id,
+                'drive_file_id': file_obj.drive_file_id,
+                'original_name': file_obj.original_name,
+                'custom_name': file_obj.custom_name,
+                'selected_folder': file_obj.selected_folder,
+                'local_path': file_obj.local_path,
+                'is_ignored': file_obj.is_ignored,
+                'sync_at': file_obj.sync_at.isoformat() if file_obj.sync_at else None
+            })
+
+    return result_list
+
+
+def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str:
+    from django.utils import timezone
+    from django.db.models import Sum
+    from .models import Avaliacao, ConfiguracaoMateria
+
+    try:
+        now = timezone.localtime(timezone.now())
+    except Exception:
+        now = timezone.now()
+
+    today = now.date()
+    weekday_map = {0: "Segunda-feira", 1: "Terca-feira", 2: "Quarta-feira", 3: "Quinta-feira", 4: "Sexta-feira", 5: "Sabado", 6: "Domingo"}
+    current_date_str = f"Hoje e {weekday_map[today.weekday()]}, {today.strftime('%d/%m/%Y')} as {now.strftime('%H:%M')}."
+
+    context = [current_date_str]
+
+    ano_letivo = profile.anos.order_by('-ano').first()
+    if not ano_letivo:
+        return "\n".join(context)
+
+    days_map = {
+        1: "Segunda-feira",
+        2: "Terca-feira",
+        3: "Quarta-feira",
+        4: "Quinta-feira",
+        5: "Sexta-feira",
+        6: "Sabado",
+        7: "Domingo"
+    }
+
+    if materia_id:
+        materia_ativa = ano_letivo.materias.filter(id=materia_id).first()
+        if materia_ativa:
+            context.append(f"\n--- CONTEXTO DETALHADO DA DISCIPLINA ATIVA: {materia_ativa.codigo} - {materia_ativa.nome} ---")
+            
+            schedules = ano_letivo.horarios.filter(materia=materia_ativa).order_by('dia', 'inicio')
+            if schedules.exists():
+                context.append("Horarios e Aulas:")
+                for s in schedules:
+                    dia_nome = days_map.get(s.dia, f"Dia {s.dia}")
+                    status_ativo = " (Ativa)" if s.data_inicio <= today <= s.data_termino else " (Inativa/Outro Periodo)"
+                    context.append(f"  - {dia_nome} | Sala: {s.sala} | Bloco: {s.bloco} | Horario: {s.inicio.strftime('%H:%M')} - {s.fim.strftime('%H:%M')} | Vigencia: {s.data_inicio.strftime('%d/%m/%Y')} ate {s.data_termino.strftime('%d/%m/%Y')}{status_ativo} | Turma: {s.turma}")
+
+            total_faltas = profile.registros_falta.filter(materia=materia_ativa, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
+            max_faltas = schedules.first().maximo_faltas if schedules.exists() else 0
+            context.append(f"Faltas: {total_faltas}/{max_faltas}")
+
+            config = ConfiguracaoMateria.objects.filter(materia=materia_ativa, perfil=profile, ano_letivo=ano_letivo).first()
+            if config:
+                context.append(f"Media minima para aprovacao: {config.media_minima}")
+
+                avaliacoes = config.avaliacoes.all()
+                avaliacoes_com_nota = avaliacoes.filter(nota__isnull=False)
+                if avaliacoes_com_nota.exists():
+                    soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
+                    soma_pesos = sum(a.peso for a in avaliacoes)
+                    if soma_pesos > 0:
+                        media_atual = round(float(soma_ponderada / soma_pesos), 2)
+                        context.append(f"Media atual calculada: {media_atual}")
+
+                provas = config.avaliacoes.all().order_by('data', 'ordem')
+                if provas.exists():
+                    context.append("Avaliacoes e Eventos (Provas, Trabalhos, etc.):")
+                    for p in provas:
+                        data_str = p.data.strftime('%d/%m/%Y') if p.data else "Sem data"
+                        status_nota = f"Nota: {p.nota}" if p.nota is not None else "Nota nao lancada"
+                        context.append(f"  - {p.nome} ({p.get_tipo_display()}) em {data_str} | Peso: {p.peso} | {status_nota}")
+
+                if hasattr(config, 'vinculo_classroom'):
+                    connection = config.vinculo_classroom
+                    files_list = []
+                    if google_token:
+                        try:
+                            merged_files = obter_arquivos_classroom_em_tempo_real(connection, google_token)
+                            for file_info in merged_files:
+                                if not file_info.get('is_ignored'):
+                                    file_name = file_info.get('custom_name') or file_info.get('original_name')
+                                    file_id = file_info.get('drive_file_id')
+                                    files_list.append(f"    * {file_name} (ID: {file_id})")
+                        except Exception:
+                            pass
+                    if not files_list:
+                        local_files = connection.arquivos.all()
+                        for file_obj in local_files:
+                            if not file_obj.is_ignored:
+                                files_list.append(f"    * {file_obj.custom_name or file_obj.original_name} (ID: {file_obj.drive_file_id})")
+                    if files_list:
+                        context.append("Materiais no Classroom:")
+                        context.extend(files_list)
+
+    context.append(f"\n--- OUTRAS DISCIPLINAS DISPONIVEIS PARA CONSULTA ---")
+    materias = ano_letivo.materias.all()
+    for m in materias:
+        if materia_id and m.id == int(materia_id):
+            continue
+        schedules = ano_letivo.horarios.filter(materia=m).order_by('dia', 'inicio')
+        total_faltas = profile.registros_falta.filter(materia=m, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
+        max_faltas = schedules.first().maximo_faltas if schedules.exists() else 0
+        
+        horarios_str = []
+        for s in schedules:
+            dia_nome = days_map.get(s.dia, f"Dia {s.dia}")
+            status_ativo = " (Ativa)" if s.data_inicio <= today <= s.data_termino else " (Inativa)"
+            horarios_str.append(f"{dia_nome} as {s.inicio.strftime('%H:%M')} [Vigencia: {s.data_inicio.strftime('%d/%m/%Y')} ate {s.data_termino.strftime('%d/%m/%Y')}]{status_ativo}")
+        horarios_desc = ", ".join(horarios_str) if horarios_str else "Sem horarios cadastrados"
+
+        context.append(f" - ID: {m.id} | Codigo: {m.codigo} | Nome: {m.nome} (Faltas: {total_faltas}/{max_faltas} | Aulas: {horarios_desc})")
+
+    context.append("\nSe precisar de detalhes (como notas, avaliacoes especificas, arquivos) de qualquer uma das outras materias listadas acima, chame a funcao 'obter_contexto_materia' fornecendo o ID correspondente.")
+    
+    return "\n".join(context)
+
+
+def executar_stream_gemini(model_name, api_key, contents, system_instruction, profile, on_completion=None, google_token=None):
+    import requests
+    import json
+
+    tools = [
+        {
+            "functionDeclarations": [
+                {
+                    "name": "obter_contexto_materia",
+                    "description": "Obtem o contexto academico detalhado (notas, faltas, avaliacoes, eventos e arquivos do Classroom) de uma disciplina especifica. Use esta ferramenta se precisar responder a perguntas sobre outra materia que nao seja a materia ativa atual, ou se o usuario perguntar sobre uma materia cujo contexto detalhado ainda nao foi fornecido.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "materia_id": {
+                                "type": "INTEGER",
+                                "description": "O ID unico da materia no banco de dados."
+                            }
+                        },
+                        "required": ["materia_id"]
+                    }
+                }
+            ]
+        }
+    ]
+
+    def realizar_requisicao(historico):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}"
+        payload = {
+            "contents": historico,
+            "systemInstruction": {
+                "parts": [
+                    {"text": system_instruction}
+                ]
+            },
+            "tools": tools
+        }
+        headers = {
+            "Content-Type": "application/json"
+        }
+        return requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
+
+    try:
+        response = realizar_requisicao(contents)
+        if response.status_code != 200:
+            raise Exception(f"Erro na API do Gemini: {response.text}")
+
+        def gerar_stream():
+            nonlocal response
+            buffer = ""
+            bracket_count = 0
+            start_idx = -1
+            in_string = False
+            escape = False
+            prompt_tokens = 0
+            candidate_tokens = 0
+            total_tokens = 0
+            i = 0
+            resposta_completa = ""
+            chamada_funcao = None
+            assinatura_pensamento = None
+
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:
+                    buffer += chunk.decode('utf-8', errors='ignore')
+                while i < len(buffer):
+                    char = buffer[i]
+                    if escape:
+                        escape = False
+                    elif char == '\\':
+                        escape = True
+                    elif char == '"':
+                        in_string = not in_string
+                    elif not in_string:
+                        if char == '{':
+                            if bracket_count == 0:
+                                start_idx = i
+                            bracket_count += 1
+                        elif char == '}':
+                            bracket_count -= 1
+                            if bracket_count == 0 and start_idx != -1:
+                                obj_str = buffer[start_idx:i+1]
+                                try:
+                                    obj = json.loads(obj_str)
+                                    parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
+                                    fc = parts[0].get('functionCall')
+                                    if fc:
+                                        chamada_funcao = fc
+                                        assinatura_pensamento = parts[0].get('thought_signature') or parts[0].get('thoughtSignature')
+                                        break
+                                    text = parts[0].get('text', '')
+                                    if text:
+                                        resposta_completa += text
+                                        yield text
+                                except Exception:
+                                    pass
+                                buffer = buffer[i+1:]
+                                i = -1
+                                start_idx = -1
+                                in_string = False
+                                escape = False
+                    i += 1
+                if chamada_funcao:
+                    break
+
+            if chamada_funcao:
+                func_name = chamada_funcao.get("name")
+                args = chamada_funcao.get("args", {})
+                materia_id = args.get("materia_id")
+                result_context = ""
+                if func_name == "obter_contexto_materia" and materia_id:
+                    result_context = obter_contexto_academico(profile, int(materia_id), google_token)
+                    print(result_context)
+                model_part = {
+                    "functionCall": chamada_funcao
+                }
+                if assinatura_pensamento:
+                    model_part["thought_signature"] = assinatura_pensamento
+
+                contents.append({
+                    "role": "model",
+                    "parts": [
+                        model_part
+                    ]
+                })
+                contents.append({
+                    "role": "function",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": func_name,
+                                "response": {
+                                    "result": result_context
+                                }
+                            }
+                        }
+                    ]
+                })
+                response2 = realizar_requisicao(contents)
+                if response2.status_code != 200:
+                    raise Exception(f"Erro na API do Gemini apos chamada de funcao: {response2.text}")
+                buffer2 = ""
+                bracket_count2 = 0
+                start_idx2 = -1
+                in_string2 = False
+                escape2 = False
+                i2 = 0
+                for chunk in response2.iter_content(chunk_size=1024):
+                    if chunk:
+                        buffer2 += chunk.decode('utf-8', errors='ignore')
+                    while i2 < len(buffer2):
+                        char = buffer2[i2]
+                        if escape2:
+                            escape2 = False
+                        elif char == '\\':
+                            escape2 = True
+                        elif char == '"':
+                            in_string2 = not in_string2
+                        elif not in_string2:
+                            if char == '{':
+                                if bracket_count2 == 0:
+                                    start_idx2 = i2
+                                bracket_count2 += 1
+                            elif char == '}':
+                                bracket_count2 -= 1
+                                if bracket_count2 == 0 and start_idx2 != -1:
+                                    obj_str = buffer2[start_idx2:i2+1]
+                                    try:
+                                        obj = json.loads(obj_str)
+                                        usage = obj.get('usageMetadata', {})
+                                        if usage:
+                                            prompt_tokens = usage.get('promptTokenCount', prompt_tokens)
+                                            candidate_tokens = usage.get('candidatesTokenCount', candidate_tokens)
+                                            total_tokens = usage.get('totalTokenCount', total_tokens)
+                                        parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
+                                        text = parts[0].get('text', '')
+                                        if text:
+                                            resposta_completa += text
+                                            yield text
+                                    except Exception:
+                                        pass
+                                    buffer2 = buffer2[i2+1:]
+                                    i2 = -1
+                                    start_idx2 = -1
+                                    in_string2 = False
+                                    escape2 = False
+                        i2 += 1
+
+            try:
+                from .models import HistoricoUsoIA
+                HistoricoUsoIA.objects.create(
+                    profile=profile,
+                    model_name=model_name,
+                    prompt_tokens=prompt_tokens,
+                    candidate_tokens=candidate_tokens,
+                    total_tokens=total_tokens
+                )
+            except Exception:
+                pass
+
+            if on_completion:
+                try:
+                    on_completion(resposta_completa)
+                except Exception:
+                    pass
+
+        return gerar_stream()
+    except Exception as e:
+        raise e
+
+
 class ChatIAView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -2017,15 +2343,13 @@ class ChatIAView(APIView):
         selected_file_ids = request.data.get('arquivos_selecionados_ids', [])
         local_files = request.data.get('arquivos_locais', [])
 
+        google_token = request.headers.get('X-Google-Access-Token')
         encrypted_api_key = profile.chave_gemini.encrypted_api_key
         api_key = ServicoCriptografia.descriptografar_dado(encrypted_api_key)
         model_name = profile.chave_gemini.model_name
 
-        context_prompt = self.construir_contexto(profile, materia_id)
-
-        contents = []
-
-        google_token = request.headers.get('X-Google-Access-Token')
+        context_prompt = obter_contexto_academico(profile, materia_id, google_token)
+        print(context_prompt)
 
         files_to_send = []
         if drive_file_id:
@@ -2039,7 +2363,6 @@ class ChatIAView(APIView):
             files_to_send.extend(selected_file_ids)
 
         files_to_send = list(dict.fromkeys(files_to_send))
-
         parts = []
 
         for file_id in files_to_send:
@@ -2063,177 +2386,23 @@ class ChatIAView(APIView):
 
         parts.append({"text": message})
 
-        contents.append({
+        contents = [{
             "role": "user",
             "parts": parts
-        })
+        }]
 
         system_instruction = (
-            "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel e concisa.\n"
+            "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
             "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n\n"
             f"Contexto academico atual do usuario:\n{context_prompt}"
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?key={api_key}"
-        payload = {
-            "contents": contents,
-            "systemInstruction": {
-                "parts": [
-                    {"text": system_instruction}
-                ]
-            }
-        }
-        headers = {
-            "Content-Type": "application/json"
-        }
-
         try:
-            response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
-            if response.status_code != 200:
-                return Response({'erro': f'Erro na API do Gemini: {response.text}', 'codigo_erro': response.status_code}, status=response.status_code)
-
-            def gerar_stream():
-                buffer = ""
-                bracket_count = 0
-                start_idx = -1
-                in_string = False
-                escape = False
-                prompt_tokens = 0
-                candidate_tokens = 0
-                total_tokens = 0
-                i = 0
-
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        buffer += chunk.decode('utf-8', errors='ignore')
-                    while i < len(buffer):
-                        char = buffer[i]
-                        if escape:
-                            escape = False
-                        elif char == '\\':
-                            escape = True
-                        elif char == '"':
-                            in_string = not in_string
-                        elif not in_string:
-                            if char == '{':
-                                if bracket_count == 0:
-                                    start_idx = i
-                                bracket_count += 1
-                            elif char == '}':
-                                bracket_count -= 1
-                                if bracket_count == 0 and start_idx != -1:
-                                    obj_str = buffer[start_idx:i+1]
-                                    try:
-                                        obj = json.loads(obj_str)
-                                        usage = obj.get('usageMetadata', {})
-                                        if usage:
-                                            prompt_tokens = usage.get('promptTokenCount', prompt_tokens)
-                                            candidate_tokens = usage.get('candidatesTokenCount', candidate_tokens)
-                                            total_tokens = usage.get('totalTokenCount', total_tokens)
-
-                                        parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
-                                        text = parts[0].get('text', '')
-                                        if text:
-                                            yield text
-                                    except Exception:
-                                        pass
-                                    buffer = buffer[i+1:]
-                                    i = -1
-                                    start_idx = -1
-                                    in_string = False
-                                    escape = False
-                        i += 1
-
-                try:
-                    from .models import HistoricoUsoIA
-                    HistoricoUsoIA.objects.create(
-                        profile=profile,
-                        model_name=model_name,
-                        prompt_tokens=prompt_tokens,
-                        candidate_tokens=candidate_tokens,
-                        total_tokens=total_tokens
-                    )
-                except Exception:
-                    pass
-
+            stream = executar_stream_gemini(model_name, api_key, contents, system_instruction, profile, google_token=google_token)
             from django.http import StreamingHttpResponse
-            return StreamingHttpResponse(gerar_stream(), content_type='text/plain')
+            return StreamingHttpResponse(stream, content_type='text/plain')
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def construir_contexto(self, profile, materia_id=None) -> str:
-        from django.utils import timezone
-        from django.db.models import Sum
-        from .models import Avaliacao, ConfiguracaoMateria
-
-        now = timezone.now()
-        today = now.date()
-        weekday_map = {0: "Segunda-feira", 1: "Terca-feira", 2: "Quarta-feira", 3: "Quinta-feira", 4: "Sexta-feira", 5: "Sabado", 6: "Domingo"}
-        current_date_str = f"Hoje e {weekday_map[today.weekday()]}, {today.strftime('%d/%m/%Y')} as {now.strftime('%H:%M')}."
-
-        context = [current_date_str]
-
-        ano_letivo = profile.anos.order_by('-ano').first()
-        if not ano_letivo:
-            return "\n".join(context)
-
-        if materia_id:
-            materia = ano_letivo.materias.filter(id=materia_id).first()
-            if materia:
-                context.append(f"Disciplina ativa: {materia.codigo} - {materia.nome}")
-                config = ConfiguracaoMateria.objects.filter(materia=materia, perfil=profile, ano_letivo=ano_letivo).first()
-                if config:
-                    context.append(f"Media minima para aprovacao nesta materia: {config.media_minima}")
-
-                    avaliacoes = config.avaliacoes.all()
-                    avaliacoes_com_nota = avaliacoes.filter(nota__isnull=False)
-                    if avaliacoes_com_nota.exists():
-                        soma_ponderada = sum(a.nota * a.peso for a in avaliacoes_com_nota)
-                        soma_pesos = sum(a.peso for a in avaliacoes)
-                        if soma_pesos > 0:
-                            media_atual = round(float(soma_ponderada / soma_pesos), 2)
-                            context.append(f"Media atual do usuario nesta materia: {media_atual}")
-
-                    total_faltas = profile.registros_falta.filter(materia=materia, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
-                    horarios = ano_letivo.horarios.filter(materia=materia)
-                    max_faltas = horarios.first().maximo_faltas if horarios.exists() else 0
-                    context.append(f"Faltas registradas nesta materia: {total_faltas} (Limite maximo permitido: {max_faltas})")
-
-                    provas = config.avaliacoes.filter(data__isnull=False).order_by('data')
-                    if provas.exists():
-                        context.append("Avaliacoes agendadas para esta materia:")
-                        for p in provas:
-                            status_nota = f" - Nota: {p.nota}" if p.nota is not None else " - Nota: Nao lancada"
-                            context.append(f"  - {p.nome} ({p.tipo}) em {p.data.strftime('%d/%m/%Y')}{status_nota}")
-
-                vinculo = ConfiguracaoMateria.objects.filter(materia=materia, perfil=profile, ano_letivo=ano_letivo).first()
-                if vinculo and hasattr(vinculo, 'vinculo_classroom'):
-                    arquivos = vinculo.vinculo_classroom.arquivos.all()
-                    if arquivos.exists():
-                        context.append("Arquivos de materiais de aula postados no Google Classroom desta materia:")
-                        for arq in arquivos:
-                            context.append(f"  * Nome do arquivo: {arq.custom_name or arq.original_name} (ID no Drive: {arq.drive_file_id})")
-        else:
-            context.append("Disciplinas matriculadas no ano letivo atual:")
-            materias = ano_letivo.materias.all()
-            for m in materias:
-                total_faltas = profile.registros_falta.filter(materia=m, ano_letivo=ano_letivo).aggregate(Sum('faltas'))['faltas__sum'] or 0
-                horarios = ano_letivo.horarios.filter(materia=m)
-                max_faltas = horarios.first().maximo_faltas if horarios.exists() else 0
-                context.append(f" - {m.codigo} - {m.nome} (Faltas: {total_faltas}/{max_faltas})")
-
-            config_ids = profile.configuracoes_materias.filter(ano_letivo=ano_letivo).values_list('id', flat=True)
-            provas_futuras = Avaliacao.objects.filter(
-                configuracao_id__in=config_ids,
-                data__gte=today
-            ).order_by('data')
-
-            if provas_futuras.exists():
-                context.append("Proximas avaliacoes agendadas em todas as disciplinas:")
-                for p in provas_futuras:
-                    context.append(f" - {p.nome} ({p.tipo}) de {p.configuracao.materia.nome} no dia {p.data.strftime('%d/%m/%Y')}")
-
-        return "\n".join(context)
 
     def obter_dados_arquivo(self, profile, file_id: str, google_token: str | None) -> dict | None:
         import mimetypes
@@ -2274,3 +2443,208 @@ class ChatIAView(APIView):
                 print(f"DEBUG GOOGLE DRIVE - Excecao ao baixar arquivo {file_id}: {str(e)}")
                 return None
         return None
+
+
+class ConversasIAView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        from .models import ConversaIA, Materia
+        conversas = ConversaIA.objects.filter(profile=profile).order_by('-updated_at')
+
+        geral = [{
+            'id': c.id,
+            'title': c.title,
+            'updated_at': c.updated_at.isoformat()
+        } for c in conversas.filter(materia__isnull=True)]
+
+        materias_ids = conversas.filter(materia__isnull=False).values_list('materia_id', flat=True).distinct()
+        materias = Materia.objects.filter(id__in=materias_ids)
+
+        disciplinas_list = []
+        for m in materias:
+            chats_materia = conversas.filter(materia=m)
+            disciplinas_list.append({
+                'materia_id': m.id,
+                'codigo': m.codigo,
+                'nome': m.nome,
+                'chats': [{
+                    'id': c.id,
+                    'title': c.title,
+                    'updated_at': c.updated_at.isoformat()
+                } for c in chats_materia]
+            })
+
+        return Response({
+            'geral': geral,
+            'disciplinas': disciplinas_list
+        })
+
+    def post(self, request):
+        profile, _ = obter_perfil_ativo(request)
+        materia_id = request.data.get('materia_id')
+        title = request.data.get('title')
+
+        if not title:
+            title = 'Nova conversa'
+
+        from .models import ConversaIA, Materia
+        materia = Materia.objects.filter(id=materia_id).first() if materia_id else None
+
+        conversa = ConversaIA.objects.create(
+            profile=profile,
+            materia=materia,
+            title=title
+        )
+
+        return Response({
+            'id': conversa.id,
+            'title': conversa.title,
+            'materia_id': conversa.materia_id
+        }, status=status.HTTP_201_CREATED)
+
+
+class ConversaIADetalheView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        profile, _ = obter_perfil_ativo(request)
+        from .models import ConversaIA
+        conversa = ConversaIA.objects.filter(profile=profile, id=pk).first()
+        if not conversa:
+            return Response({'erro': 'Conversa nao encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        mensagens = conversa.messages.all().order_by('created_at')
+        return Response({
+            'id': conversa.id,
+            'title': conversa.title,
+            'materia_id': conversa.materia_id,
+            'messages': [{
+                'role': m.role,
+                'text': m.text,
+                'created_at': m.created_at.isoformat()
+            } for m in mensagens]
+        })
+
+    def delete(self, request, pk):
+        profile, _ = obter_perfil_ativo(request)
+        from .models import ConversaIA
+        conversa = ConversaIA.objects.filter(profile=profile, id=pk).first()
+        if not conversa:
+            return Response({'erro': 'Conversa nao encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        conversa.delete()
+        return Response({'sucesso': True})
+
+
+class EnviarMensagemConversaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        profile, _ = obter_perfil_ativo(request)
+        from .models import ConversaIA, MensagemConversaIA
+        conversa = ConversaIA.objects.filter(profile=profile, id=pk).first()
+        if not conversa:
+            return Response({'erro': 'Conversa nao encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        message = request.data.get('mensagem')
+        if not message:
+            return Response({'erro': 'Mensagem nao fornecida.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        drive_file_id = request.data.get('arquivo_aberto_id')
+        selected_file_ids = request.data.get('arquivos_selecionados_ids', [])
+        local_files = request.data.get('arquivos_locais', [])
+
+        google_token = request.headers.get('X-Google-Access-Token')
+        encrypted_api_key = profile.chave_gemini.encrypted_api_key
+        api_key = ServicoCriptografia.descriptografar_dado(encrypted_api_key)
+        model_name = profile.chave_gemini.model_name
+
+        materia_id = conversa.materia_id
+        context_prompt = obter_contexto_academico(profile, materia_id, google_token)
+        print("--- CONTEXTO ENVIADO A IA ---")
+        print(context_prompt)
+        print("----------------------------")
+
+        ultima_mensagem = MensagemConversaIA.objects.create(
+            conversa=conversa,
+            role='user',
+            text=message
+        )
+
+        files_to_send = []
+        if drive_file_id:
+            if isinstance(drive_file_id, list):
+                files_to_send.extend(drive_file_id)
+            elif isinstance(drive_file_id, str) and ',' in drive_file_id:
+                files_to_send.extend([fid.strip() for fid in drive_file_id.split(',') if fid.strip()])
+            else:
+                files_to_send.append(drive_file_id)
+        if selected_file_ids:
+            files_to_send.extend(selected_file_ids)
+
+        files_to_send = list(dict.fromkeys(files_to_send))
+        parts = []
+
+        for file_id in files_to_send:
+            file_data = self.obter_dados_arquivo(profile, file_id, google_token)
+            if file_data:
+                parts.append({
+                    "inlineData": {
+                        "mimeType": file_data["mime_type"],
+                        "data": file_data["base64_data"]
+                    }
+                })
+
+        for f in local_files:
+            if 'mime_type' in f and 'base64_data' in f:
+                parts.append({
+                    "inlineData": {
+                        "mimeType": f["mime_type"],
+                        "data": f["base64_data"]
+                    }
+                })
+
+        mensagens_anteriores = conversa.messages.all().order_by('created_at')
+        contents = []
+
+        for msg in mensagens_anteriores:
+            if msg.id == ultima_mensagem.id:
+                parts.append({"text": msg.text})
+                contents.append({
+                    "role": "user",
+                    "parts": parts
+                })
+            else:
+                contents.append({
+                    "role": msg.role,
+                    "parts": [{"text": msg.text}]
+                })
+
+        system_instruction = (
+            "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
+            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n\n"
+            f"Contexto academico atual do usuario:\n{context_prompt}"
+        )
+
+        def salvar_resposta(texto):
+            MensagemConversaIA.objects.create(
+                conversa=conversa,
+                role='model',
+                text=texto
+            )
+            conversa.save()
+
+        try:
+            stream = executar_stream_gemini(model_name, api_key, contents, system_instruction, profile, on_completion=salvar_resposta, google_token=google_token)
+            from django.http import StreamingHttpResponse
+            return StreamingHttpResponse(stream, content_type='text/plain')
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def obter_dados_arquivo(self, profile, file_id: str, google_token: str | None) -> dict | None:
+        view_temp = ChatIAView()
+        return view_temp.obter_dados_arquivo(profile, file_id, google_token)
+
+
