@@ -2090,6 +2090,63 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
     return "\n".join(context)
 
 
+def obter_conteudo_arquivo_servidor(profile, drive_file_id, google_token):
+    import mimetypes
+    import requests
+    import os
+    import pdfplumber
+    import io
+    from .models import ArquivoMateriaClassroom
+
+    arquivo = ArquivoMateriaClassroom.objects.filter(drive_file_id=drive_file_id).first()
+    conteudo_binario = None
+    nome_arquivo = "documento.pdf"
+
+    if arquivo:
+        nome_arquivo = arquivo.original_name
+        
+    if not drive_file_id.startswith('local_') and google_token:
+        try:
+            headers = {'Authorization': f'Bearer {google_token}'}
+            drive_url = f'https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media'
+            drive_res = requests.get(drive_url, headers=headers, timeout=20)
+            if drive_res.status_code == 200:
+                conteudo_binario = drive_res.content
+        except Exception:
+            pass
+
+    if not conteudo_binario and arquivo and arquivo.local_path:
+        if os.path.exists(arquivo.local_path):
+            try:
+                with open(arquivo.local_path, 'rb') as f:
+                    conteudo_binario = f.read()
+            except Exception:
+                pass
+
+    if not conteudo_binario:
+        return "Nao foi possivel obter o conteudo do arquivo."
+
+    mime_type, _ = mimetypes.guess_type(nome_arquivo)
+    mime_type = mime_type or 'application/pdf'
+
+    if 'pdf' in mime_type:
+        try:
+            texto = []
+            with pdfplumber.open(io.BytesIO(conteudo_binario)) as pdf:
+                for page in pdf.pages:
+                    t = page.extract_text()
+                    if t:
+                        texto.append(t)
+            return "\n".join(texto) if texto else "O PDF esta vazio ou nao contem texto extraivel."
+        except Exception as e:
+            return f"Erro ao extrair texto do PDF: {str(e)}"
+    else:
+        try:
+            return conteudo_binario.decode('utf-8', errors='ignore')
+        except Exception as e:
+            return f"Erro ao decodificar arquivo de texto: {str(e)}"
+
+
 def executar_stream_gemini(model_name, api_key, contents, system_instruction, profile, on_completion=None, google_token=None):
     import requests
     import json
@@ -2109,6 +2166,20 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
                             }
                         },
                         "required": ["materia_id"]
+                    }
+                },
+                {
+                    "name": "obter_conteudo_arquivo",
+                    "description": "Obtem o conteudo em texto ou informacoes internas de um arquivo especifico do Classroom ou local associado a disciplina. Use esta ferramenta sempre que o usuario fizer perguntas sobre o conteudo, regras, requisitos ou detalhes de um arquivo/documento especifico (como trab2.pdf ou outros arquivos) listado nos materiais da disciplina.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "drive_file_id": {
+                                "type": "STRING",
+                                "description": "O ID do arquivo no Google Drive ou identificador local."
+                            }
+                        },
+                        "required": ["drive_file_id"]
                     }
                 }
             ]
@@ -2138,124 +2209,43 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
 
         def gerar_stream():
             nonlocal response
-            buffer = ""
-            bracket_count = 0
-            start_idx = -1
-            in_string = False
-            escape = False
             prompt_tokens = 0
             candidate_tokens = 0
             total_tokens = 0
-            i = 0
-            resposta_completa = ""
-            chamada_funcao = None
-            assinatura_pensamento = None
+            full_response = ""
+            current_turn = 0
+            turn_limit = 5
 
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    buffer += chunk.decode('utf-8', errors='ignore')
-                while i < len(buffer):
-                    char = buffer[i]
-                    if escape:
-                        escape = False
-                    elif char == '\\':
-                        escape = True
-                    elif char == '"':
-                        in_string = not in_string
-                    elif not in_string:
-                        if char == '{':
-                            if bracket_count == 0:
-                                start_idx = i
-                            bracket_count += 1
-                        elif char == '}':
-                            bracket_count -= 1
-                            if bracket_count == 0 and start_idx != -1:
-                                obj_str = buffer[start_idx:i+1]
-                                try:
-                                    obj = json.loads(obj_str)
-                                    parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
-                                    fc = parts[0].get('functionCall')
-                                    if fc:
-                                        chamada_funcao = fc
-                                        assinatura_pensamento = parts[0].get('thought_signature') or parts[0].get('thoughtSignature')
-                                        break
-                                    text = parts[0].get('text', '')
-                                    if text:
-                                        resposta_completa += text
-                                        yield text
-                                except Exception:
-                                    pass
-                                buffer = buffer[i+1:]
-                                i = -1
-                                start_idx = -1
-                                in_string = False
-                                escape = False
-                    i += 1
-                if chamada_funcao:
-                    break
+            while current_turn < turn_limit:
+                buffer = ""
+                bracket_count = 0
+                start_idx = -1
+                in_string = False
+                escape = False
+                i = 0
+                function_call = None
+                thought_signature = None
 
-            if chamada_funcao:
-                func_name = chamada_funcao.get("name")
-                args = chamada_funcao.get("args", {})
-                materia_id = args.get("materia_id")
-                result_context = ""
-                if func_name == "obter_contexto_materia" and materia_id:
-                    result_context = obter_contexto_academico(profile, int(materia_id), google_token)
-                    print(result_context)
-                model_part = {
-                    "functionCall": chamada_funcao
-                }
-                if assinatura_pensamento:
-                    model_part["thought_signature"] = assinatura_pensamento
-
-                contents.append({
-                    "role": "model",
-                    "parts": [
-                        model_part
-                    ]
-                })
-                contents.append({
-                    "role": "function",
-                    "parts": [
-                        {
-                            "functionResponse": {
-                                "name": func_name,
-                                "response": {
-                                    "result": result_context
-                                }
-                            }
-                        }
-                    ]
-                })
-                response2 = realizar_requisicao(contents)
-                if response2.status_code != 200:
-                    raise Exception(f"Erro na API do Gemini apos chamada de funcao: {response2.text}")
-                buffer2 = ""
-                bracket_count2 = 0
-                start_idx2 = -1
-                in_string2 = False
-                escape2 = False
-                i2 = 0
-                for chunk in response2.iter_content(chunk_size=1024):
+                for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
-                        buffer2 += chunk.decode('utf-8', errors='ignore')
-                    while i2 < len(buffer2):
-                        char = buffer2[i2]
-                        if escape2:
-                            escape2 = False
+                        buffer += chunk.decode('utf-8', errors='ignore')
+                    while i < len(buffer):
+                        char = buffer[i]
+                        if escape:
+                            escape = False
                         elif char == '\\':
-                            escape2 = True
+                            escape = True
                         elif char == '"':
-                            in_string2 = not in_string2
-                        elif not in_string2:
+                            in_string = not in_string
+                        elif not in_string:
                             if char == '{':
-                                if bracket_count2 == 0:
-                                    start_idx2 = i2
-                                bracket_count2 += 1
+                                if bracket_count == 0:
+                                    start_idx = i
+                                bracket_count += 1
                             elif char == '}':
-                                bracket_count2 -= 1
-                                if bracket_count2 == 0 and start_idx2 != -1:
-                                    obj_str = buffer2[start_idx2:i2+1]
+                                bracket_count -= 1
+                                if bracket_count == 0 and start_idx != -1:
+                                    obj_str = buffer[start_idx:i+1]
                                     try:
                                         obj = json.loads(obj_str)
                                         usage = obj.get('usageMetadata', {})
@@ -2264,18 +2254,70 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
                                             candidate_tokens = usage.get('candidatesTokenCount', candidate_tokens)
                                             total_tokens = usage.get('totalTokenCount', total_tokens)
                                         parts = obj.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])
+                                        fc = parts[0].get('functionCall')
+                                        if fc:
+                                            function_call = fc
+                                            thought_signature = parts[0].get('thought_signature') or parts[0].get('thoughtSignature')
+                                            break
                                         text = parts[0].get('text', '')
                                         if text:
-                                            resposta_completa += text
+                                            full_response += text
                                             yield text
                                     except Exception:
                                         pass
-                                    buffer2 = buffer2[i2+1:]
-                                    i2 = -1
-                                    start_idx2 = -1
-                                    in_string2 = False
-                                    escape2 = False
-                        i2 += 1
+                                    buffer = buffer[i+1:]
+                                    i = -1
+                                    start_idx = -1
+                                    in_string = False
+                                    escape = False
+                        i += 1
+                    if function_call:
+                        break
+
+                if not function_call:
+                    break
+
+                function_name = function_call.get("name")
+                args = function_call.get("args", {})
+                result_context = ""
+                if function_name == "obter_contexto_materia":
+                    materia_id = args.get("materia_id")
+                    if materia_id:
+                        result_context = obter_contexto_academico(profile, int(materia_id), google_token)
+                elif function_name == "obter_conteudo_arquivo":
+                    drive_file_id = args.get("drive_file_id")
+                    if drive_file_id:
+                        result_context = obter_conteudo_arquivo_servidor(profile, drive_file_id, google_token)
+
+                model_part = {
+                    "functionCall": function_call
+                }
+                if thought_signature:
+                    model_part["thought_signature"] = thought_signature
+                    model_part["thoughtSignature"] = thought_signature
+
+                contents.append({
+                    "role": "model",
+                    "parts": [model_part]
+                })
+                contents.append({
+                    "role": "function",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": function_name,
+                                "response": {
+                                    "result": result_context
+                                }
+                            }
+                        }
+                    ]
+                })
+
+                response = realizar_requisicao(contents)
+                if response.status_code != 200:
+                    raise Exception(f"Erro na API do Gemini apos chamada de funcao: {response.text}")
+                current_turn += 1
 
             try:
                 from .models import HistoricoUsoIA
@@ -2291,7 +2333,7 @@ def executar_stream_gemini(model_name, api_key, contents, system_instruction, pr
 
             if on_completion:
                 try:
-                    on_completion(resposta_completa)
+                    on_completion(full_response)
                 except Exception:
                     pass
 
@@ -2382,40 +2424,45 @@ class ChatIAView(APIView):
         import mimetypes
         import base64
         import requests
+        import os
         from .models import ArquivoMateriaClassroom
 
-        if file_id.startswith('local_'):
-            return None
-        else:
-            if not google_token:
-                return None
+        arquivo = ArquivoMateriaClassroom.objects.filter(
+            classroom_connection__subject_config__perfil=profile,
+            drive_file_id=file_id
+        ).first()
 
-            arquivo = ArquivoMateriaClassroom.objects.filter(
-                classroom_connection__subject_config__perfil=profile,
-                drive_file_id=file_id
-            ).first()
+        nome_arquivo = arquivo.original_name if arquivo else "documento"
+        mime_type, _ = mimetypes.guess_type(nome_arquivo)
+        mime_type = mime_type or 'application/pdf'
 
-            nome_arquivo = arquivo.original_name if arquivo else "documento"
-            mime_type, _ = mimetypes.guess_type(nome_arquivo)
-            mime_type = mime_type or 'application/pdf'
+        conteudo_binario = None
 
+        if not file_id.startswith('local_') and google_token:
             try:
                 headers = {'Authorization': f'Bearer {google_token}'}
                 drive_url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
                 drive_res = requests.get(drive_url, headers=headers, timeout=20)
-
                 if drive_res.status_code == 200:
-                    content_type = drive_res.headers.get('Content-Type', mime_type)
-                    base64_data = base64.b64encode(drive_res.content).decode('utf-8')
-                    return {
-                        "mime_type": content_type,
-                        "base64_data": base64_data
-                    }
-                else:
-                    print(f"DEBUG GOOGLE DRIVE - Erro no download do arquivo {file_id}. Status: {drive_res.status_code}, Resposta: {drive_res.text[:200]}")
-            except Exception as e:
-                print(f"DEBUG GOOGLE DRIVE - Excecao ao baixar arquivo {file_id}: {str(e)}")
-                return None
+                    conteudo_binario = drive_res.content
+                    mime_type = drive_res.headers.get('Content-Type', mime_type)
+            except Exception:
+                pass
+
+        if not conteudo_binario and arquivo and arquivo.local_path:
+            if os.path.exists(arquivo.local_path):
+                try:
+                    with open(arquivo.local_path, 'rb') as f:
+                        conteudo_binario = f.read()
+                except Exception:
+                    pass
+
+        if conteudo_binario:
+            base64_data = base64.b64encode(conteudo_binario).decode('utf-8')
+            return {
+                "mime_type": mime_type,
+                "base64_data": base64_data
+            }
         return None
 
 
