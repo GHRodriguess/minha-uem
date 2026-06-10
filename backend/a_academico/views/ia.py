@@ -77,12 +77,32 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
 
                 all_evaluations = config.avaliacoes.all()
                 graded_evaluations = all_evaluations.filter(nota__isnull=False)
+                total_weights = sum(float(a.peso) for a in all_evaluations)
+                graded_weights = sum(float(a.peso) for a in graded_evaluations)
+                ungraded_weights = sum(float(a.peso) for a in all_evaluations.filter(nota__isnull=True))
                 if graded_evaluations.exists():
-                    weighted_sum = sum(a.nota * a.peso for a in graded_evaluations)
-                    weights_sum = sum(a.peso for a in graded_evaluations)
-                    if weights_sum > 0:
-                        current_average = round(float(weighted_sum / weights_sum), 2)
-                        context.append(f"Media atual calculada: {current_average}")
+                    weighted_sum = sum(float(a.nota * a.peso) for a in graded_evaluations)
+                    if graded_weights > 0:
+                        current_average = round(weighted_sum / graded_weights, 2)
+                        context.append(f"Media atual calculada (apenas das provas ja realizadas): {current_average}")
+                    if total_weights > 0:
+                        min_final_average = round(weighted_sum / total_weights, 2)
+                        max_final_average = round((weighted_sum + 10.0 * ungraded_weights) / total_weights, 2)
+                        percentage_graded = round((graded_weights / total_weights) * 100, 1)
+                        context.append(f"Progresso da avaliacao: {percentage_graded}% do peso total avaliado")
+                        context.append(f"Media final minima possivel (se tirar zero no restante): {min_final_average}")
+                        context.append(f"Media final maxima possivel (se tirar dez no restante): {max_final_average}")
+                        required_sum = float(config.media_minima) * total_weights
+                        needed_points = required_sum - weighted_sum
+                        if min_final_average >= float(config.media_minima):
+                            context.append("Situacao: Aprovado garantido! Mesmo se tirar zero nas avaliacoes restantes, a media final sera igual ou superior a media minima de aprovacao.")
+                        elif max_final_average < float(config.media_minima):
+                            context.append("Situacao: Reprovado. Matematicamente nao e mais possivel alcancar a media minima de aprovacao, mesmo gabaritando o restante.")
+                        else:
+                            context.append("Situacao: Em andamento. Ainda precisa realizar avaliacoes para atingir a media minima.")
+                            if ungraded_weights > 0:
+                                needed_average = round(needed_points / ungraded_weights, 2)
+                                context.append(f"Nota media necessaria nas avaliacoes restantes: {needed_average}")
 
                 provas = config.avaliacoes.all().order_by('data', 'ordem')
                 if provas.exists():
@@ -482,7 +502,6 @@ class ChatIAView(APIView):
         model_name = profile.chave_gemini.model_name
 
         context_prompt = obter_contexto_academico(profile, materia_id, google_token)
-        print(context_prompt)
 
         files_to_send = []
         if drive_file_id:
@@ -526,7 +545,8 @@ class ChatIAView(APIView):
 
         system_instruction = (
             "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
-            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n\n"
+            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n"
+            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n\n"
             f"Contexto academico atual do usuario:\n{context_prompt}"
         )
 
@@ -697,9 +717,6 @@ class EnviarMensagemConversaView(APIView):
 
         materia_id = conversa.materia_id
         context_prompt = obter_contexto_academico(profile, materia_id, google_token)
-        print("--- CONTEXTO ENVIADO A IA ---")
-        print(context_prompt)
-        print("----------------------------")
 
         ultima_mensagem = MensagemConversaIA.objects.create(
             conversa=conversa,
@@ -758,7 +775,8 @@ class EnviarMensagemConversaView(APIView):
 
         system_instruction = (
             "Voce e o assistente virtual do site Minha UEM. Voce ajuda estudantes da Universidade Estadual de Maringa (UEM) em suas tarefas academicas. Responda em Portugues (PT-BR) de forma amigavel and concisa.\n"
-            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n\n"
+            "IMPORTANTE: Nao mencione dados de desempenho academico (como notas, faltas, media atual ou avaliacoes) a menos que o usuario pergunte especificamente sobre isso ou que seja relevante para responder a pergunta dele.\n"
+            "ATENCAO AO CALCULO DE APROVACAO: Nunca assuma que o aluno ja passou apenas olhando a 'Media atual'. A 'Media atual' e parcial e considera apenas avaliacoes ja realizadas. Use os dados de 'Situacao', 'Progresso da avaliacao' e 'Nota media necessaria' fornecidos no contexto para responder com precisao se ele ja passou ou o que ainda precisa fazer.\n\n"
             f"Contexto academico atual do usuario:\n{context_prompt}"
         )
 
