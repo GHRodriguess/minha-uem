@@ -1954,53 +1954,38 @@ def obter_arquivos_classroom_em_tempo_real(connection, token):
                             'title': title
                         })
 
-    local_files = {file_obj.drive_file_id: file_obj for file_obj in connection.arquivos.all()}
-
-    result_list = []
+    current_drive_ids = set()
     for file_info in drive_files:
         file_id = file_info.get('id')
         title = file_info.get('title')
         if not file_id or not title:
             continue
+        current_drive_ids.add(file_id)
 
-        if file_id in local_files:
-            file_obj = local_files[file_id]
-            result_list.append({
-                'id': file_obj.id,
-                'drive_file_id': file_obj.drive_file_id,
-                'original_name': file_obj.original_name,
-                'custom_name': file_obj.custom_name,
-                'selected_folder': file_obj.selected_folder,
-                'local_path': file_obj.local_path,
-                'is_ignored': file_obj.is_ignored,
-                'sync_at': file_obj.sync_at.isoformat() if file_obj.sync_at else None
-            })
+        file_obj = connection.arquivos.filter(drive_file_id=file_id).first()
+        if file_obj:
+            if file_obj.original_name != title:
+                file_obj.original_name = title
+                file_obj.save()
         else:
-            result_list.append({
-                'id': None,
-                'drive_file_id': file_id,
-                'original_name': title,
-                'custom_name': None,
-                'selected_folder': 'documentos',
-                'local_path': None,
-                'is_ignored': title.startswith('.'),
-                'sync_at': None
-            })
+            ArquivoMateriaClassroom.objects.create(
+                classroom_connection=connection,
+                drive_file_id=file_id,
+                original_name=title,
+                selected_folder='documentos'
+            )
 
-    for local_id, file_obj in local_files.items():
-        if local_id.startswith('local_'):
-            result_list.append({
-                'id': file_obj.id,
-                'drive_file_id': file_obj.drive_file_id,
-                'original_name': file_obj.original_name,
-                'custom_name': file_obj.custom_name,
-                'selected_folder': file_obj.selected_folder,
-                'local_path': file_obj.local_path,
-                'is_ignored': file_obj.is_ignored,
-                'sync_at': file_obj.sync_at.isoformat() if file_obj.sync_at else None
-            })
+    connection.arquivos.filter(
+        local_path__isnull=True
+    ).exclude(
+        drive_file_id__in=current_drive_ids
+    ).exclude(
+        drive_file_id__startswith='local_'
+    ).delete()
 
-    return result_list
+    arquivos = connection.arquivos.all().order_by('-sync_at')
+    serializer = ArquivoMateriaClassroomSerializer(arquivos, many=True)
+    return serializer.data
 
 
 def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str:
@@ -2074,21 +2059,10 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
                 if hasattr(config, 'vinculo_classroom'):
                     connection = config.vinculo_classroom
                     files_list = []
-                    if google_token:
-                        try:
-                            merged_files = obter_arquivos_classroom_em_tempo_real(connection, google_token)
-                            for file_info in merged_files:
-                                if not file_info.get('is_ignored'):
-                                    file_name = file_info.get('custom_name') or file_info.get('original_name')
-                                    file_id = file_info.get('drive_file_id')
-                                    files_list.append(f"    * {file_name} (ID: {file_id})")
-                        except Exception:
-                            pass
-                    if not files_list:
-                        local_files = connection.arquivos.all()
-                        for file_obj in local_files:
-                            if not file_obj.is_ignored:
-                                files_list.append(f"    * {file_obj.custom_name or file_obj.original_name} (ID: {file_obj.drive_file_id})")
+                    local_files = connection.arquivos.all()
+                    for file_obj in local_files:
+                        if not file_obj.is_ignored:
+                            files_list.append(f"    * {file_obj.custom_name or file_obj.original_name} (ID: {file_obj.drive_file_id})")
                     if files_list:
                         context.append("Materiais no Classroom:")
                         context.extend(files_list)
