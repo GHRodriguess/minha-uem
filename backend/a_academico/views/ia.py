@@ -127,7 +127,10 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
 
 
 def obter_conteudo_arquivo_servidor(profile, drive_file_id, google_token):
-    arquivo = ArquivoMateriaClassroom.objects.filter(drive_file_id=drive_file_id).first()
+    arquivo = ArquivoMateriaClassroom.objects.filter(
+        classroom_connection__subject_config__perfil=profile,
+        drive_file_id=drive_file_id
+    ).first()
     conteudo_binario = None
     nome_arquivo = "documento.pdf"
 

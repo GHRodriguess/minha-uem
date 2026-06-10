@@ -145,13 +145,16 @@ class ProfessorClassroom(models.Model):
 
 class ArquivoMateriaClassroom(models.Model):
     classroom_connection = models.ForeignKey(VinculoGoogleClassroom, on_delete=models.CASCADE, related_name='arquivos')
-    drive_file_id = models.CharField(max_length=100, unique=True)
+    drive_file_id = models.CharField(max_length=100)
     original_name = models.CharField(max_length=255)
     custom_name = models.CharField(max_length=255, null=True, blank=True)
     selected_folder = models.CharField(max_length=100, default="documentos")
     is_ignored = models.BooleanField(default=False)
     local_path = models.CharField(max_length=500, null=True, blank=True)
     sync_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('classroom_connection', 'drive_file_id')
 
     def save(self, *args, **kwargs):
         if not self.pk and self.original_name and self.original_name.startswith('.'):
