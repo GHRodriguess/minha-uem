@@ -58,6 +58,28 @@ export function PainelPDF({
     }
   }, [fileUrl, carregarPdf])
 
+  const lastScaleRef = useRef(scale)
+
+  useEffect(() => {
+    if (scale !== lastScaleRef.current) {
+      const container = containerDePaginasRef.current
+      if (container) {
+        const oldScrollTop = container.scrollTop
+        const containerHeight = container.clientHeight
+        const scaleFactor = scale / lastScaleRef.current
+        const newScrollTop = (oldScrollTop + containerHeight / 2) * scaleFactor - containerHeight / 2
+
+        const ajustarPosicaoScroll = () => {
+          container.scrollTop = newScrollTop
+        }
+        const timeoutId = setTimeout(ajustarPosicaoScroll, 50)
+        lastScaleRef.current = scale
+        return () => clearTimeout(timeoutId)
+      }
+      lastScaleRef.current = scale
+    }
+  }, [scale])
+
   const navegarParaPagina = useCallback((page: number) => {
     irParaPagina(page)
     const element = document.getElementById(`pdf-${side}-pagina-${page}`)

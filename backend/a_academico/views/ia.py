@@ -437,7 +437,7 @@ class ConfiguracaoIAView(APIView):
             "Content-Type": "application/json"
         }
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
             if response.status_code != 200:
                 try:
                     error_data = response.json()
