@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { X, Send, Loader2, Sparkles, Brain, FileText, History, ArrowLeft } from 'lucide-react'
 import { useChatIA } from '@/lib/hooks/useChatIA'
@@ -18,6 +18,47 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
   const path = usePathname()
   const materiaId = path?.includes('/disciplinas/') ? Number(path.split('/disciplinas/')[1]?.split('/')[0]) : undefined
   const [isHistoryView, setIsHistoryView] = useState(false)
+  const [width, setWidth] = useState<number>(420)
+  const [isResizing, setIsResizing] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedWidth = localStorage.getItem('minha_uem_chat_ia_width')
+      if (storedWidth) {
+        setWidth(parseInt(storedWidth, 10))
+      }
+    }
+  }, [])
+
+  const obterEstiloLargura = () => {
+    if (layoutMode === 'integrated') {
+      return { width: `${width}px` }
+    }
+    return {}
+  }
+
+  const iniciarRedimensionamento = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+    const startX = e.clientX
+    const startWidth = width
+
+    const movimentarPainel = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX
+      const newWidth = Math.max(320, Math.min(800, startWidth - deltaX))
+      setWidth(newWidth)
+      localStorage.setItem('minha_uem_chat_ia_width', String(newWidth))
+    }
+
+    const finalizarRedimensionamento = () => {
+      setIsResizing(false)
+      document.removeEventListener('mousemove', movimentarPainel)
+      document.removeEventListener('mouseup', finalizarRedimensionamento)
+    }
+
+    document.addEventListener('mousemove', movimentarPainel)
+    document.addEventListener('mouseup', finalizarRedimensionamento)
+  }
 
   const {
     conversas, conversaAtiva, setConversaAtiva, criarNovaConversa,
@@ -40,10 +81,20 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
   }
 
   if (!isOpen) return null
-  const containerClass = `${layoutMode === 'integrated' ? 'relative h-full w-105 bg-card shrink-0' : 'fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl'} border-l border-border flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300`
+  const containerClass = `${layoutMode === 'integrated' ? 'relative h-full bg-card shrink-0' : 'fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl'} border-l border-border flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300`
 
   return (
-    <div className={containerClass}>
+    <>
+      {isResizing && (
+        <div className="fixed inset-0 cursor-col-resize z-50 select-none" />
+      )}
+      <div style={obterEstiloLargura()} className={containerClass}>
+        {layoutMode === 'integrated' && (
+          <div
+            onMouseDown={iniciarRedimensionamento}
+            className="absolute top-0 left-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-50"
+          />
+        )}
       <div className="p-4 border-b border-border flex items-center justify-between bg-muted/10">
         <div className="flex items-center gap-2">
           {isHistoryView ? (
@@ -142,5 +193,6 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
         </>
       )}
     </div>
+    </>
   )
 }
