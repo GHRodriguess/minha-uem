@@ -95,6 +95,12 @@ class Avaliacao(models.Model):
         ('OUTRO', 'Outro'),
     ]
 
+    STATUS_CHOICES = [
+        ('A_FAZER', 'A Fazer'),
+        ('EM_ANDAMENTO', 'Em Andamento'),
+        ('CONCLUIDO', 'Concluído'),
+    ]
+
     configuracao = models.ForeignKey(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='avaliacoes')
     nome = models.CharField(max_length=100)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='PROVA')
@@ -102,9 +108,19 @@ class Avaliacao(models.Model):
     nota = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     data = models.DateField(null=True, blank=True)
     ordem = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='A_FAZER')
 
     class Meta:
         ordering = ['ordem', 'id']
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_instance = Avaliacao.objects.filter(pk=self.pk).first()
+            if old_instance and old_instance.nota is None and self.nota is not None:
+                self.status = 'CONCLUIDO'
+        elif self.nota is not None:
+            self.status = 'CONCLUIDO'
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nome} ({self.configuracao.materia.nome})"

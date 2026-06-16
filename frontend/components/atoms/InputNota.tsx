@@ -57,7 +57,7 @@ export function InputNota({ value, onChange, placeholder = "0.00", className, di
       onChange={lidarComMudanca}
       onBlur={salvar}
       onKeyDown={lidarComTecla}
-      className={cn("w-20 text-center font-bold", className)}
+      className={cn("w-20 text-center font-bold px-1 text-xs sm:text-sm", className)}
       disabled={disabled}
     />
   )
