@@ -21,6 +21,7 @@ export interface Avaliacao {
   nota: number | null;
   data: string | null;
   ordem: number;
+  status: 'A_FAZER' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 }
 
 export interface AnotacaoMateria {

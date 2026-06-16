@@ -1,28 +1,31 @@
 'use client'
 
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { academic_service } from '@/lib/api/academico'
 import CardUploadPDF from '@/components/organisms/CardUploadPDF'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import CarregamentoHome from '@/components/templates/CarregamentoHome'
 import { CardMateriaHome } from '@/components/organisms/CardMateriaHome'
-import { GridEstatisticasHome } from '@/components/organisms/GridEstatisticasHome'
-import { PainelLateralHome } from '@/components/organisms/PainelLateralHome'
+import { BannerBoasVindas } from '@/components/organisms/BannerBoasVindas'
+import { CalendarioEventosHoje } from '@/components/organisms/CalendarioEventosHoje'
+import { ListaEventosProximos } from '@/components/organisms/ListaEventosProximos'
 import { obterAulasHoje } from '@/lib/utils/aulas'
 
 export default function Home() {
   const { data: session } = useSession()
-  const { anoAtivoId: activeYearId, anosDisponiveis: availableYears, carregandoAnos, perfil: profile, setPerfil: setProfile } = useAcademico()
+  const { anoAtivoId: activeYearId, carregandoAnos, perfil: profile, setPerfil: setProfile } = useAcademico()
+  const [activeTab, setActiveTab] = useState<'hoje' | 'disciplinas'>('hoje')
 
-  const alternarFalta = async (materiaId: number, dateStr: string, classNum: number, hasAbsence: boolean) => {
+  const alternarFalta = async (subjectId: number, dateStr: string, classNum: number, hasAbsence: boolean) => {
     if (!session?.accessToken) return
     const newAbsences = hasAbsence ? 0 : 1
     try {
-      await academic_service.atualizarFaltas(session.accessToken, materiaId, dateStr, classNum, newAbsences, activeYearId || undefined)
+      await academic_service.atualizarFaltas(session.accessToken, subjectId, dateStr, classNum, newAbsences, activeYearId || undefined)
       setProfile(prev => {
         if (!prev || !prev.materias) return prev
         const updated = prev.materias.map(m => {
-          if (m.id !== materiaId) return m
+          if (m.id !== subjectId) return m
           const current = m.detalhes_faltas || []
           const updatedAbsences = newAbsences === 0
             ? current.filter(f => !(f.data === dateStr && f.aula === classNum))
@@ -48,37 +51,59 @@ export default function Home() {
   const todayClasses = obterAulasHoje(profile)
   const todayStr = new Date().toISOString().split('T')[0]
   const nextClass = todayClasses.find(a => a.horario.inicio > `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`)
-  const activeYearLabel = availableYears.find(a => a.id === activeYearId)?.ano || '---'
 
   const sortedMaterias = [...(profile.materias || [])].sort((a, b) => {
     const firstA = a.horarios?.[0]
     const firstB = b.horarios?.[0]
-    const isEmCursoA = firstA && todayStr >= firstA.data_inicio && todayStr <= firstA.data_termino ? 1 : 0
-    const isEmCursoB = firstB && todayStr >= firstB.data_inicio && todayStr <= firstB.data_termino ? 1 : 0
-    return isEmCursoB - isEmCursoA || a.nome.localeCompare(b.nome)
+    const isActiveA = firstA && todayStr >= firstA.data_inicio && todayStr <= firstA.data_termino ? 1 : 0
+    const isActiveB = firstB && todayStr >= firstB.data_inicio && todayStr <= firstB.data_termino ? 1 : 0
+    return isActiveB - isActiveA || a.nome.localeCompare(b.nome)
   })
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
-      <section>
-        <h2 className="text-3xl font-black text-foreground tracking-tight">Visão Geral</h2>
-        <p className="text-sm text-muted-foreground mt-1 font-semibold">Painel acadêmico integrado.</p>
-      </section>
+      <BannerBoasVindas profile={profile} nextClass={nextClass} />
 
-      <GridEstatisticasHome profile={profile} activeYearLabel={activeYearLabel} nextClass={nextClass} />
+      <div className="flex border-b border-border/40 gap-6">
+        <button
+          onClick={() => setActiveTab('hoje')}
+          className={`pb-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            activeTab === 'hoje' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Hoje
+        </button>
+        <button
+          onClick={() => setActiveTab('disciplinas')}
+          className={`pb-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            activeTab === 'disciplinas' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Minhas Disciplinas
+        </button>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-black text-foreground mb-6 uppercase tracking-wider">Suas Disciplinas</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sortedMaterias.map(materia => (
-              <CardMateriaHome key={materia.id} materia={materia} />
+      {activeTab === 'hoje' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+          <div className="space-y-6">
+            <h3 className="text-lg font-black text-foreground uppercase tracking-wider">Aulas de Hoje</h3>
+            <CalendarioEventosHoje aulasHoje={todayClasses} dataString={todayStr} onAlternarFalta={alternarFalta} />
+          </div>
+          <div className="space-y-6">
+            <h3 className="text-lg font-black text-foreground uppercase tracking-wider">Avaliações Próximas</h3>
+            <ListaEventosProximos materias={profile.materias || []} dataString={todayStr} />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-fade-in">
+          <h3 className="text-lg font-black text-foreground uppercase tracking-wider">Suas Disciplinas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sortedMaterias.map(subject => (
+              <CardMateriaHome key={subject.id} subject={subject} />
             ))}
           </div>
         </div>
-
-        <PainelLateralHome aulasHoje={todayClasses} dataString={todayStr} onAlternarFalta={alternarFalta} materias={profile.materias || []} />
-      </div>
+      )}
     </div>
   )
 }

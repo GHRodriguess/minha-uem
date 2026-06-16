@@ -21,7 +21,7 @@ class AnoLetivoSerializer(serializers.ModelSerializer):
 class AvaliacaoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avaliacao
-        fields = ['id', 'nome', 'tipo', 'peso', 'nota', 'data', 'ordem']
+        fields = ['id', 'nome', 'tipo', 'peso', 'nota', 'data', 'ordem', 'status']
 
 class AnotacaoMateriaSerializer(serializers.ModelSerializer):
     class Meta:
