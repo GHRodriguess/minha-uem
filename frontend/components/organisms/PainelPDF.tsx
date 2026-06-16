@@ -190,14 +190,14 @@ export function PainelPDF({
           }`}
         >
           {showLoading ? (
-            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-[300px] gap-3 animate-pulse">
+            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-75 gap-3 animate-pulse">
               <span className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 Carregando Documento...
               </span>
             </div>
           ) : !fileUrl ? (
-            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-[300px] text-center select-none">
+            <div className="flex flex-col items-center justify-center flex-1 w-full h-full min-h-75 text-center select-none">
               <p className="text-xs font-bold text-muted-foreground">Nenhum PDF selecionado</p>
               <p className="text-[10px] text-muted-foreground/80 mt-1">
                 Arraste um PDF aqui ou use a barra lateral para carregar.
