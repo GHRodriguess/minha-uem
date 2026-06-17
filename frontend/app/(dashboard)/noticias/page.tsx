@@ -9,6 +9,7 @@ import GerenciadorNoticiasAdmin from '@/components/organisms/GerenciadorNoticias
 import FiltroCategoriasNoticias from '@/components/molecules/FiltroCategoriasNoticias'
 import { Button } from '@/components/ui/button'
 import { PlusCircle, Newspaper } from 'lucide-react'
+import EsqueletoNoticia from '@/components/atoms/EsqueletoNoticia'
 
 export default function NoticiasPage() {
   const { data: session } = useSession()
@@ -17,9 +18,11 @@ export default function NoticiasPage() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('TODAS')
   const [noticiaEdicao, setNoticiaEdicao] = useState<Noticia | null>(null)
   const [formularioAberto, setFormularioAberto] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const carregarNoticias = useCallback(async () => {
     if (!session?.accessToken) return
+    setIsLoading(true)
     try {
       const list = await suporte_servico.listarNoticias(session.accessToken)
       const ordenado = [...list].sort((a, b) => b.id - a.id)
@@ -29,6 +32,8 @@ export default function NoticiasPage() {
       }
     } catch (e) {
       console.error(e)
+    } finally {
+      setIsLoading(false)
     }
   }, [session?.accessToken])
 
@@ -86,7 +91,11 @@ export default function NoticiasPage() {
       />
 
       <div className="grid grid-cols-1 gap-4">
-        {noticiasFiltradas.length === 0 ? (
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <EsqueletoNoticia key={i} />
+          ))
+        ) : noticiasFiltradas.length === 0 ? (
           <div className="text-center p-12 border border-dashed border-border rounded-2xl bg-card">
             <Newspaper className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
             <p className="text-sm font-bold text-muted-foreground">Nenhuma notícia encontrada.</p>

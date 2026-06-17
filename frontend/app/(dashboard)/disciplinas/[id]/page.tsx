@@ -25,20 +25,23 @@ interface PaginaDisciplinaProps {
 export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const { id } = use(params)
   const { data: session } = useSession()
-  const { anoAtivoId } = useAcademico()
-  const [materia, setMateria] = useState<Materia | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { anoAtivoId, perfil } = useAcademico()
+  const localSubject = perfil?.materias?.find(m => m.id === parseInt(id))
+  const [materia, setMateria] = useState<Materia | null>(localSubject || null)
+  const [loading, setLoading] = useState(!localSubject)
   const { preCarregarArquivos, filesCache } = useClassroom()
   const requisitadoRef = useRef<{ id: string; anoId: number | null } | null>(null)
 
   const buscarDados = useCallback(async (silencioso = false) => {
     if (!session?.accessToken || !anoAtivoId) return
 
-    if (!silencioso && requisitadoRef.current?.id === id && requisitadoRef.current?.anoId === anoAtivoId) {
+    const isSilent = silencioso || !!localSubject
+
+    if (!isSilent && requisitadoRef.current?.id === id && requisitadoRef.current?.anoId === anoAtivoId) {
       return
     }
 
-    if (!silencioso) {
+    if (!isSilent) {
       requisitadoRef.current = { id, anoId: anoAtivoId }
       setLoading(true)
     }
@@ -50,15 +53,22 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
     } catch (error) {
       console.error('Erro ao buscar detalhes da disciplina:', error)
     } finally {
-      if (!silencioso) {
+      if (!isSilent) {
         setLoading(false)
       }
     }
-  }, [session, anoAtivoId, id])
+  }, [session, anoAtivoId, id, localSubject])
 
   useEffect(() => {
     buscarDados()
   }, [buscarDados])
+
+  useEffect(() => {
+    if (localSubject && !materia) {
+      setMateria(localSubject)
+      setLoading(false)
+    }
+  }, [localSubject, materia])
 
   useEffect(() => {
     if (anoAtivoId) {
