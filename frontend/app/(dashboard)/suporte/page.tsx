@@ -12,7 +12,13 @@ import ChatSuporte from '@/components/organisms/ChatSuporte'
 
 export default function SuportePage() {
   const { data: session } = useSession()
-  const { chamados, marcarComoLidoLocal, adicionarMensagemLocal, adicionarChamadoLocal } = useSuporte()
+  const { 
+    chamados, 
+    carregandoChamados, 
+    marcarComoLidoLocal, 
+    adicionarMensagemLocal, 
+    adicionarChamadoLocal 
+  } = useSuporte()
   const [chamadoSelecionado, setChamadoSelecionado] = useState<ChamadoSuporte | null>(null)
   const [exibirFormulario, setExibirFormulario] = useState(false)
 
@@ -80,7 +86,12 @@ export default function SuportePage() {
         <div className={chamadoSelecionado || exibirFormulario ? "hidden md:block md:col-span-1" : "col-span-1"}>
           <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
             <h2 className="font-bold text-sm text-foreground">Meus Chamados</h2>
-            <ListaChamados chamados={myTickets} chamadoSelecionadoId={chamadoSelecionado?.id || null} onSelecionarChamado={handleSelecionarChamado} />
+            <ListaChamados 
+              chamados={myTickets} 
+              chamadoSelecionadoId={chamadoSelecionado?.id || null} 
+              onSelecionarChamado={handleSelecionarChamado} 
+              carregando={carregandoChamados}
+            />
           </div>
         </div>
 

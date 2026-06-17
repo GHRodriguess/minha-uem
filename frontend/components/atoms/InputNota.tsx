@@ -13,10 +13,10 @@ interface InputNotaProps {
 }
 
 export function InputNota({ value, onChange, placeholder = "0.00", className, disabled }: InputNotaProps) {
-  const [localValue, setLocalValue] = useState<string>(value !== null ? value.toString() : "")
+  const [localValue, setLocalValue] = useState<string>(value !== null && value !== undefined ? value.toString() : "")
 
   useEffect(() => {
-    setLocalValue(value !== null ? value.toString() : "")
+    setLocalValue(value !== null && value !== undefined ? value.toString() : "")
   }, [value])
 
   const lidarComMudanca = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,10 +34,10 @@ export function InputNota({ value, onChange, placeholder = "0.00", className, di
       if (num >= 0 && num <= 10) {
         onChange(num)
       } else {
-        setLocalValue(value !== null ? value.toString() : "")
+        setLocalValue(value !== null && value !== undefined ? value.toString() : "")
       }
     } else {
-      setLocalValue(value !== null ? value.toString() : "")
+      setLocalValue(value !== null && value !== undefined ? value.toString() : "")
     }
   }
 

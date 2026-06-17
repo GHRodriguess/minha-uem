@@ -2,14 +2,21 @@
 
 import { ChamadoSuporte } from '@/lib/api/suporte'
 import { clsx } from 'clsx'
+import EsqueletoChamado from '@/components/atoms/EsqueletoChamado'
 
 interface ListaChamadosProps {
   chamados: ChamadoSuporte[]
   chamadoSelecionadoId: number | null
   onSelecionarChamado: (id: number) => void
+  carregando?: boolean
 }
 
-export default function ListaChamados({ chamados, chamadoSelecionadoId, onSelecionarChamado }: ListaChamadosProps) {
+export default function ListaChamados({ 
+  chamados, 
+  chamadoSelecionadoId, 
+  onSelecionarChamado,
+  carregando 
+}: ListaChamadosProps) {
   const obterCategoriaFormatada = (cat: string) => {
     const nomes: Record<string, string> = {
       INTERFACE: 'Interface',
@@ -22,7 +29,11 @@ export default function ListaChamados({ chamados, chamadoSelecionadoId, onSeleci
 
   return (
     <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-2">
-      {chamados.length === 0 ? (
+      {carregando ? (
+        Array.from({ length: 3 }).map((_, i) => (
+          <EsqueletoChamado key={i} />
+        ))
+      ) : chamados.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">Nenhum chamado de suporte aberto.</p>
       ) : (
         chamados.map((c) => {
