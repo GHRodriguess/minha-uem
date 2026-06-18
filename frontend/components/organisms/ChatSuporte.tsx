@@ -5,6 +5,7 @@ import { ChamadoSuporte, MensagemSuporte } from '@/lib/api/suporte'
 import { Button } from '@/components/ui/button'
 import { Send, CheckCircle2 } from 'lucide-react'
 import { clsx } from 'clsx'
+import useAutoRedimensionarTextArea from '@/lib/hooks/useAutoRedimensionarTextArea'
 
 interface ChatSuporteProps {
   chamado: ChamadoSuporte
@@ -18,6 +19,9 @@ export default function ChatSuporte({ chamado, usuarioEmail, onEnviarMensagem, o
   const [novaMensagem, setNovaMensagem] = useState('')
   const [enviando, setEnviando] = useState(false)
   const finalDoChatRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useAutoRedimensionarTextArea(inputRef, novaMensagem)
 
   useEffect(() => {
     finalDoChatRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -91,12 +95,13 @@ export default function ChatSuporte({ chamado, usuarioEmail, onEnviarMensagem, o
       {chamado.status === 'ABERTO' ? (
         <form onSubmit={handleEnviar} className="p-3 bg-muted/20 border-t border-border flex gap-2 items-end shrink-0">
           <textarea
+            ref={inputRef}
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
             onKeyDown={lidarComKeyDown}
             placeholder="Digite sua resposta..."
             rows={1}
-            className="flex-1 min-h-9.5 max-h-32 py-2 px-4 rounded-xl border border-border bg-card text-foreground text-xs focus:outline-none focus:border-primary transition-all duration-200 resize-none whitespace-pre-wrap overflow-y-auto"
+            className="flex-1 min-h-9.5 py-2 px-4 rounded-xl border border-border bg-card text-foreground text-xs focus:outline-none focus:border-primary transition-all duration-200 resize-none whitespace-pre-wrap overflow-y-auto scrollbar-none"
             disabled={enviando}
             required
           />

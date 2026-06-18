@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { X, Send, Loader2, Sparkles, Brain, FileText, History, ArrowLeft } from 'lucide-react'
 import { useChatIA } from '@/lib/hooks/useChatIA'
 import { useConversasIA } from '@/lib/hooks/useConversasIA'
+import useAutoRedimensionarTextArea from '@/lib/hooks/useAutoRedimensionarTextArea'
 import BalaoMensagemIA from '../atoms/BalaoMensagemIA'
 import SeletorArquivosIA from '../molecules/SeletorArquivosIA'
 import FeedbackIADesativada from '../molecules/FeedbackIADesativada'
@@ -69,6 +70,9 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
     messages, input, setInput, sending, hasKey, loadingKey, selectedFileIds,
     chatEndRef, arquivosMateria, arquivosAbertos, alternarArquivo, enviarMensagem
   } = useChatIA(isOpen, fileUrls, conversaAtiva, criarNovaConversa)
+
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  useAutoRedimensionarTextArea(inputRef, input)
 
   const lidarComKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -177,13 +181,14 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
             )}
             <form onSubmit={enviarMensagem} className="flex gap-2 items-end">
               <textarea
+                ref={inputRef}
                 placeholder={arquivosAbertos.length > 0 ? "Perguntar sobre os arquivos abertos..." : "Digite sua mensagem..."}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={lidarComKeyDown}
                 disabled={sending}
                 rows={1}
-                className="flex-1 min-h-11 max-h-32 py-3 px-4 rounded-xl bg-muted/30 border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50 resize-none whitespace-pre-wrap overflow-y-auto"
+                className="flex-1 min-h-11 py-3 px-4 rounded-xl bg-muted/30 border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50 resize-none whitespace-pre-wrap overflow-y-auto scrollbar-none"
               />
               <Button type="submit" disabled={sending || !input.trim()} className="h-11 w-11 p-0 rounded-xl shrink-0">
                 <Send className="w-4 h-4 text-primary-foreground" />

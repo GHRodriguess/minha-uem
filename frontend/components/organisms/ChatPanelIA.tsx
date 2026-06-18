@@ -4,6 +4,8 @@ import { useRef } from 'react'
 import { Send, Sparkles, Loader2, Plus, FileText, X, Menu } from 'lucide-react'
 import { Conversa } from '@/lib/api/ia'
 import BalaoMensagemIA from '../atoms/BalaoMensagemIA'
+import useAutoRedimensionarTextArea from '@/lib/hooks/useAutoRedimensionarTextArea'
+
 
 interface ChatPanelIAProps {
   conversaAtiva: Conversa | null
@@ -38,6 +40,8 @@ export default function ChatPanelIA({
 }: ChatPanelIAProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useAutoRedimensionarTextArea(inputRef, input)
 
   const lidarComSelecaoArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -188,7 +192,7 @@ export default function ChatPanelIA({
             onKeyDown={lidarComKeyDown}
             disabled={sending}
             rows={1}
-            className="flex-1 min-h-10 max-h-32 py-2.5 px-2 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50 resize-none whitespace-pre-wrap overflow-y-auto"
+            className="flex-1 min-h-10 py-2.5 px-2 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50 resize-none whitespace-pre-wrap overflow-y-auto scrollbar-none"
           />
           <button
             type="button"
