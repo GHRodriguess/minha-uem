@@ -51,3 +51,7 @@ from .ia import (
     ConversaIADetalheView,
     EnviarMensagemConversaView
 )
+from .videos import (
+    VideosMateriaClassroomView,
+    AtualizarVideoClassroomView
+)

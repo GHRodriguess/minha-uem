@@ -181,6 +181,35 @@ class ArquivoMateriaClassroom(models.Model):
         return f"{self.custom_name or self.original_name} ({self.classroom_connection.subject_config.materia.nome})"
 
 
+class VideoMateriaClassroom(models.Model):
+    TIPO_CHOICES = [
+        ('drive', 'Google Drive'),
+        ('youtube', 'YouTube'),
+    ]
+
+    classroom_connection = models.ForeignKey(VinculoGoogleClassroom, on_delete=models.CASCADE, related_name='videos')
+    video_id = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    titulo = models.CharField(max_length=255)
+    custom_name = models.CharField(max_length=255, null=True, blank=True)
+    selected_folder = models.CharField(max_length=100, default='videos')
+    is_ignored = models.BooleanField(default=False)
+    url = models.URLField(max_length=500, null=True, blank=True)
+    thumbnail = models.URLField(max_length=500, null=True, blank=True)
+    sync_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('classroom_connection', 'video_id')
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.titulo and self.titulo.startswith('.'):
+            self.is_ignored = True
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.custom_name or self.titulo} ({self.classroom_connection.subject_config.materia.nome})"
+
+
 class AnotacaoMateria(models.Model):
     subject_config = models.ForeignKey(ConfiguracaoMateria, on_delete=models.CASCADE, related_name='notes')
     content = models.TextField()

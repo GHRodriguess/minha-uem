@@ -37,7 +37,9 @@ from .views import (
     ChatIAView,
     ConversasIAView,
     ConversaIADetalheView,
-    EnviarMensagemConversaView
+    EnviarMensagemConversaView,
+    VideosMateriaClassroomView,
+    AtualizarVideoClassroomView
 )
 
 urlpatterns = [
@@ -61,6 +63,8 @@ urlpatterns = [
     path('classroom/arquivos/<str:drive_file_id>/', AtualizarArquivoClassroomView.as_view(), name='classroom_arquivos_detalhe'),
     path('classroom/arquivos/<str:drive_file_id>/conteudo/', ObterConteudoArquivoDriveView.as_view(), name='classroom_arquivos_conteudo'),
     path('classroom/arquivos/<str:drive_file_id>/baixar/', BaixarArquivoClassroomView.as_view(), name='classroom_arquivos_baixar'),
+    path('classroom/videos/', VideosMateriaClassroomView.as_view(), name='classroom_videos'),
+    path('classroom/videos/<str:video_id>/', AtualizarVideoClassroomView.as_view(), name='classroom_videos_detalhe'),
     path('classroom/explorar-diretorios/', ExploradorDiretoriosView.as_view(), name='classroom_explorar_diretorios'),
     path('classroom/mural/', MuralClassroomView.as_view(), name='classroom_mural'),
     path('classroom/mural/marcar-lido/', MarcarMuralLidoView.as_view(), name='classroom_mural_marcar_lido'),

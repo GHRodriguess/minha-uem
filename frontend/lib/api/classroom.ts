@@ -97,6 +97,26 @@ export interface StatusVinculoClassroom {
     arquivos: ArquivoClassroom[];
 }
 
+export interface VideoClassroom {
+    id: number | null;
+    video_id: string;
+    tipo: 'drive' | 'youtube';
+    titulo: string;
+    custom_name: string | null;
+    selected_folder: string;
+    is_ignored: boolean;
+    url: string | null;
+    thumbnail: string | null;
+    sync_at: string | null;
+}
+
+export interface StatusVideosClassroom {
+    vinculado: boolean;
+    classroom_course_id?: string;
+    classroom_course_name?: string;
+    videos: VideoClassroom[];
+}
+
 export interface ItemDiretorio {
     nome: string;
     path: string;
@@ -477,6 +497,50 @@ export const classroom_service = {
                 redistribuicoes: redistributions
             },
             token
+        );
+    },
+
+    obterVideos(
+        token: string,
+        googleToken: string | null,
+        materiaId: number,
+        anoId: number,
+        signal?: AbortSignal,
+    ) {
+        return executarComRenovacaoGoogle(
+            (tokenGoogleUsar) => {
+                const headers: Record<string, string> = {
+                    "X-Google-Access-Token": tokenGoogleUsar,
+                };
+                return api_client.obter<StatusVideosClassroom>(
+                    `${base_path}/videos/`,
+                    { materia_id: materiaId, ano_id: anoId },
+                    token,
+                    signal,
+                    headers,
+                );
+            },
+            googleToken,
+        );
+    },
+
+    atualizarVideo(
+        token: string,
+        videoId: string,
+        materiaId: number,
+        anoId: number,
+        dados: Partial<VideoClassroom>,
+        signal?: AbortSignal,
+    ) {
+        return api_client.patch<VideoClassroom>(
+            `${base_path}/videos/${videoId}/`,
+            {
+                ...dados,
+                materia_id: materiaId,
+                ano_id: anoId,
+            },
+            token,
+            signal,
         );
     }
 };

@@ -77,7 +77,7 @@ export default function DashboardLayout({
         </main>
       </div>
 
-      {!isIAPage && pathname !== null && !pathname.includes('/arquivos/visualizador') && (
+      {!isIAPage && pathname !== null && !pathname.includes('/arquivos/visualizador') && !pathname.includes('/videos/visualizador') && (
         <>
           <BotaoFlutuanteIA onClick={() => setIsChatOpen(!isChatOpen)} isOpen={isChatOpen} />
           <SidebarChatIA isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />

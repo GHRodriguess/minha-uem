@@ -13,9 +13,21 @@ import SeletorModeloChatIA from '../molecules/SeletorModeloChatIA'
 import ListaConversasIA from '../molecules/ListaConversasIA'
 import { Button } from '@/components/ui/button'
 
-interface SidebarChatProps { isOpen: boolean; onClose: () => void; layoutMode?: 'fixed' | 'integrated'; fileUrls?: Record<string, string> }
+interface SidebarChatProps {
+  isOpen: boolean
+  onClose: () => void
+  layoutMode?: 'fixed' | 'integrated'
+  fileUrls?: Record<string, string>
+  className?: string
+}
 
-export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', fileUrls }: SidebarChatProps) {
+export default function SidebarChatIA({
+  isOpen,
+  onClose,
+  layoutMode = 'fixed',
+  fileUrls,
+  className
+}: SidebarChatProps) {
   const path = usePathname()
   const materiaId = path?.includes('/disciplinas/') ? Number(path.split('/disciplinas/')[1]?.split('/')[0]) : undefined
   const [isHistoryView, setIsHistoryView] = useState(false)
@@ -84,8 +96,14 @@ export default function SidebarChatIA({ isOpen, onClose, layoutMode = 'fixed', f
     }
   }
 
-  if (!isOpen) return null
-  const containerClass = `${layoutMode === 'integrated' ? 'relative h-full bg-card shrink-0' : 'fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl'} border-l border-border flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300`
+  const ocultarChat = layoutMode === 'fixed' && path && (path.includes('/visualizador') || path.includes('/visualizar'))
+  if (!isOpen || ocultarChat) return null
+  const borderClass = className?.includes('border') ? '' : 'border-l border-border'
+  const containerClass = `${
+    layoutMode === 'integrated'
+      ? `relative h-full bg-card shrink-0 ${borderClass}`
+      : `fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl ${borderClass}`
+  } flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300 ${className || ''}`
 
   return (
     <>
