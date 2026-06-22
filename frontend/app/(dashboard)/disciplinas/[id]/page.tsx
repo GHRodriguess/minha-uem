@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState, useCallback, use, useRef } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
-import { AlertTriangle, ArrowLeft, GraduationCap, FileText } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, GraduationCap, FileText, Video } from 'lucide-react'
 import Link from 'next/link'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
@@ -29,7 +29,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   const localSubject = perfil?.materias?.find(m => m.id === parseInt(id))
   const [materia, setMateria] = useState<Materia | null>(localSubject || null)
   const [loading, setLoading] = useState(!localSubject)
-  const { preCarregarArquivos, filesCache } = useClassroom()
+  const { preCarregarArquivos, filesCache, obterVideos, videosCache } = useClassroom()
   const requisitadoRef = useRef<{ id: string; anoId: number | null } | null>(null)
 
   const buscarDados = useCallback(async (silencioso = false) => {
@@ -73,8 +73,9 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   useEffect(() => {
     if (anoAtivoId) {
       preCarregarArquivos(parseInt(id), anoAtivoId)
+      obterVideos(parseInt(id), anoAtivoId)
     }
-  }, [id, anoAtivoId, preCarregarArquivos])
+  }, [id, anoAtivoId, preCarregarArquivos, obterVideos])
 
   if (loading) {
     return <CarregamentoDetalheDisciplina />
@@ -155,27 +156,73 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
         <CardAnotacoesMateria materia={materia} />
 
         {filesCache[materia.id]?.vinculado ? (
-          <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in">
-            <div className="flex items-start gap-4">
-              <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
-                <FileText className="w-8 h-8" />
+          videosCache[materia.id]?.videos?.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col justify-between items-start gap-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                    <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                      {filesCache[materia.id]?.arquivos?.length > 0
+                        ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
+                        : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
+                    </p>
+                  </div>
+                </div>
+                <Link 
+                  href={`/disciplinas/${materia.id}/arquivos`}
+                  className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm uppercase tracking-wider w-full md:w-auto justify-center"
+                >
+                  Visualizar Arquivos
+                </Link>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {filesCache[materia.id]?.arquivos?.length > 0
-                    ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
-                    : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
-                </p>
+
+              <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col justify-between items-start gap-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
+                    <Video className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-foreground">Vídeo Aulas</h2>
+                    <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                      {videosCache[materia.id].videos.length} vídeo aulas e gravações sincronizadas do Google Classroom
+                    </p>
+                  </div>
+                </div>
+                <Link 
+                  href={`/disciplinas/${materia.id}/videos`}
+                  className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm uppercase tracking-wider w-full md:w-auto justify-center"
+                >
+                  Assistir Aulas
+                </Link>
               </div>
             </div>
-            <Link 
-              href={`/disciplinas/${materia.id}/arquivos`}
-              className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
-            >
-              Visualizar Arquivos
-            </Link>
-          </div>
+          ) : (
+            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in">
+              <div className="flex items-start gap-4">
+                <div className="bg-primary/10 p-4 rounded-2xl text-primary shrink-0">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-xl font-bold text-foreground">Materiais de Estudo</h2>
+                  <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                    {filesCache[materia.id]?.arquivos?.length > 0
+                      ? `${filesCache[materia.id].arquivos.length} arquivos e documentos sincronizados do Google Classroom`
+                      : 'Gerencie e visualize os arquivos integrados do Google Classroom'}
+                  </p>
+                </div>
+              </div>
+              <Link 
+                href={`/disciplinas/${materia.id}/arquivos`}
+                className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
+              >
+                Visualizar Arquivos
+              </Link>
+            </div>
+          )
         ) : (
           <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-8">

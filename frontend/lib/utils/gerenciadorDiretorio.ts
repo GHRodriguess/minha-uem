@@ -86,7 +86,10 @@ export class GerenciadorDiretorio {
 
   static async obterSubdiretorio(root: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle> {
     let currentHandle = root;
-    const parts = this.normalizarCaminho(pathParts);
+    let parts = this.normalizarCaminho(pathParts);
+    if (root.name.toLowerCase() === 'uem' && parts[0]?.toLowerCase() === 'uem') {
+      parts = parts.slice(1);
+    }
     for (const part of parts) {
       if (!part) continue;
       currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
@@ -96,7 +99,10 @@ export class GerenciadorDiretorio {
 
   static async obterSubdiretorioSemCriar(root: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle | null> {
     let currentHandle = root;
-    const parts = this.normalizarCaminho(pathParts);
+    let parts = this.normalizarCaminho(pathParts);
+    if (root.name.toLowerCase() === 'uem' && parts[0]?.toLowerCase() === 'uem') {
+      parts = parts.slice(1);
+    }
     for (const part of parts) {
       if (!part) continue;
       try {

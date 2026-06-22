@@ -7,16 +7,21 @@ import {
   ConfiguracaoClassroom, 
   ArquivoClassroom, 
   StatusVinculoClassroom,
-  RespostaNotificacoesClassroom
+  RespostaNotificacoesClassroom,
+  VideoClassroom,
+  StatusVideosClassroom
 } from '@/lib/api/classroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 import { useAcademico } from './ProvedorAcademico'
 
 interface ContextoClassroomData {
   filesCache: Record<number, StatusVinculoClassroom>
+  videosCache: Record<number, StatusVideosClassroom>
   classroomConfig: ConfiguracaoClassroom | null
   loadingStates: Record<number, boolean>
   syncingStates: Record<number, boolean>
+  loadingVideosStates: Record<number, boolean>
+  syncingVideosStates: Record<number, boolean>
   directoryHandle: FileSystemDirectoryHandle | null
   hasFolderPermission: boolean
   isFileSystemSupported: boolean
@@ -37,6 +42,8 @@ interface ContextoClassroomData {
   obterNotificacoesGerais: (anoId: number, forcar?: boolean) => Promise<void>
   marcarMateriaLidaLocal: (materiaId: number) => void
   atualizarCategoriasMateria: (materiaId: number, anoId: number, customFolders: string, redistributions: Array<{ drive_file_id: string; new_folder: string }>) => Promise<void>
+  obterVideos: (materiaId: number, anoId: number, forcarSync?: boolean) => Promise<StatusVideosClassroom | null>
+  atualizarVideo: (materiaId: number, videoId: string, dados: Partial<VideoClassroom>) => Promise<void>
 }
 
 const ContextoClassroom = createContext<ContextoClassroomData>({} as ContextoClassroomData)
@@ -45,9 +52,12 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const { anoAtivoId } = useAcademico()
   const [filesCache, setFilesCache] = useState<Record<number, StatusVinculoClassroom>>({})
+  const [videosCache, setVideosCache] = useState<Record<number, StatusVideosClassroom>>({})
   const [classroomConfig, setClassroomConfig] = useState<ConfiguracaoClassroom | null>(null)
   const [loadingStates, setLoadingStates] = useState<Record<number, boolean>>({})
   const [syncingStates, setSyncingStates] = useState<Record<number, boolean>>({})
+  const [loadingVideosStates, setLoadingVideosStates] = useState<Record<number, boolean>>({})
+  const [syncingVideosStates, setSyncingVideosStates] = useState<Record<number, boolean>>({})
   const [unreadNotifications, setUnreadNotifications] = useState<RespostaNotificacoesClassroom | null>(null)
   const [notificationsCount, setNotificationsCount] = useState<number>(0)
 
@@ -154,10 +164,15 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   const isSelectingFolderRef = React.useRef(false)
 
   const filesCacheRef = React.useRef(filesCache)
+  const videosCacheRef = React.useRef(videosCache)
 
   React.useEffect(() => {
     filesCacheRef.current = filesCache
   }, [filesCache])
+
+  React.useEffect(() => {
+    videosCacheRef.current = videosCache
+  }, [videosCache])
 
   React.useEffect(() => {
     setIsFileSystemSupported(typeof window !== 'undefined' && 'showDirectoryPicker' in window)
@@ -378,6 +393,106 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     if (filesCache[materiaId] || loadingStates[materiaId]) return
     obterArquivos(materiaId, anoId, false)
   }, [filesCache, loadingStates, obterArquivos])
+
+  const obterVideos = useCallback(async (
+    materiaId: number, 
+    anoId: number, 
+    forcarSync: boolean = false
+  ): Promise<StatusVideosClassroom | null> => {
+    if (!session?.accessToken) return null
+
+    const cacheAtual = videosCacheRef.current
+    if (!forcarSync && cacheAtual[materiaId]) {
+      return cacheAtual[materiaId]
+    }
+
+    const isExisting = !!cacheAtual[materiaId]
+
+    if (isExisting) {
+      setSyncingVideosStates(prev => ({ ...prev, [materiaId]: true }))
+    } else {
+      setLoadingVideosStates(prev => ({ ...prev, [materiaId]: true }))
+    }
+
+    try {
+      let connectionData: StatusVideosClassroom | null = null
+
+      try {
+        connectionData = await classroom_service.obterVideos(
+          session.accessToken,
+          null,
+          materiaId,
+          anoId
+        )
+
+        if (connectionData && connectionData.videos) {
+          setVideosCache(prev => ({ ...prev, [materiaId]: connectionData! }))
+        }
+      } catch (localError) {
+        console.error(localError)
+      }
+
+      if (session.googleAccessToken) {
+        classroom_service.obterVideos(
+          session.accessToken,
+          session.googleAccessToken,
+          materiaId,
+          anoId
+        ).then(syncData => {
+          if (syncData) {
+            setVideosCache(prev => ({ ...prev, [materiaId]: syncData }))
+          }
+        }).catch(syncError => {
+          console.error(syncError)
+        }).finally(() => {
+          setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+        })
+      } else {
+        setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+      }
+
+      return connectionData
+    } catch (error) {
+      console.error(error)
+      return null
+    } finally {
+      setLoadingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+      setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+    }
+  }, [session])
+
+  const atualizarVideo = useCallback(async (
+    materiaId: number,
+    videoId: string,
+    dados: Partial<VideoClassroom>
+  ) => {
+    if (!session?.accessToken) return
+
+    setVideosCache(prev => {
+      const existing = prev[materiaId]
+      if (!existing) return prev
+      return {
+        ...prev,
+        [materiaId]: {
+          ...existing,
+          videos: existing.videos.map(v => v.video_id === videoId ? { ...v, ...dados } : v)
+        }
+      }
+    })
+
+    try {
+      await classroom_service.atualizarVideo(
+        session.accessToken,
+        videoId,
+        materiaId,
+        anoAtivoId || 0,
+        dados
+      )
+    } catch (error) {
+      console.error(error)
+      obterVideos(materiaId, anoAtivoId || 0, true)
+    }
+  }, [session, anoAtivoId, obterVideos])
 
   const atualizarArquivoLocal = useCallback((
     materiaId: number, 
@@ -718,9 +833,12 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   return (
     <ContextoClassroom.Provider value={{
       filesCache,
+      videosCache,
       classroomConfig,
       loadingStates,
       syncingStates,
+      loadingVideosStates,
+      syncingVideosStates,
       directoryHandle,
       hasFolderPermission,
       isFileSystemSupported,
@@ -740,7 +858,9 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       enviarArquivoLocal,
       obterNotificacoesGerais,
       marcarMateriaLidaLocal,
-      atualizarCategoriasMateria
+      atualizarCategoriasMateria,
+      obterVideos,
+      atualizarVideo
     }}>
       {children}
     </ContextoClassroom.Provider>

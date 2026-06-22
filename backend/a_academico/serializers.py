@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia, ProfessorClassroom
+
+from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia, ProfessorClassroom, VideoMateriaClassroom
 from django.db.models import Sum, F
 from django.contrib.auth.models import User
 
@@ -489,6 +490,12 @@ class ArquivoMateriaClassroomSerializer(serializers.ModelSerializer):
     class Meta:
         model = ArquivoMateriaClassroom
         fields = ['id', 'drive_file_id', 'original_name', 'custom_name', 'selected_folder', 'local_path', 'sync_at', 'is_ignored']
+
+
+class VideoMateriaClassroomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoMateriaClassroom
+        fields = ['id', 'video_id', 'tipo', 'titulo', 'custom_name', 'selected_folder', 'is_ignored', 'url', 'thumbnail', 'sync_at']
 
 
 class ProfessorClassroomSerializer(serializers.ModelSerializer):

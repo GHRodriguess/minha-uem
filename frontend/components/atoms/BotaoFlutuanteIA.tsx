@@ -1,6 +1,7 @@
 'use client'
 
 import { Sparkles } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 
 interface BotaoFlutuanteIAProps {
   onClick: () => void
@@ -8,6 +9,12 @@ interface BotaoFlutuanteIAProps {
 }
 
 export default function BotaoFlutuanteIA({ onClick, isOpen }: BotaoFlutuanteIAProps) {
+  const pathname = usePathname()
+
+  if (pathname && (pathname.includes('/visualizador') || pathname.includes('/visualizar'))) {
+    return null
+  }
+
   return (
     <button
       onClick={onClick}
