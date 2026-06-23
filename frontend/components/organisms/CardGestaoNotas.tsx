@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
 import { academic_service } from '@/lib/api/academico'
@@ -16,6 +16,12 @@ interface CardGestaoNotasProps {
 export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
   const { data: session } = useSession()
   const [config, setConfig] = useState<ConfiguracaoMateria | null>(materia.configuracao_notas || null)
+
+  useEffect(() => {
+    if (materia.configuracao_notas) {
+      setConfig(materia.configuracao_notas)
+    }
+  }, [materia.configuracao_notas])
 
   const atualizarAvaliacao = async (id: number, data: Partial<Avaliacao>) => {
     if (!session?.accessToken || !config) return
@@ -47,7 +53,7 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
 
   if (!config) return null
   const todasNotas = config.avaliacoes.every(a => a.nota !== null) && config.avaliacoes.length > 0
-  const aprovado = config.media_atual >= config.media_minima
+  const aprovado = config.media_atual >= (config.media_minima ?? 6.0)
 
   return (
     <div className="space-y-6 text-xs">

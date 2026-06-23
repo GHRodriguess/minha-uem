@@ -294,7 +294,8 @@ class MateriaSerializer(serializers.ModelSerializer):
 class ConfiguracaoMateriaResumidaSerializer(ConfiguracaoMateriaSerializer):
     class Meta:
         model = ConfiguracaoMateria
-        fields = ['id', 'avaliacoes', 'media_atual', 'quanto_falta', 'approval_status']
+        fields = ['id', 'avaliacoes', 'media_atual', 'quanto_falta', 'approval_status', 'media_minima']
+
 
 
 class MateriaResumidaSerializer(serializers.ModelSerializer):

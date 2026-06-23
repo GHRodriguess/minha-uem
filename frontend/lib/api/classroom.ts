@@ -272,6 +272,14 @@ export const classroom_service = {
         anoId: number,
         signal?: AbortSignal,
     ) {
+        if (!googleToken) {
+            return api_client.obter<StatusVinculoClassroom>(
+                `${base_path}/arquivos/`,
+                { materia_id: materiaId, ano_id: anoId },
+                token,
+                signal,
+            );
+        }
         return executarComRenovacaoGoogle(
             (tokenGoogleUsar) => {
                 const headers: Record<string, string> = {
@@ -507,6 +515,14 @@ export const classroom_service = {
         anoId: number,
         signal?: AbortSignal,
     ) {
+        if (!googleToken) {
+            return api_client.obter<StatusVideosClassroom>(
+                `${base_path}/videos/`,
+                { materia_id: materiaId, ano_id: anoId },
+                token,
+                signal,
+            );
+        }
         return executarComRenovacaoGoogle(
             (tokenGoogleUsar) => {
                 const headers: Record<string, string> = {
