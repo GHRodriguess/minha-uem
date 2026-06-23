@@ -165,6 +165,8 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
 
   const filesCacheRef = React.useRef(filesCache)
   const videosCacheRef = React.useRef(videosCache)
+  const pendingArquivosRequestsRef = React.useRef<Record<number, Promise<StatusVinculoClassroom | null> | undefined>>({})
+  const pendingVideosRequestsRef = React.useRef<Record<number, Promise<StatusVideosClassroom | null> | undefined>>({})
 
   React.useEffect(() => {
     filesCacheRef.current = filesCache
@@ -305,88 +307,104 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   ): Promise<StatusVinculoClassroom | null> => {
     if (!session?.accessToken) return null
 
+    const token = session.accessToken
+    const googleToken = session.googleAccessToken || null
+
     const cacheAtual = filesCacheRef.current
     if (!forcarSync && cacheAtual[materiaId]) {
       return cacheAtual[materiaId]
     }
 
-    const isExisting = !!cacheAtual[materiaId]
-
-    if (isExisting) {
-      setSyncingStates(prev => ({ ...prev, [materiaId]: true }))
-    } else {
-      setLoadingStates(prev => ({ ...prev, [materiaId]: true }))
+    if (!forcarSync && pendingArquivosRequestsRef.current[materiaId]) {
+      return pendingArquivosRequestsRef.current[materiaId]
     }
 
-    try {
-      let connectionData: StatusVinculoClassroom | null = null
+    const requestPromise = (async () => {
+      const isExisting = !!cacheAtual[materiaId]
 
-      try {
-        connectionData = await classroom_service.obterArquivos(
-          session.accessToken,
-          null,
-          materiaId,
-          anoId
-        )
-
-        if (connectionData && connectionData.arquivos) {
-          connectionData.arquivos = connectionData.arquivos.map(fileItem => ({
-            ...fileItem,
-            selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
-          }))
-          
-          setFilesCache(prev => ({ ...prev, [materiaId]: connectionData! }))
-
-          if (directoryHandle && hasFolderPermission) {
-            escanearPastaLocal(materiaId, anoId)
-          }
-        }
-      } catch (localError) {
-        console.error(localError)
+      if (isExisting) {
+        setSyncingStates(prev => ({ ...prev, [materiaId]: true }))
+      } else {
+        setLoadingStates(prev => ({ ...prev, [materiaId]: true }))
       }
 
-      if (session.googleAccessToken) {
-        classroom_service.obterArquivos(
-          session.accessToken,
-          session.googleAccessToken,
-          materiaId,
-          anoId
-        ).then(syncData => {
-          if (syncData) {
-            if (syncData.arquivos) {
-              syncData.arquivos = syncData.arquivos.map(fileItem => ({
-                ...fileItem,
-                selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
-              }))
-            }
-            setFilesCache(prev => ({ ...prev, [materiaId]: syncData }))
+      try {
+        let connectionData: StatusVinculoClassroom | null = null
+
+        try {
+          connectionData = await classroom_service.obterArquivos(
+            token,
+            null,
+            materiaId,
+            anoId
+          )
+
+          if (connectionData && connectionData.arquivos) {
+            connectionData.arquivos = connectionData.arquivos.map(fileItem => ({
+              ...fileItem,
+              selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
+            }))
+            
+            setFilesCache(prev => ({ ...prev, [materiaId]: connectionData! }))
+
             if (directoryHandle && hasFolderPermission) {
               escanearPastaLocal(materiaId, anoId)
             }
           }
-        }).catch(syncError => {
-          console.error(syncError)
-        }).finally(() => {
+        } catch (localError) {
+          console.error(localError)
+        }
+
+        if (googleToken) {
+          classroom_service.obterArquivos(
+            token,
+            googleToken,
+            materiaId,
+            anoId
+          ).then(syncData => {
+            if (syncData) {
+              if (syncData.arquivos) {
+                syncData.arquivos = syncData.arquivos.map(fileItem => ({
+                  ...fileItem,
+                  selected_folder: fileItem.selected_folder === 'docs' ? 'documentos' : fileItem.selected_folder
+                }))
+              }
+              setFilesCache(prev => ({ ...prev, [materiaId]: syncData }))
+              if (directoryHandle && hasFolderPermission) {
+                escanearPastaLocal(materiaId, anoId)
+              }
+            }
+          }).catch(syncError => {
+            console.error(syncError)
+          }).finally(() => {
+            setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
+          })
+        } else {
           setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
-        })
-      } else {
+        }
+
+        if (!classroomConfig) {
+          classroom_service.obterConfiguracao(token)
+            .then(configData => setClassroomConfig(configData))
+            .catch(err => console.error(err))
+        }
+
+        return connectionData
+      } catch (error) {
+        console.error(error)
+        return null
+      } finally {
+        setLoadingStates(prev => ({ ...prev, [materiaId]: false }))
         setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
+        delete pendingArquivosRequestsRef.current[materiaId]
       }
+    })()
 
-      if (!classroomConfig) {
-        classroom_service.obterConfiguracao(session.accessToken)
-          .then(configData => setClassroomConfig(configData))
-          .catch(err => console.error(err))
-      }
-
-      return connectionData
-    } catch (error) {
-      console.error(error)
-      return null
-    } finally {
-      setLoadingStates(prev => ({ ...prev, [materiaId]: false }))
-      setSyncingStates(prev => ({ ...prev, [materiaId]: false }))
+    if (!forcarSync) {
+      pendingArquivosRequestsRef.current[materiaId] = requestPromise
     }
+
+    return requestPromise
   }, [session, classroomConfig, directoryHandle, hasFolderPermission, escanearPastaLocal])
 
   const preCarregarArquivos = useCallback(async (materiaId: number, anoId: number): Promise<void> => {
@@ -401,64 +419,80 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   ): Promise<StatusVideosClassroom | null> => {
     if (!session?.accessToken) return null
 
+    const token = session.accessToken
+    const googleToken = session.googleAccessToken || null
+
     const cacheAtual = videosCacheRef.current
     if (!forcarSync && cacheAtual[materiaId]) {
       return cacheAtual[materiaId]
     }
 
-    const isExisting = !!cacheAtual[materiaId]
-
-    if (isExisting) {
-      setSyncingVideosStates(prev => ({ ...prev, [materiaId]: true }))
-    } else {
-      setLoadingVideosStates(prev => ({ ...prev, [materiaId]: true }))
+    if (!forcarSync && pendingVideosRequestsRef.current[materiaId]) {
+      return pendingVideosRequestsRef.current[materiaId]
     }
 
-    try {
-      let connectionData: StatusVideosClassroom | null = null
+    const requestPromise = (async () => {
+      const isExisting = !!cacheAtual[materiaId]
+
+      if (isExisting) {
+        setSyncingVideosStates(prev => ({ ...prev, [materiaId]: true }))
+      } else {
+        setLoadingVideosStates(prev => ({ ...prev, [materiaId]: true }))
+      }
 
       try {
-        connectionData = await classroom_service.obterVideos(
-          session.accessToken,
-          null,
-          materiaId,
-          anoId
-        )
+        let connectionData: StatusVideosClassroom | null = null
 
-        if (connectionData && connectionData.videos) {
-          setVideosCache(prev => ({ ...prev, [materiaId]: connectionData! }))
-        }
-      } catch (localError) {
-        console.error(localError)
-      }
+        try {
+          connectionData = await classroom_service.obterVideos(
+            token,
+            null,
+            materiaId,
+            anoId
+          )
 
-      if (session.googleAccessToken) {
-        classroom_service.obterVideos(
-          session.accessToken,
-          session.googleAccessToken,
-          materiaId,
-          anoId
-        ).then(syncData => {
-          if (syncData) {
-            setVideosCache(prev => ({ ...prev, [materiaId]: syncData }))
+          if (connectionData && connectionData.videos) {
+            setVideosCache(prev => ({ ...prev, [materiaId]: connectionData! }))
           }
-        }).catch(syncError => {
-          console.error(syncError)
-        }).finally(() => {
-          setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
-        })
-      } else {
-        setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
-      }
+        } catch (localError) {
+          console.error(localError)
+        }
 
-      return connectionData
-    } catch (error) {
-      console.error(error)
-      return null
-    } finally {
-      setLoadingVideosStates(prev => ({ ...prev, [materiaId]: false }))
-      setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+        if (googleToken) {
+          classroom_service.obterVideos(
+            token,
+            googleToken,
+            materiaId,
+            anoId
+          ).then(syncData => {
+            if (syncData) {
+              setVideosCache(prev => ({ ...prev, [materiaId]: syncData }))
+            }
+          }).catch(syncError => {
+            console.error(syncError)
+          }).finally(() => {
+            setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+          })
+        } else {
+          setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+        }
+
+        return connectionData
+      } catch (error) {
+        console.error(error)
+        return null
+      } finally {
+        setLoadingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+        setSyncingVideosStates(prev => ({ ...prev, [materiaId]: false }))
+        delete pendingVideosRequestsRef.current[materiaId]
+      }
+    })()
+
+    if (!forcarSync) {
+      pendingVideosRequestsRef.current[materiaId] = requestPromise
     }
+
+    return requestPromise
   }, [session])
 
   const atualizarVideo = useCallback(async (

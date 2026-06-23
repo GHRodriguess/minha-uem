@@ -30,7 +30,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
     let examRequired = 0
 
     if (unassignedAssessments.length === 0 || Object.keys(simulatedGrades).length === unassignedAssessments.length) {
-      if (roundedProjected >= config.media_minima) {
+      if (roundedProjected >= (config.media_minima ?? 6.0)) {
         status = 'APROVADO'
       } else if (roundedProjected >= 3.0) {
         status = 'EXAME'
@@ -111,7 +111,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
         <div className="flex items-center gap-3 p-4 bg-muted/30 border border-border/50 rounded-xl">
           <GraduationCap className="w-5 h-5 text-primary shrink-0" />
           <div className="text-xs font-medium">
-            {config.media_atual >= config.media_minima ? (
+            {config.media_atual >= (config.media_minima ?? 6.0) ? (
               <p className="text-green-500 font-bold">Parabéns! Você já foi aprovado nesta disciplina!</p>
             ) : config.media_atual >= 3.0 ? (
               <p className="text-amber-500 font-bold">Você está de Exame Final. Nota necessária: {(10.0 - config.media_atual).toFixed(2)}</p>
