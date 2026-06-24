@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Materia } from '@/types/academico'
 import { AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react'
+import { obterDataFormatada } from '@/lib/utils'
 
 interface CardMateriaHomeProps {
   subject: Materia
@@ -31,7 +32,7 @@ export function CardMateriaHome({ subject }: CardMateriaHomeProps) {
   const currentStatus = subject.configuracao_notas?.approval_status ?? 'EM_ANDAMENTO'
   const pointsNeeded = subject.configuracao_notas?.quanto_falta ?? 0
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = obterDataFormatada(new Date())
   const isInProgress = todayStr >= firstSchedule.data_inicio && todayStr <= firstSchedule.data_termino
   const isUpcoming = todayStr < firstSchedule.data_inicio
 

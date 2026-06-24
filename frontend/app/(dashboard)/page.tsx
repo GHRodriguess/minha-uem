@@ -11,6 +11,7 @@ import { BannerBoasVindas } from '@/components/organisms/BannerBoasVindas'
 import { CalendarioEventosHoje } from '@/components/organisms/CalendarioEventosHoje'
 import { ListaEventosProximos } from '@/components/organisms/ListaEventosProximos'
 import { obterAulasHoje } from '@/lib/utils/aulas'
+import { obterDataFormatada } from '@/lib/utils'
 
 export default function Home() {
   const { data: session } = useSession()
@@ -49,7 +50,7 @@ export default function Home() {
   }
 
   const todayClasses = obterAulasHoje(profile)
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = obterDataFormatada(new Date())
   const nextClass = todayClasses.find(a => a.horario.inicio > `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`)
 
   const sortedMaterias = [...(profile.materias || [])].sort((a, b) => {
