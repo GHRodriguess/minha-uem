@@ -12,13 +12,7 @@ import { FiltrosCalendario } from '@/components/molecules/FiltrosCalendario'
 import CarregamentoHorarios from '@/components/templates/CarregamentoHorarios'
 import { CalendarioGrade } from '@/components/organisms/CalendarioGrade'
 import { CalendarioListaEventos } from '@/components/organisms/CalendarioListaEventos'
-
-function obterDataFormatada(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+import { obterDataFormatada } from '@/lib/utils'
 
 export default function HorariosPage() {
   const { data: session } = useSession()
