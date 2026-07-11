@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { PainelPDF } from './PainelPDF'
+import { PainelVisualizador } from './PainelVisualizador'
 import { DivisorSplitter } from '@/components/atoms/DivisorSplitter'
 
 interface SplitterVisualizacaoProps {
+  leftFile: any | null
+  rightFile: any | null
   leftFileUrl: string | null
   rightFileUrl: string | null
   isSplit: boolean
@@ -19,6 +21,8 @@ interface SplitterVisualizacaoProps {
 }
 
 export function SplitterVisualizacao({
+  leftFile,
+  rightFile,
   leftFileUrl,
   rightFileUrl,
   isSplit,
@@ -148,12 +152,15 @@ export function SplitterVisualizacao({
   if (!isSplit || !rightFileUrl) {
     return (
       <div ref={containerRef} className="flex-1 w-full h-full relative overflow-hidden flex">
-        <PainelPDF
+        <PainelVisualizador
+          file={leftFile}
           fileUrl={leftFileUrl}
           side="left"
           canClose={leftFileUrl !== null}
           onClose={onCloseLeft}
           isLoading={isLeftLoading}
+          onDropFile={onDropFile}
+          onDropLocalFile={onDropLocalFile}
         />
         {renderizarZonasDeDrop()}
       </div>
@@ -166,12 +173,15 @@ export function SplitterVisualizacao({
       className="flex flex-1 w-full h-full overflow-hidden select-none relative"
     >
       <div style={{ width: `${leftWidth}%` }} className="h-full overflow-hidden flex shrink-0">
-        <PainelPDF
+        <PainelVisualizador
+          file={leftFile}
           fileUrl={leftFileUrl}
           side="left"
           canClose={leftFileUrl !== null}
           onClose={onCloseLeft}
           isLoading={isLeftLoading}
+          onDropFile={onDropFile}
+          onDropLocalFile={onDropLocalFile}
         />
       </div>
 
@@ -182,12 +192,15 @@ export function SplitterVisualizacao({
       />
 
       <div style={{ width: `${100 - leftWidth}%` }} className="h-full overflow-hidden flex flex-1">
-        <PainelPDF
+        <PainelVisualizador
+          file={rightFile}
           fileUrl={rightFileUrl}
           side="right"
           canClose={rightFileUrl !== null}
           onClose={onCloseRight}
           isLoading={isRightLoading}
+          onDropFile={onDropFile}
+          onDropLocalFile={onDropLocalFile}
         />
       </div>
 

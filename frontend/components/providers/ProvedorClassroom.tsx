@@ -558,10 +558,11 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     originalName: string,
     selectedFolder?: string
   ) => {
-    if (!session?.accessToken || !session.googleAccessToken || !directoryHandle || !hasFolderPermission) return
+    if (!session?.accessToken) throw new Error('Sessão inválida')
+    if (!directoryHandle || !hasFolderPermission) throw new Error('Acesso à pasta local não concedido')
 
     const cache = filesCacheRef.current[materiaId]
-    if (!cache) return
+    if (!cache) throw new Error('Cache de arquivos não carregado')
 
     const courseName = cache.curso_nome || "Sem_Curso"
     const year = cache.ano_letivo || String(anoId)
@@ -571,14 +572,17 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     const finalFileName = fileItem?.custom_name || originalName
 
     try {
+      console.log('[Download] 1/4 Obtendo conteúdo do arquivo do Drive...')
       const fileBlob = await classroom_service.obterConteudoArquivo(
         session.accessToken,
-        session.googleAccessToken,
+        session.googleAccessToken || '',
         driveFileId
       )
+      console.log('[Download] 2/4 Conteúdo do Drive recebido (tamanho:', fileBlob.size, 'bytes). Gravando em disco local...')
 
       const pathParts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
       const localPath = await GerenciadorDiretorio.gravarArquivoLocal(directoryHandle, pathParts, finalFileName, fileBlob)
+      console.log('[Download] 3/4 Arquivo físico gravado localmente:', localPath, '. Registrando no banco de dados do backend...')
 
       const downloadedItem = await classroom_service.baixarArquivo(
         session.accessToken,
@@ -589,6 +593,7 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
         localPath,
         folder
       )
+      console.log('[Download] 4/4 Download registrado com sucesso no backend!')
 
       localStorage.setItem('baixado_' + driveFileId, 'true')
 
@@ -597,7 +602,7 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
         local_path: downloadedItem.local_path
       })
     } catch (error) {
-      console.error(error)
+      console.error('[Download] Erro crítico no fluxo de download:', error)
       throw error
     }
   }, [session, directoryHandle, hasFolderPermission, atualizarArquivoLocal])

@@ -17,7 +17,13 @@ import {
   FileText,
   ArrowUpDown,
   Layers,
-  Laptop
+  Laptop,
+  FileSpreadsheet,
+  FileImage,
+  FileSignature,
+  FileVideo,
+  FileCode,
+  FileEdit
 } from 'lucide-react'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
@@ -29,6 +35,17 @@ interface CardClassroomProps {
 
 type OrdenacaoArquivo = 'nome' | 'recentes'
 type AgrupamentoArquivo = 'nenhum' | 'categoria' | 'status'
+
+const determinarIconeCard = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  if (ext === 'pdf') return <FileSignature className="w-4 h-4" />
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return <FileSpreadsheet className="w-4 h-4" />
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return <FileImage className="w-4 h-4" />
+  if (['doc', 'docx', 'odt'].includes(ext)) return <FileEdit className="w-4 h-4" />
+  if (['mp4', 'mkv', 'webm', 'ogg', 'mov', 'avi', 'flv', 'wmv', 'm4v', '3gp'].includes(ext)) return <FileVideo className="w-4 h-4" />
+  if (['py', 'js', 'ts', 'html', 'css', 'json', 'md', 'java', 'cpp', 'c', 'sql', 'sh', 'yml', 'yaml'].includes(ext)) return <FileCode className="w-4 h-4" />
+  return <FileText className="w-4 h-4" />
+}
 
 export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
   const { data: session } = useSession()
@@ -200,7 +217,11 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
     return tipo.charAt(0).toUpperCase() + tipo.slice(1)
   }
 
-  const arquivosProcessados = [...statusVinculo.arquivos].sort((a, b) => {
+  const arquivosDisponiveis = isFileSystemSupported
+    ? statusVinculo.arquivos
+    : statusVinculo.arquivos.filter((f) => !f.drive_file_id.startsWith('local_'))
+
+  const arquivosProcessados = [...arquivosDisponiveis].sort((a, b) => {
     if (ordenacao === 'nome') {
       const nameA = a.custom_name || a.original_name
       const nameB = b.custom_name || b.original_name
@@ -228,7 +249,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
           >
             <div className="flex items-start gap-3">
               <div className={`p-2 rounded-lg shrink-0 ${isReallyDownloaded ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
-                <FileText className="w-4 h-4" />
+                {determinarIconeCard(arquivo.original_name)}
               </div>
 
               <div className="space-y-1 min-w-0 flex-1">
@@ -275,7 +296,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                     </p>
                   )}
 
-                  {isReallyDownloaded && (
+                  {isFileSystemSupported && isReallyDownloaded && (
                     <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-3 h-3 shrink-0" />
                       <span className="text-[9px] font-black uppercase tracking-widest">Baixado</span>
@@ -299,7 +320,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
               </select>
 
               <div className="flex items-center gap-1.5">
-                {isReallyDownloaded && (
+                {isFileSystemSupported && isReallyDownloaded && (
                   <button
                     onClick={() => abrirItemLocal(materiaId, arquivo.id || arquivo.drive_file_id)}
                     className="flex items-center justify-center p-2 h-8 w-8 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
@@ -309,7 +330,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                   </button>
                 )}
 
-                {!isReallyDownloaded && (
+                {isFileSystemSupported && !isReallyDownloaded && (
                   <button
                     onClick={() => lidarComDownload(arquivo.drive_file_id, arquivo.original_name)}
                     disabled={estaBaixando}

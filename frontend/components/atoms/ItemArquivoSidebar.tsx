@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { FileText, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { FileText, ChevronLeft, ChevronRight, Eye, EyeOff, Video, FileCode, FileEdit } from 'lucide-react'
+import { obterTipoVisualizador } from '@/components/organisms/PainelVisualizador'
 
 interface ArquivoMateriaSimples {
   drive_file_id: string
@@ -9,6 +10,7 @@ interface ArquivoMateriaSimples {
   custom_name: string | null
   selected_folder: string
   is_ignored?: boolean
+  video_tipo?: 'drive' | 'youtube'
 }
 
 interface ItemArquivoSidebarProps {
@@ -50,6 +52,14 @@ export function ItemArquivoSidebar({
     }
   }
 
+  const type = obterTipoVisualizador(file.original_name, file.video_tipo)
+  const obterIcone = () => {
+    if (type === 'video') return <Video className={`w-4 h-4 shrink-0 mt-0.5 ${isOpened ? 'text-primary' : 'text-muted-foreground'}`} />
+    if (type === 'text') return <FileCode className={`w-4 h-4 shrink-0 mt-0.5 ${isOpened ? 'text-primary' : 'text-muted-foreground'}`} />
+    if (type === 'word') return <FileEdit className={`w-4 h-4 shrink-0 mt-0.5 ${isOpened ? 'text-primary' : 'text-muted-foreground'}`} />
+    return <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${isOpened ? 'text-primary' : 'text-muted-foreground'}`} />
+  }
+
   return (
     <div
       draggable={true}
@@ -74,7 +84,7 @@ export function ItemArquivoSidebar({
       } ${file.is_ignored ? 'opacity-60' : ''}`}
       title="Clique para abrir de forma inteligente, ou use o menu no hover para mais opções"
     >
-      <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${isOpened ? 'text-primary' : 'text-muted-foreground'}`} />
+      {obterIcone()}
       
       <span className="text-[11px] font-bold text-foreground leading-relaxed truncate-2-lines flex-1 group-hover:pr-20 transition-all duration-150">
         {file.custom_name || file.original_name}

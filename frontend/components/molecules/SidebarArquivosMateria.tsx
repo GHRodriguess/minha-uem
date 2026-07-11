@@ -42,8 +42,8 @@ export function SidebarArquivosMateria({
 
   if (!isOpen) return null
 
-  const pdfs = files.filter(f => f.original_name.toLowerCase().endsWith('.pdf'))
-  const pdfsFiltrados = pdfs.filter(f => {
+  const itensDisponiveis = files
+  const itensFiltrados = itensDisponiveis.filter(f => {
     const bateNome = (f.custom_name || f.original_name).toLowerCase().includes(termoPesquisa.toLowerCase())
     const bateOculto = mostrarOcultados ? true : !f.is_ignored
     return bateNome && bateOculto
@@ -61,7 +61,7 @@ export function SidebarArquivosMateria({
   }
 
   const renderizarGrupo = (titulo: string, folderKey: string) => {
-    const list = pdfsFiltrados.filter(f => {
+    const list = itensFiltrados.filter(f => {
       if (folderKey === 'outros') {
         return !listaCategorias.includes(f.selected_folder)
       }
@@ -97,7 +97,7 @@ export function SidebarArquivosMateria({
       <div className="flex justify-between items-center border-b border-border/40 pb-2">
         <div className="flex flex-col gap-0.5">
           <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Arquivos</h3>
-          <p className="text-[9px] text-muted-foreground font-semibold uppercase">{pdfs.length} disponíveis</p>
+          <p className="text-[9px] text-muted-foreground font-semibold uppercase">{itensDisponiveis.length} disponíveis</p>
         </div>
         <button
           onClick={onClose}
@@ -130,13 +130,13 @@ export function SidebarArquivosMateria({
       </div>
 
       <div className="flex flex-col gap-4 overflow-y-auto pr-0.5">
-        {loading && pdfsFiltrados.length === 0 ? (
+        {loading && itensFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 text-primary">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Sincronizando...</span>
           </div>
-        ) : pdfsFiltrados.length === 0 ? (
-          <p className="text-[10px] text-muted-foreground text-center py-6 font-medium">Nenhum PDF encontrado.</p>
+        ) : itensFiltrados.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground text-center py-6 font-medium">Nenhum arquivo encontrado.</p>
         ) : (
           <>
             {listaCategorias.map(cat => renderizarGrupo(formatarNomeTipo(cat), cat))}

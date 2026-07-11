@@ -11,8 +11,8 @@ interface PainelPDFProps {
   fileUrl: string | null
   onClose?: () => void
   canClose?: boolean
-  onDropFile?: (fileId: string, clientX: number, rect: DOMRect) => void
-  onDropLocalFile?: (file: File, clientX: number, rect: DOMRect) => void
+  onDropFile?: (fileId: string, side: 'left' | 'right') => void
+  onDropLocalFile?: (file: File, side: 'left' | 'right') => void
   side?: 'left' | 'right'
   isLoading?: boolean
 }
@@ -172,17 +172,16 @@ export function PainelPDF({
           onDrop={(e) => {
             e.preventDefault()
             setDragOver(false)
-            const rect = e.currentTarget.getBoundingClientRect()
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
               const file = e.dataTransfer.files[0]
               if (file.type === 'application/pdf' && onDropLocalFile) {
-                onDropLocalFile(file, e.clientX, rect)
+                onDropLocalFile(file, side)
               }
               return
             }
             const fileId = e.dataTransfer.getData('text/plain')
             if (fileId && onDropFile) {
-              onDropFile(fileId, e.clientX, rect)
+              onDropFile(fileId, side)
             }
           }}
           className={`flex-1 bg-muted/20 overflow-y-auto p-6 pt-20 flex flex-col items-center gap-2 scrollbar-thin transition-all duration-200 ${
