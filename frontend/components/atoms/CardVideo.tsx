@@ -46,7 +46,7 @@ export function CardVideo({ materiaId, video }: CardVideoProps) {
             <Video className="w-10 h-10" />
           </div>
         )}
-        <div className="absolute inset-0 bg-background/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer" onClick={() => router.push(`/disciplinas/${materiaId}/videos/visualizador?videoId=${video.video_id}`)}>
+        <div className="absolute inset-0 bg-background/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer" onClick={() => router.push(`/disciplinas/${materiaId}/arquivos/visualizador?fileId=${video.video_id}`)}>
           <div className="w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform">
             <Play className="w-5 h-5 fill-current ml-0.5" />
           </div>

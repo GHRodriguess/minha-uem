@@ -511,7 +511,7 @@ class ObterConteudoArquivoDriveView(APIView):
             headers = {'Authorization': f'Bearer {google_token}'}
             drive_url = f'https://www.googleapis.com/drive/v3/files/{drive_file_id}?alt=media'
             
-            drive_res = requests.get(drive_url, headers=headers, stream=True)
+            drive_res = requests.get(drive_url, headers=headers, stream=True, timeout=30)
 
             if drive_res.status_code == 401:
                 return Response({'erro': 'Token do Google expirado ou inválido', 'codigo': 'GOOGLE_TOKEN_EXPIRADO'}, status=status.HTTP_400_BAD_REQUEST)

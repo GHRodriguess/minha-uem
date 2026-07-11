@@ -13,10 +13,12 @@ import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
 import { ModalAcessoPasta } from '@/components/molecules/ModalAcessoPasta'
 import SidebarChatIA from '@/components/organisms/SidebarChatIA'
 import { useSincronizarUrlVisualizador } from '@/lib/hooks/useSincronizarUrlVisualizador'
+import { VideoClassroom } from '@/lib/api/classroom'
 
 interface TemplateVisualizadorPDFProps {
   materiaId: number
   files: any[]
+  videos: VideoClassroom[]
   initialLeftFileId: string | null
   initialRightFileId: string | null
 }
@@ -24,11 +26,20 @@ interface TemplateVisualizadorPDFProps {
 export function TemplateVisualizadorPDF({
   materiaId,
   files,
+  videos,
   initialLeftFileId,
   initialRightFileId
 }: TemplateVisualizadorPDFProps) {
   const { data: session } = useSession()
-  const { directoryHandle, hasFolderPermission, alternarOcultarArquivo, filesCache, loadingStates, solicitarAcessoPasta } = useClassroom()
+  const {
+    directoryHandle,
+    hasFolderPermission,
+    alternarOcultarArquivo,
+    filesCache,
+    loadingStates,
+    solicitarAcessoPasta,
+    isFileSystemSupported
+  } = useClassroom()
   const { anoAtivoId } = useAcademico()
   const customFolders = filesCache[materiaId]?.custom_folders || ''
   const isCargandoSidebar = loadingStates[materiaId]
@@ -36,10 +47,26 @@ export function TemplateVisualizadorPDF({
   const [leftFileId, setLeftFileId] = useState<string | null>(initialLeftFileId)
   const [rightFileId, setRightFileId] = useState<string | null>(initialRightFileId)
   const [showPermissionModal, definirExibicaoModal] = useState(false)
+  const modalExibidoRef = useRef<Record<string, boolean>>({})
 
   useSincronizarUrlVisualizador(leftFileId, rightFileId)
 
-  const [orderedFiles, setOrderedFiles] = useState<any[]>(files)
+  const todosArquivos = React.useMemo(() => {
+    const arquivosMapeados = files.map(f => ({ ...f, video_tipo: undefined }))
+    const videosMapeados = (videos || []).map(v => ({
+      drive_file_id: v.video_id,
+      original_name: v.titulo,
+      custom_name: v.custom_name,
+      selected_folder: v.selected_folder,
+      is_ignored: v.is_ignored,
+      local_path: null,
+      sync_at: v.sync_at,
+      video_tipo: v.tipo
+    }))
+    return [...arquivosMapeados, ...videosMapeados]
+  }, [files, videos])
+
+  const [orderedFiles, setOrderedFiles] = useState<any[]>([])
 
   const obterArquivosOrdenados = useCallback((baseFiles: any[]) => {
     if (typeof window === 'undefined') return baseFiles
@@ -56,9 +83,7 @@ export function TemplateVisualizadorPDF({
       return [...baseFiles].sort((a, b) => {
         const idxA = orderedIds.indexOf(a.drive_file_id)
         const idxB = orderedIds.indexOf(b.drive_file_id)
-        if (idxA !== -1 && idxB !== -1) {
-          return idxA - idxB
-        }
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
         if (idxA !== -1) return -1
         if (idxB !== -1) return 1
         const nameA = (a.custom_name || a.original_name).toLowerCase()
@@ -71,8 +96,8 @@ export function TemplateVisualizadorPDF({
   }, [materiaId])
 
   useEffect(() => {
-    setOrderedFiles(obterArquivosOrdenados(files))
-  }, [files, obterArquivosOrdenados])
+    setOrderedFiles(obterArquivosOrdenados(todosArquivos))
+  }, [todosArquivos, obterArquivosOrdenados])
 
   const lidarComReordenacaoManual = useCallback((draggedId: string, targetId: string) => {
     setOrderedFiles(prev => {
@@ -96,12 +121,16 @@ export function TemplateVisualizadorPDF({
 
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false)
   const dragCounterRef = useRef(0)
+  const arquivosCarregandoRef = useRef<Record<string, boolean>>({})
 
   const carregarPdfDoDrive = useCallback(async (fileId: string) => {
-    if (fileUrls[fileId]) return fileUrls[fileId]
-
     try {
-      const fileItem = files.find(f => f.drive_file_id === fileId)
+      const fileItem = todosArquivos.find(f => f.drive_file_id === fileId)
+      if (fileItem?.video_tipo === 'youtube') {
+        setFileUrls(prev => ({ ...prev, [fileId]: 'youtube' }))
+        return 'youtube'
+      }
+
       if (fileItem && fileItem.local_path && directoryHandle && hasFolderPermission) {
         try {
           const parts = fileItem.local_path.split('/')
@@ -116,18 +145,23 @@ export function TemplateVisualizadorPDF({
       }
 
       if (fileId.startsWith('local_')) {
+        setFileUrls(prev => ({ ...prev, [fileId]: 'failed' }))
         return null
       }
-      if (!session?.googleAccessToken) return null
+      if (!session?.googleAccessToken) {
+        setFileUrls(prev => ({ ...prev, [fileId]: 'failed' }))
+        return null
+      }
       const blob = await obterBlobGoogleDrive(fileId, session.googleAccessToken)
       const url = URL.createObjectURL(blob)
       setFileUrls(prev => ({ ...prev, [fileId]: url }))
       return url
     } catch (err) {
       console.error(err)
+      setFileUrls(prev => ({ ...prev, [fileId]: 'failed' }))
       return null
     }
-  }, [session?.googleAccessToken, fileUrls, files, directoryHandle, hasFolderPermission])
+  }, [session?.googleAccessToken, todosArquivos, directoryHandle, hasFolderPermission])
 
   const lidarComAberturaArquivo = useCallback((fileId: string, side: 'left' | 'right') => {
     if (side === 'left') {
@@ -152,9 +186,7 @@ export function TemplateVisualizadorPDF({
   const lidarComDragLeaveGlobal = (e: React.DragEvent) => {
     e.preventDefault()
     dragCounterRef.current--
-    if (dragCounterRef.current === 0) {
-      setIsDraggingGlobal(false)
-    }
+    if (dragCounterRef.current === 0) setIsDraggingGlobal(false)
   }
 
   const lidarComDropGlobal = (e: React.DragEvent) => {
@@ -170,14 +202,10 @@ export function TemplateVisualizadorPDF({
 
     setFileUrls(prev => ({ ...prev, [localId]: url }))
     if (side === 'left') {
-      if (leftFileId && !rightFileId) {
-        setRightFileId(leftFileId)
-      }
+      if (leftFileId && !rightFileId) setRightFileId(leftFileId)
       setLeftFileId(localId)
     } else {
-      if (rightFileId && !leftFileId) {
-        setLeftFileId(rightFileId)
-      }
+      if (rightFileId && !leftFileId) setLeftFileId(rightFileId)
       setRightFileId(localId)
     }
   }, [leftFileId, rightFileId])
@@ -196,14 +224,14 @@ export function TemplateVisualizadorPDF({
   }, [])
 
   const lidarComOcultarArquivo = useCallback(async (fileId: string, atualOcultado: boolean) => {
-    const fileItem = files.find(f => f.drive_file_id === fileId)
+    const fileItem = todosArquivos.find(f => f.drive_file_id === fileId)
     if (!fileItem || !anoAtivoId) return
     try {
       await alternarOcultarArquivo(materiaId, anoAtivoId, fileId, fileItem.original_name, !atualOcultado)
     } catch (err) {
       console.error(err)
     }
-  }, [files, anoAtivoId, alternarOcultarArquivo, materiaId])
+  }, [todosArquivos, anoAtivoId, alternarOcultarArquivo, materiaId])
 
   const lidarComDropArquivo = useCallback((fileId: string, side: 'left' | 'right') => {
     lidarComAberturaArquivo(fileId, side)
@@ -222,51 +250,64 @@ export function TemplateVisualizadorPDF({
   }
 
   useEffect(() => {
-    if (leftFileId && !fileUrls[leftFileId]) {
-      const fileItem = files.find(f => f.drive_file_id === leftFileId)
+    if (leftFileId && !fileUrls[leftFileId] && !arquivosCarregandoRef.current[leftFileId]) {
+      const fileItem = todosArquivos.find(f => f.drive_file_id === leftFileId)
+      const ehLocal = leftFileId.startsWith('local_') || !!fileItem?.local_path
+      if (!ehLocal && !session?.googleAccessToken) {
+        return
+      }
+
       if (fileItem || !leftFileId.startsWith('local_')) {
-        carregarPdfDoDrive(leftFileId)
+        arquivosCarregandoRef.current[leftFileId] = true
+        carregarPdfDoDrive(leftFileId).finally(() => {
+          delete arquivosCarregandoRef.current[leftFileId]
+        })
       }
     }
-  }, [leftFileId, files, fileUrls, carregarPdfDoDrive])
+  }, [leftFileId, todosArquivos, fileUrls, carregarPdfDoDrive, session?.googleAccessToken])
 
   useEffect(() => {
-    if (rightFileId && !fileUrls[rightFileId]) {
-      const fileItem = files.find(f => f.drive_file_id === rightFileId)
+    if (rightFileId && !fileUrls[rightFileId] && !arquivosCarregandoRef.current[rightFileId]) {
+      const fileItem = todosArquivos.find(f => f.drive_file_id === rightFileId)
+      const ehLocal = rightFileId.startsWith('local_') || !!fileItem?.local_path
+      if (!ehLocal && !session?.googleAccessToken) {
+        return
+      }
+
       if (fileItem || !rightFileId.startsWith('local_')) {
-        carregarPdfDoDrive(rightFileId)
+        arquivosCarregandoRef.current[rightFileId] = true
+        carregarPdfDoDrive(rightFileId).finally(() => {
+          delete arquivosCarregandoRef.current[rightFileId]
+        })
       }
     }
-  }, [rightFileId, files, fileUrls, carregarPdfDoDrive])
+  }, [rightFileId, todosArquivos, fileUrls, carregarPdfDoDrive, session?.googleAccessToken])
 
   useEffect(() => {
-    const hasLocalWithoutPermission =
-      !hasFolderPermission &&
-      ((leftFileId?.startsWith('local_') && files.some(f => f.drive_file_id === leftFileId)) ||
-       (rightFileId?.startsWith('local_') && files.some(f => f.drive_file_id === rightFileId)))
+    const temArquivoLocalSemPermissao = (fileId: string | null) => {
+      if (!fileId) return false
+      const fileItem = todosArquivos.find(f => f.drive_file_id === fileId)
+      const ehLocal = fileId.startsWith('local_') || !!fileItem?.local_path
+      return ehLocal && !hasFolderPermission
+    }
 
-    if (hasLocalWithoutPermission) {
+    const leftSemPermissao = temArquivoLocalSemPermissao(leftFileId)
+    const rightSemPermissao = temArquivoLocalSemPermissao(rightFileId)
+
+    if (leftSemPermissao && leftFileId && !modalExibidoRef.current[leftFileId]) {
+      modalExibidoRef.current[leftFileId] = true
       definirExibicaoModal(true)
-    } else {
+    } else if (rightSemPermissao && rightFileId && !modalExibidoRef.current[rightFileId]) {
+      modalExibidoRef.current[rightFileId] = true
+      definirExibicaoModal(true)
+    } else if (!leftSemPermissao && !rightSemPermissao) {
       definirExibicaoModal(false)
     }
-  }, [leftFileId, rightFileId, files, hasFolderPermission])
+  }, [leftFileId, rightFileId, todosArquivos, hasFolderPermission])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const url = new URL(window.location.href)
-    if (leftFileId) {
-      url.searchParams.set('fileId', leftFileId)
-    } else {
-      url.searchParams.delete('fileId')
-    }
-    if (rightFileId) {
-      url.searchParams.set('rightFileId', rightFileId)
-    } else {
-      url.searchParams.delete('rightFileId')
-    }
-    window.history.replaceState(null, '', url.pathname + url.search)
-  }, [leftFileId, rightFileId])
+  const arquivosExibidos = (isFileSystemSupported && !!directoryHandle && hasFolderPermission)
+    ? orderedFiles
+    : orderedFiles.filter(f => !f.drive_file_id.startsWith('local_'))
 
   return (
     <div
@@ -286,17 +327,17 @@ export function TemplateVisualizadorPDF({
         </Link>
 
         <h1 className="text-sm font-black text-foreground uppercase tracking-wider hidden md:block">
-          Visualizador de PDFs
+          Visualizador de Arquivos
         </h1>
 
         <div className="flex items-center gap-2">
-
-
-          <label className="flex items-center justify-center gap-1.5 h-9 px-3 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl cursor-pointer transition-colors shadow-sm active:scale-95">
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload Local</span>
-            <input type="file" accept=".pdf" className="hidden" onChange={lidarComUploadLocal} />
-          </label>
+          {(isFileSystemSupported && !!directoryHandle && hasFolderPermission) && (
+            <label className="flex items-center justify-center gap-1.5 h-9 px-3 border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground rounded-xl cursor-pointer transition-colors shadow-sm active:scale-95">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Local</span>
+              <input type="file" accept=".pdf" className="hidden" onChange={lidarComUploadLocal} />
+            </label>
+          )}
 
           <button
             onClick={() => setSidebarFilesOpen(prev => !prev)}
@@ -327,7 +368,7 @@ export function TemplateVisualizadorPDF({
       <div className="flex flex-1 overflow-hidden relative">
         <SidebarArquivosMateria
           isOpen={sidebarFilesOpen}
-          files={orderedFiles}
+          files={arquivosExibidos}
           onOpenFile={(fileId, side) => {
             if (side) {
               lidarComAberturaArquivo(fileId, side)
@@ -352,6 +393,8 @@ export function TemplateVisualizadorPDF({
         />
 
         <SplitterVisualizacao
+          leftFile={leftFileId ? todosArquivos.find(f => f.drive_file_id === leftFileId) || { drive_file_id: leftFileId, original_name: 'Arquivo Local', custom_name: null, selected_folder: 'documentos' } : null}
+          rightFile={rightFileId ? todosArquivos.find(f => f.drive_file_id === rightFileId) || { drive_file_id: rightFileId, original_name: 'Arquivo Local', custom_name: null, selected_folder: 'documentos' } : null}
           leftFileUrl={leftFileId ? fileUrls[leftFileId] || null : null}
           rightFileUrl={rightFileId ? fileUrls[rightFileId] || null : null}
           isSplit={rightFileId !== null}

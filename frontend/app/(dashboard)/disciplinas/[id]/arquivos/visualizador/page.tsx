@@ -19,22 +19,25 @@ export default function PaginaVisualizadorPDF({
   const rightFileId = searchParams.get('rightFileId')
 
   const materiaId = parseInt(id, 10)
-  const { filesCache, obterArquivos } = useClassroom()
+  const { filesCache, obterArquivos, videosCache, obterVideos } = useClassroom()
   const { anoAtivoId } = useAcademico()
 
   useEffect(() => {
-    if (materiaId && anoAtivoId && !filesCache[materiaId]) {
-      obterArquivos(materiaId, anoAtivoId)
+    if (materiaId && anoAtivoId) {
+      if (!filesCache[materiaId]) obterArquivos(materiaId, anoAtivoId)
+      if (!videosCache[materiaId]) obterVideos(materiaId, anoAtivoId)
     }
-  }, [materiaId, anoAtivoId, filesCache, obterArquivos])
+  }, [materiaId, anoAtivoId, filesCache, videosCache, obterArquivos, obterVideos])
 
   const dadosVinculo = filesCache[materiaId]
   const arquivosMateria = dadosVinculo?.arquivos || []
+  const videosMateria = videosCache[materiaId]?.videos || []
 
   return (
     <TemplateVisualizadorPDF
       materiaId={materiaId}
       files={arquivosMateria}
+      videos={videosMateria}
       initialLeftFileId={fileId}
       initialRightFileId={rightFileId}
     />

@@ -8,14 +8,11 @@ import {
   ArrowLeft, 
   AlertTriangle,
   Folder,
-  FileCheck2,
-  HardDriveDownload,
   School,
   RefreshCw,
   AlertCircle
 } from 'lucide-react'
 import CarregamentoArquivos from '@/components/templates/CarregamentoArquivos'
-import Esqueleto from '@/components/atoms/Esqueleto'
 import { academic_service } from '@/lib/api/academico'
 import { Materia } from '@/types/academico'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
@@ -190,10 +187,6 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
   }
 
   const isVinculado = linkedData?.vinculado
-  const totalFiles = linkedData?.arquivos?.length || 0
-  const totalDownloaded = linkedData?.arquivos?.filter(a => localStorage.getItem('baixado_' + a.drive_file_id) === 'true')?.length || 0
-  const totalPending = totalFiles - totalDownloaded
-
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       <section className="flex flex-col gap-4">
@@ -264,65 +257,17 @@ export function TemplateArquivos({ materiaId }: TemplateArquivosProps) {
         </div>
       ) : (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
-              <div className="p-4 bg-primary/10 text-primary rounded-2xl shrink-0">
-                <Folder className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Total de Arquivos</p>
-                {areFilesLoading ? (
-                  <Esqueleto className="h-8 w-12 mt-1" />
-                ) : (
-                  <p className="text-2xl font-black text-foreground">{totalFiles}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
-              <div className="p-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0">
-                <FileCheck2 className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Arquivos Baixados</p>
-                {areFilesLoading ? (
-                  <Esqueleto className="h-8 w-12 mt-1" />
-                ) : (
-                  <p className="text-2xl font-black text-foreground">{totalDownloaded}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
-              <div className="p-4 bg-amber-500/10 text-amber-500 rounded-2xl shrink-0">
-                <HardDriveDownload className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Disponíveis no Drive</p>
-                {areFilesLoading ? (
-                  <Esqueleto className="h-8 w-12 mt-1" />
-                ) : (
-                  <p className="text-2xl font-black text-foreground">{totalPending}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
           {areFilesLoading ? (
             <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-              <div className="flex justify-between items-center pb-4 border-b border-border">
-                <Esqueleto className="h-5 w-40" />
-                <Esqueleto className="h-8 w-24 rounded-lg" />
-              </div>
+              <div className="h-5 w-40 bg-muted animate-pulse rounded" />
               <div className="space-y-3">
-                {[1, 2, 3, 4].map((index) => (
+                {[1, 2, 3].map((index) => (
                   <div key={index} className="flex items-center gap-4 py-3">
-                    <Esqueleto className="w-8 h-8 rounded-lg animate-pulse" />
+                    <div className="w-8 h-8 rounded-lg bg-muted animate-pulse" />
                     <div className="space-y-2 flex-1">
-                      <Esqueleto className="h-4 w-1/3" />
-                      <Esqueleto className="h-3 w-1/4" />
+                      <div className="h-4 w-1/3 bg-muted animate-pulse rounded" />
+                      <div className="h-3 w-1/4 bg-muted animate-pulse rounded" />
                     </div>
-                    <Esqueleto className="w-20 h-6 rounded-lg" />
                   </div>
                 ))}
               </div>
