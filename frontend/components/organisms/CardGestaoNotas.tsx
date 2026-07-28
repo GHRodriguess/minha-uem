@@ -6,6 +6,7 @@ import { Materia, ConfiguracaoMateria, Avaliacao } from '@/types/academico'
 import { academic_service } from '@/lib/api/academico'
 import { Calculator, Target, ExternalLink } from 'lucide-react'
 import { InputNota } from '../atoms/InputNota'
+import { formatarNota } from '@/lib/utils/formatters'
 import Link from 'next/link'
 
 interface CardGestaoNotasProps {
@@ -62,14 +63,14 @@ export function CardGestaoNotas({ materia, anoId }: CardGestaoNotasProps) {
           <Calculator className="w-5 h-5 text-primary" />
           <div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase">Média Atual</p>
-            <p className="text-xl font-black text-foreground">{config.media_atual.toFixed(2)}</p>
+            <p className="text-xl font-black text-foreground">{formatarNota(config.media_atual)}</p>
           </div>
         </div>
         <div className={`border rounded-2xl p-4 flex items-center gap-3 ${todasNotas ? (aprovado ? 'bg-green-500/5 border-green-500/10' : 'bg-destructive/5 border-destructive/10') : 'bg-muted/5 border-border'}`}>
           <Target className={`w-5 h-5 ${todasNotas ? (aprovado ? 'text-green-500' : 'text-destructive') : 'text-muted-foreground'}`} />
           <div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase">{todasNotas ? 'Status Final' : 'Precisa Tirar'}</p>
-            <p className={`text-xl font-black ${todasNotas ? (aprovado ? 'text-green-500' : 'text-destructive') : 'text-foreground'}`}>{todasNotas ? (aprovado ? 'Aprovado' : 'Reprovado') : config.quanto_falta.toFixed(2)}</p>
+            <p className={`text-xl font-black ${todasNotas ? (aprovado ? 'text-green-500' : 'text-destructive') : 'text-foreground'}`}>{todasNotas ? (aprovado ? 'Aprovado' : 'Reprovado') : formatarNota(config.quanto_falta)}</p>
           </div>
         </div>
       </div>

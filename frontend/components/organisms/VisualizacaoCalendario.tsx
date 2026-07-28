@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Avaliacao, Materia } from '@/types/academico'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, FileEdit } from 'lucide-react'
+import { formatarNota } from '@/lib/utils/formatters'
 
 interface VisualizacaoCalendarioProps {
   avaliacoes: (Avaliacao & { materia: Materia })[]
@@ -106,8 +107,8 @@ export default function VisualizacaoCalendario({ avaliacoes, onEdit }: Visualiza
                   <div className="flex gap-2 text-[9px] text-muted-foreground font-semibold uppercase mt-1">
                     <span>{t.tipo}</span>
                     <span>•</span>
-                    <span>Peso: {t.peso}</span>
-                    {t.nota !== null && <><span>•</span><span className="text-green-500 font-bold">Nota: {t.nota}</span></>}
+                    <span>Peso: {formatarNota(Number(t.peso))}</span>
+                    {t.nota !== null && <><span>•</span><span className="text-green-500 font-bold">Nota: {formatarNota(Number(t.nota))}</span></>}
                   </div>
                 </div>
                 <button onClick={() => onEdit(t, t.materia.id)} className="p-2 hover:bg-muted border border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors"><FileEdit className="w-4 h-4" /></button>
