@@ -2,7 +2,7 @@ import { Perfil, Materia, Horario } from '@/types/academico'
 
 export function obterAulasHoje(profile: Perfil | null): { materia: Materia; horario: Horario }[] {
   if (!profile?.materias) return []
-  const today = new Date('08/04/2026')
+  const today = new Date()
   const backendDay = today.getDay() === 0 ? 7 : today.getDay()
   return profile.materias.flatMap(m => 
     (m.horarios || []).filter(h => {
