@@ -15,15 +15,15 @@
   --accent-foreground: #0f172a;
   --destructive: #ef4444;
   --destructive-foreground: #f9f9f9;
-  --border: #b8b8b8;
+  --border: rgba(184, 184, 184, 0.4);
   --input: #e2e8f0;
   --ring: #165dfc;
   --radius: 0.625rem;
-  --card: #f9f9f9;
+  --card: rgba(249, 249, 249, 0.7);
   --card-foreground: #0f172a;
   --background: #f0f0f0;
   --foreground: #0f172a;
-  --popover: #f9f9f9;
+  --popover: rgba(249, 249, 249, 0.8);
   --popover-foreground: #0f172a;
   --chart-1: #e2e8f0;
   --chart-2: #64748b;
@@ -98,12 +98,12 @@
   --accent-foreground: #f8fafc;
   --destructive: #991b1b;
   --destructive-foreground: #f8fafc;
-  --border: #43434369;
-  --input: #171717;
+  --border: rgba(67, 67, 67, 0.4);
+  --input: #313131;
   --ring: #165dfc;
-  --card: #181818d9;
+  --card: rgba(24, 24, 24, 0.65);
   --card-foreground: #f8fafc;
-  --popover: #171717;
+  --popover: rgba(23, 23, 23, 0.75);
   --popover-foreground: #f8fafc;
   --chart-1: #e2e8f0;
   --chart-2: #64748b;
@@ -169,4 +169,14 @@
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.bg-card,
+.bg-popover {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }

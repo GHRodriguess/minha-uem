@@ -38,7 +38,11 @@ export default function RootLayout({
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col relative">
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10vw] left-[-10vw] w-[45vw] h-[45vw] rounded-full bg-primary/12 blur-[120px] dark:bg-primary/5 transition-opacity" />
+          <div className="absolute bottom-[-10vw] right-[-10vw] w-[45vw] h-[45vw] rounded-full bg-primary/12 blur-[120px] dark:bg-primary/5 transition-opacity" />
+        </div>
         <ProvedorTema
           attribute="class"
           defaultTheme="system"
