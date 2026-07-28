@@ -18,6 +18,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const { isImpersonating, impersonatedUserName, encerrarSimulacao } = useSuporte()
 
@@ -43,13 +44,26 @@ export default function DashboardLayout({
 
   const isIAPage = pathname === '/ia'
 
+  const alternarSidebar = () => {
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(!isSidebarOpen)
+    } else {
+      setIsDesktopSidebarVisible(!isDesktopSidebarVisible)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background text-foreground relative">
-      {!isIAPage && <Sidebar className="hidden lg:flex" />}
+      {!isIAPage && isDesktopSidebarVisible && (
+        <Sidebar 
+          className="hidden lg:flex" 
+          onClose={() => setIsDesktopSidebarVisible(false)} 
+        />
+      )}
 
       {!isIAPage && isSidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden flex">
-          <div 
+          <div
             className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300"
             onClick={() => setIsSidebarOpen(false)}
           />
@@ -71,7 +85,12 @@ export default function DashboardLayout({
             </button>
           </div>
         )}
-        {!isIAPage && <Topbar onMenuClick={() => setIsSidebarOpen(true)} />}
+        {!isIAPage && (
+          <Topbar 
+            onMenuClick={alternarSidebar} 
+            isSidebarVisible={isDesktopSidebarVisible} 
+          />
+        )}
         <main className={isIAPage ? "flex-1 h-screen overflow-hidden" : "flex-1 p-4 sm:p-6 md:p-8"}>
           {children}
         </main>
@@ -86,4 +105,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-

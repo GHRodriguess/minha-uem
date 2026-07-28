@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ConfiguracaoMateria } from '@/types/academico'
 import { Info, Sparkles, GraduationCap } from 'lucide-react'
+import { arredondarNota, formatarNota } from '@/lib/utils/formatters'
 
 interface CalculadoraSobrevivenciaProps {
   config: ConfiguracaoMateria
@@ -24,7 +25,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
     })
 
     const projected = totalWeights > 0 ? (currentSum + simulatedSum) / totalWeights : 0
-    const roundedProjected = Math.round(projected * 100) / 100
+    const roundedProjected = arredondarNota(projected)
 
     let status = 'EM_ANDAMENTO'
     let examRequired = 0
@@ -81,7 +82,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
           <div className="pt-4 border-t border-border flex items-center justify-between">
             <div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase">Média Projetada</p>
-              <p className="text-2xl font-black text-foreground">{projected.toFixed(2)}</p>
+              <p className="text-2xl font-black text-foreground">{formatarNota(projected)}</p>
             </div>
             
             <div className="text-right">
@@ -103,7 +104,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
           {status === 'EXAME' && (
             <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2 text-xs text-amber-600 dark:text-amber-500 font-medium">
               <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Nota mínima exigida no Exame Final: <strong className="font-bold">{examRequired.toFixed(2)}</strong></span>
+              <span>Nota mínima exigida no Exame Final: <strong className="font-bold">{formatarNota(examRequired)}</strong></span>
             </div>
           )}
         </div>
@@ -114,7 +115,7 @@ export function CalculadoraSobrevivencia({ config }: CalculadoraSobrevivenciaPro
             {config.media_atual >= (config.media_minima ?? 6.0) ? (
               <p className="text-green-500 font-bold">Parabéns! Você já foi aprovado nesta disciplina!</p>
             ) : config.media_atual >= 3.0 ? (
-              <p className="text-amber-500 font-bold">Você está de Exame Final. Nota necessária: {(10.0 - config.media_atual).toFixed(2)}</p>
+              <p className="text-amber-500 font-bold">Você está de Exame Final. Nota necessária: {formatarNota(10.0 - config.media_atual)}</p>
             ) : (
               <p className="text-destructive font-bold">Reprovado. Média final abaixo de 3.0.</p>
             )}

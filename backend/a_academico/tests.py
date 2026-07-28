@@ -183,3 +183,28 @@ class TesteCacheSinaisAgenda(TestCase):
         cache.set(cache_key, "dummy", 600)
         self.academic_year.horarios.remove(schedule)
         self.assertIsNone(cache.get(cache_key))
+
+class TesteArredondamentoUEM(TestCase):
+    def test_arredondar_nota_casos(self):
+        from .utils import arredondar_nota
+        self.assertEqual(arredondar_nota(9.56667), 9.6)
+        self.assertEqual(arredondar_nota(9.125), 9.1)
+        self.assertEqual(arredondar_nota(9.25), 9.3)
+        self.assertEqual(arredondar_nota(8.0), 8.0)
+        self.assertEqual(arredondar_nota(10.0), 10.0)
+
+    def test_serializer_media_atual_arredondamento(self):
+        from .serializers import ConfiguracaoMateriaSerializer
+        user = User.objects.create_user(username='test_user', password='password')
+        course = Curso.objects.create(codigo='CURSO_TEST', nome='Curso Teste')
+        profile = PerfilAcademico.objects.create(user=user, curso=course, calendar_token=uuid.uuid4())
+        academic_year = AnoLetivo.objects.create(perfil=profile, ano=2026)
+        subject = Materia.objects.create(codigo='MAT_DISC', nome='Matematica Discreta')
+        config = ConfiguracaoMateria.objects.create(perfil=profile, materia=subject, ano_letivo=academic_year)
+
+        Avaliacao.objects.create(configuracao=config, nome='P1', tipo='PROVA', peso=1.0, nota=10.0)
+        Avaliacao.objects.create(configuracao=config, nome='P2', tipo='PROVA', peso=1.0, nota=8.5)
+
+        serializer = ConfiguracaoMateriaSerializer(config)
+        self.assertEqual(serializer.data['media_atual'], 9.3)
+

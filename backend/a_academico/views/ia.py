@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 
+from a_academico.utils import arredondar_nota
 from a_academico.models import (
     ChaveApiGemini,
     ConversaIA,
@@ -84,11 +85,11 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
             if graded_evaluations.exists():
                 weighted_sum = sum(float(a.nota * a.peso) for a in graded_evaluations)
                 if graded_weights > 0:
-                    current_average = round(weighted_sum / graded_weights, 2)
+                    current_average = arredondar_nota(weighted_sum / graded_weights)
                     context.append(f"Media atual calculada (apenas das provas ja realizadas): {current_average}")
                 if total_weights > 0:
-                    min_final_average = round(weighted_sum / total_weights, 2)
-                    max_final_average = round((weighted_sum + 10.0 * ungraded_weights) / total_weights, 2)
+                    min_final_average = arredondar_nota(weighted_sum / total_weights)
+                    max_final_average = arredondar_nota((weighted_sum + 10.0 * ungraded_weights) / total_weights)
                     percentage_graded = round((graded_weights / total_weights) * 100, 1)
                     context.append(f"Progresso da avaliacao: {percentage_graded}% do peso total avaliado")
                     context.append(f"Media final minima possivel (se tirar zero no restante): {min_final_average}")
@@ -102,7 +103,7 @@ def obter_contexto_academico(profile, materia_id=None, google_token=None) -> str
                     else:
                         context.append("Situacao: Em andamento. Ainda precisa realizar avaliacoes para atingir a media minima.")
                         if ungraded_weights > 0:
-                            needed_average = round(needed_points / ungraded_weights, 2)
+                            needed_average = arredondar_nota(needed_points / ungraded_weights)
                             context.append(f"Nota media necessaria nas avaliacoes restantes: {needed_average}")
 
             provas = config.avaliacoes.all().order_by('data', 'ordem')

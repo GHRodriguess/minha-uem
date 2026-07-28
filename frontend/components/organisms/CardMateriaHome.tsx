@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Materia } from '@/types/academico'
 import { AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react'
 import { obterDataFormatada } from '@/lib/utils'
+import { formatarNota } from '@/lib/utils/formatters'
 
 interface CardMateriaHomeProps {
   subject: Materia
@@ -89,7 +90,7 @@ export function CardMateriaHome({ subject }: CardMateriaHomeProps) {
         <div className="flex items-center justify-between text-xs border-t border-border/40 pt-3">
           <div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Média</p>
-            <p className="font-bold text-foreground text-sm mt-0.5">{average.toFixed(1)}</p>
+            <p className="font-bold text-foreground text-sm mt-0.5">{formatarNota(average)}</p>
           </div>
           <div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Situação</p>
@@ -98,7 +99,7 @@ export function CardMateriaHome({ subject }: CardMateriaHomeProps) {
           {pointsNeeded > 0 && currentStatus === 'EM_ANDAMENTO' && (
             <div className="text-right">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Falta</p>
-              <p className="font-bold text-primary text-sm mt-0.5">{pointsNeeded.toFixed(1)}</p>
+              <p className="font-bold text-primary text-sm mt-0.5">{formatarNota(pointsNeeded)}</p>
             </div>
           )}
         </div>

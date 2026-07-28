@@ -102,7 +102,7 @@ export default function SidebarChatIA({
   const containerClass = `${
     layoutMode === 'integrated'
       ? `relative h-full bg-card shrink-0 ${borderClass}`
-      : `fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card/95 shadow-2xl ${borderClass}`
+      : `fixed inset-y-0 right-0 z-50 w-full sm:w-105 bg-card shadow-2xl ${borderClass}`
   } flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-300 ${className || ''}`
 
   return (

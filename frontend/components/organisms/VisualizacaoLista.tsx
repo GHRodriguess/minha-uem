@@ -2,6 +2,7 @@
 
 import { Avaliacao, Materia } from '@/types/academico'
 import { Calendar, FileEdit, Trash2, Weight } from 'lucide-react'
+import { formatarNota } from '@/lib/utils/formatters'
 
 interface VisualizacaoListaProps {
   avaliacoes: (Avaliacao & { materia: Materia })[]
@@ -83,11 +84,11 @@ export default function VisualizacaoLista({
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground font-medium flex items-center gap-0.5">
                         <Weight className="w-3 h-3 text-muted-foreground/60" />
-                        P:{item.peso}
+                        P:{formatarNota(Number(item.peso))}
                       </span>
                       {item.nota !== null && (
                         <span className="font-black text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full text-[10px]">
-                          Nota: {item.nota}
+                          Nota: {formatarNota(Number(item.nota))}
                         </span>
                       )}
                     </div>

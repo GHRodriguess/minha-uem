@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import PerfilAcademico, Curso, Materia, Horario, AnoLetivo, ConfiguracaoMateria, Avaliacao, ConfiguracaoGeralClassroom, VinculoGoogleClassroom, ArquivoMateriaClassroom, AnotacaoMateria, RegistroFalta, ChamadoSuporte, MensagemChamado, Noticia, ProfessorClassroom, VideoMateriaClassroom
+from .utils import arredondar_nota
 from django.db.models import Sum, F
 from django.contrib.auth.models import User
 
@@ -60,7 +61,7 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         if weights_sum == 0:
             return 0
             
-        return round(float(weighted_sum / weights_sum), 2)
+        return arredondar_nota(weighted_sum / weights_sum)
 
     def get_quanto_falta(self, obj):
         if not obj.avaliacoes.exists():
@@ -86,7 +87,7 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
             return 0
             
         required_average_remaining = missing_points / float(remaining_weights_sum)
-        return round(required_average_remaining, 2)
+        return arredondar_nota(required_average_remaining)
 
     def obter_media_proporcional(self, obj):
         assigned_assessments = obj.avaliacoes.filter(nota__isnull=False)
@@ -96,13 +97,13 @@ class ConfiguracaoMateriaSerializer(serializers.ModelSerializer):
         weights_sum = sum(a.peso for a in assigned_assessments)
         if weights_sum == 0:
             return 0.0
-        return round(float(weighted_sum / weights_sum), 2)
+        return arredondar_nota(weighted_sum / weights_sum)
 
     def obter_nota_exame_necessaria(self, obj):
         projected_average = self.get_media_atual(obj)
         if 3.0 <= projected_average < float(obj.media_minima):
             required_grade = 10.0 - projected_average
-            return round(required_grade, 2)
+            return arredondar_nota(required_grade)
         return 0.0
 
     def obter_status_aprovacao(self, obj):

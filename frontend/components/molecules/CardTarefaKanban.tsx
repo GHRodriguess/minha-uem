@@ -2,6 +2,7 @@
 
 import { Avaliacao, Materia } from '@/types/academico'
 import { Calendar, Weight, FileEdit, Trash2 } from 'lucide-react'
+import { formatarNota } from '@/lib/utils/formatters'
 
 interface CardTarefaKanbanProps {
   avaliacao: Avaliacao
@@ -72,7 +73,7 @@ export default function CardTarefaKanban({
 
         <span className="flex items-center gap-1">
           <Weight className="w-3 h-3 text-muted-foreground/60" />
-          P: {avaliacao.peso}
+          P: {formatarNota(Number(avaliacao.peso))}
         </span>
       </div>
 
@@ -80,7 +81,7 @@ export default function CardTarefaKanban({
         <div className="mt-1 pt-2 border-t border-border/50 flex justify-between items-center">
           <span className="text-[10px] font-bold text-muted-foreground uppercase">Nota</span>
           <span className="text-xs font-black text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-            {Number(avaliacao.nota).toFixed(2)}
+            {formatarNota(Number(avaliacao.nota))}
           </span>
         </div>
       )}
