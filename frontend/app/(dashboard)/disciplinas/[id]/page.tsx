@@ -97,14 +97,14 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       <section className="flex flex-col gap-4">
-        <Link 
-          href="/disciplinas" 
+        <Link
+          href="/disciplinas"
           className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary transition-colors w-fit"
         >
           <ArrowLeft className="w-4 h-4" />
           Voltar para Disciplinas
         </Link>
-        
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -123,8 +123,8 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
       <BannerClassroom materiaId={materia.id} />
 
       <div className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 flex flex-col">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="xl:col-span-2 flex flex-col">
             <div className="bg-card border border-border rounded-3xl p-8 shadow-sm h-full flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-8">
@@ -143,10 +143,10 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
 
           <div className="space-y-8">
             <CardPrazosDisciplina materia={materia} />
-            <CardFrequenciaDisciplina 
-              materia={materia} 
-              anoId={anoAtivoId || 0} 
-              onUpdate={() => buscarDados(true)} 
+            <CardFrequenciaDisciplina
+              materia={materia}
+              anoId={anoAtivoId || 0}
+              onUpdate={() => buscarDados(true)}
             />
             <CardHorariosDisciplina materia={materia} />
           </div>
@@ -169,7 +169,7 @@ export default function PaginaDisciplina({ params }: PaginaDisciplinaProps) {
                 </p>
               </div>
             </div>
-            <Link 
+            <Link
               href={`/disciplinas/${materia.id}/arquivos`}
               className="h-11 px-6 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm shrink-0 uppercase tracking-wider"
             >

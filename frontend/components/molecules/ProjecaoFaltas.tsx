@@ -16,21 +16,23 @@ export function ProjecaoFaltas({ materia }: ProjecaoFaltasProps) {
   const isFailed = materia.faltas_atuais > absencesLimit
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+    <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Compass className="w-5 h-5 text-primary animate-pulse" />
-        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Projeção Inteligente de Faltas</h3>
+        <Compass className="w-5 h-5 text-primary shrink-0 animate-pulse" />
+        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider leading-snug break-words">
+          Projeção Inteligente de Faltas
+        </h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-muted/40 p-3 rounded-xl border border-border/50 text-center">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase">Frequência Real</p>
-          <p className="text-xl font-black text-foreground">{attendance.toFixed(1)}%</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide truncate">Frequência Real</p>
+          <p className="text-xl font-black text-foreground mt-0.5">{attendance.toFixed(1)}%</p>
         </div>
 
         <div className="bg-muted/40 p-3 rounded-xl border border-border/50 text-center">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase">Faltas Disponíveis</p>
-          <p className={`text-xl font-black ${isFailed ? 'text-destructive' : remaining <= 2 ? 'text-destructive' : 'text-primary'}`}>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide truncate">Faltas Disponíveis</p>
+          <p className={`text-xl font-black mt-0.5 ${isFailed ? 'text-destructive' : remaining <= 2 ? 'text-destructive' : 'text-primary'}`}>
             {isFailed ? 0 : remaining}
           </p>
         </div>

@@ -1,37 +1,37 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
+import Logo from '../atoms/Logo'
 import BotaoTema from '../atoms/BotaoTema'
 import DropdownNotificacoes from '../molecules/DropdownNotificacoes'
-import InfoUsuario from '../molecules/InfoUsuario'
+import DropdownUsuario from '../molecules/DropdownUsuario'
 import { useAcademico } from '../providers/ProvedorAcademico'
-import { Calendar, Menu } from 'lucide-react'
+import { Calendar, PanelLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface TopbarProps {
   onMenuClick?: () => void
+  isSidebarVisible?: boolean
 }
 
-export default function Topbar({ onMenuClick }: TopbarProps) {
+export default function Topbar({ onMenuClick, isSidebarVisible = true }: TopbarProps) {
   const { data: session } = useSession()
   const { anoAtivoId, setAnoAtivoId, anosDisponiveis } = useAcademico()
 
   return (
     <header className="h-20 bg-card border-b border-border px-4 sm:px-6 md:px-8 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <Logo />
+        <div className="w-px h-6 bg-border hidden sm:block" />
         <Button
           variant="ghost"
           size="icon"
           onClick={onMenuClick}
-          className="lg:hidden h-10 w-10 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
+          className="h-10 w-10 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
+          title={isSidebarVisible ? "Ocultar menu lateral" : "Exibir menu lateral"}
         >
-          <Menu className="w-5 h-5" />
+          <PanelLeft className="w-5 h-5" />
         </Button>
-        <div className="hidden sm:block">
-          <h1 className="text-sm md:text-base font-medium text-muted-foreground">
-            Olá, <span className="text-foreground font-bold">{session?.user?.name?.split(' ')[0]}</span>! Bem-vindo de volta.
-          </h1>
-        </div>
       </div>
 
       <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
@@ -56,9 +56,10 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         <BotaoTema />
         <DropdownNotificacoes />
         <div className="w-px h-8 bg-border" />
-        <InfoUsuario
+        <DropdownUsuario
           nome={session?.user?.name}
           foto={session?.user?.image}
+          email={session?.user?.email}
         />
       </div>
     </header>
