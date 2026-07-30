@@ -6,6 +6,7 @@ import { VideoClassroom, ArquivoClassroom } from '@/lib/api/classroom'
 import { obterBlobGoogleDrive } from '@/lib/utils/googleDrive'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 import { VisualizadorVideoHeader } from '../molecules/VisualizadorVideoHeader'
 import { VisualizadorVideoSidebar } from '../molecules/VisualizadorVideoSidebar'
 import { VisualizadorVideoConteudo } from '../organisms/VisualizadorVideoConteudo'
@@ -42,10 +43,10 @@ export function TemplateVisualizadorVideo({
       if (arq) {
         return {
           video_id: arq.drive_file_id,
-          titulo: arq.custom_name || arq.original_name,
+          titulo: obterNomeExibicao(arq.custom_name, arq.original_name),
           tipo: 'drive' as const,
           url: `https://drive.google.com/file/d/${arq.drive_file_id}/view`,
-          custom_name: arq.custom_name || arq.original_name,
+          custom_name: arq.custom_name,
           classroom_id: '',
           materia: materiaId,
           sincronizado_em: ''
@@ -114,7 +115,7 @@ export function TemplateVisualizadorVideo({
     <div className="fixed inset-0 w-screen h-screen z-50 bg-background flex flex-col overflow-hidden select-none">
       <VisualizadorVideoHeader
         materiaId={materiaId}
-        titulo={activeVideo ? (activeVideo.custom_name || activeVideo.titulo) : 'Visualizador de Vídeo'}
+        titulo={activeVideo ? obterNomeExibicao(activeVideo.custom_name, activeVideo.titulo) : 'Visualizador de Vídeo'}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         chatIAOpen={chatIAOpen}
@@ -138,7 +139,7 @@ export function TemplateVisualizadorVideo({
           videoEmbedUrl={obterVideoEmbedUrl()}
           videoLocalUrl={videoLocalUrl}
           pdfUrl={pdfUrl}
-          pdfTitulo={activePdf ? (activePdf.custom_name || activePdf.original_name) : ''}
+          pdfTitulo={activePdf ? obterNomeExibicao(activePdf.custom_name, activePdf.original_name) : ''}
           activePdfId={activePdfId}
           chatIAOpen={chatIAOpen}
           fecharPdf={() => setActivePdfId(null)}

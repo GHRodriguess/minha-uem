@@ -5,6 +5,7 @@ import { Eye, EyeOff, ExternalLink, Trash2, Download, Edit2, Check, X, GripVerti
 import { ArquivoClassroom } from '@/lib/api/classroom'
 import { IconeArquivo } from '@/components/atoms/IconeArquivo'
 import { StatusArquivo } from '@/components/atoms/StatusArquivo'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface CardArquivoCompactoProps {
   arquivo: ArquivoClassroom
@@ -34,7 +35,7 @@ export function CardArquivoCompacto({
   onReordenar
 }: CardArquivoCompactoProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [tempName, setTempName] = useState(arquivo.custom_name || arquivo.original_name)
+  const [tempName, setTempName] = useState(obterNomeExibicao(arquivo.custom_name, arquivo.original_name))
   const [isDragOver, setIsDragOver] = useState(false)
 
   const lidarComConfirmacaoNome = async () => {
@@ -94,9 +95,9 @@ export function CardArquivoCompacto({
           ) : (
             <div className="flex items-center gap-2 group/name max-w-xl min-w-0">
               <p className="font-bold text-foreground text-[11px] truncate leading-tight cursor-pointer hover:text-primary transition-colors" onDoubleClick={() => setIsEditing(true)}>
-                {arquivo.custom_name || arquivo.original_name}
+                {obterNomeExibicao(arquivo.custom_name, arquivo.original_name)}
               </p>
-              <button onClick={() => { setTempName(arquivo.custom_name || arquivo.original_name); setIsEditing(true); }} className="opacity-0 group-hover/name:opacity-100 transition-opacity p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"><Edit2 className="w-2.5 h-2.5" /></button>
+              <button onClick={() => { setTempName(obterNomeExibicao(arquivo.custom_name, arquivo.original_name)); setIsEditing(true); }} className="opacity-0 group-hover/name:opacity-100 transition-opacity p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"><Edit2 className="w-2.5 h-2.5" /></button>
             </div>
           )}
           

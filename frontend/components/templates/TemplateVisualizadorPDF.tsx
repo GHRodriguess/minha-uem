@@ -10,6 +10,7 @@ import { obterBlobGoogleDrive } from '@/lib/utils/googleDrive'
 import { useClassroom } from '@/components/providers/ProvedorClassroom'
 import { useAcademico } from '@/components/providers/ProvedorAcademico'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 import { ModalAcessoPasta } from '@/components/molecules/ModalAcessoPasta'
 import SidebarChatIA from '@/components/organisms/SidebarChatIA'
 import { useSincronizarUrlVisualizador } from '@/lib/hooks/useSincronizarUrlVisualizador'
@@ -73,8 +74,8 @@ export function TemplateVisualizadorPDF({
     const storedOrder = localStorage.getItem(`minha_uem_visualizador_ordem_${materiaId}`)
     if (!storedOrder) {
       return [...baseFiles].sort((a, b) => {
-        const nameA = (a.custom_name || a.original_name).toLowerCase()
-        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        const nameA = obterNomeExibicao(a.custom_name, a.original_name).toLowerCase()
+        const nameB = obterNomeExibicao(b.custom_name, b.original_name).toLowerCase()
         return nameA.localeCompare(nameB, 'pt-BR')
       })
     }
@@ -86,8 +87,8 @@ export function TemplateVisualizadorPDF({
         if (idxA !== -1 && idxB !== -1) return idxA - idxB
         if (idxA !== -1) return -1
         if (idxB !== -1) return 1
-        const nameA = (a.custom_name || a.original_name).toLowerCase()
-        const nameB = (b.custom_name || b.original_name).toLowerCase()
+        const nameA = obterNomeExibicao(a.custom_name, a.original_name).toLowerCase()
+        const nameB = obterNomeExibicao(b.custom_name, b.original_name).toLowerCase()
         return nameA.localeCompare(nameB, 'pt-BR')
       })
     } catch {

@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { X, Search, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { ItemArquivoSidebar } from '@/components/atoms/ItemArquivoSidebar'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface ArquivoMateriaSimples {
   drive_file_id: string
@@ -44,7 +45,7 @@ export function SidebarArquivosMateria({
 
   const itensDisponiveis = files
   const itensFiltrados = itensDisponiveis.filter(f => {
-    const bateNome = (f.custom_name || f.original_name).toLowerCase().includes(termoPesquisa.toLowerCase())
+    const bateNome = obterNomeExibicao(f.custom_name, f.original_name).toLowerCase().includes(termoPesquisa.toLowerCase())
     const bateOculto = mostrarOcultados ? true : !f.is_ignored
     return bateNome && bateOculto
   })

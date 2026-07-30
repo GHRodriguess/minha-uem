@@ -4,6 +4,7 @@ import React from 'react'
 import { X, ExternalLink, Download } from 'lucide-react'
 import { IconeArquivo } from '@/components/atoms/IconeArquivo'
 import { ArquivoClassroom } from '@/lib/api/classroom'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface ModalVisualizadorIframeProps {
   arquivo: ArquivoClassroom | null
@@ -29,7 +30,7 @@ export function ModalVisualizadorIframe({
               <IconeArquivo filename={arquivo.original_name} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-foreground">{arquivo.custom_name || arquivo.original_name}</h3>
+              <h3 className="text-sm font-bold text-foreground">{obterNomeExibicao(arquivo.custom_name, arquivo.original_name)}</h3>
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
                 Pré-visualização do Documento
               </p>

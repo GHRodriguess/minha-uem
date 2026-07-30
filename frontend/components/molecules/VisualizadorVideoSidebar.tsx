@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Video, FileText } from 'lucide-react'
 import { VideoClassroom, ArquivoClassroom } from '@/lib/api/classroom'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface VisualizadorVideoSidebarProps {
   videos: VideoClassroom[]
@@ -41,7 +42,7 @@ export function VisualizadorVideoSidebar({
           arquivos.filter(a => !a.is_ignored && a.original_name.toLowerCase().endsWith('.pdf')).map(a => (
             <button key={a.drive_file_id} onClick={() => selecionarPdf(a.drive_file_id)} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-2.5 ${a.drive_file_id === activePdfId ? 'border-primary bg-primary/5 text-primary font-bold' : 'border-border bg-card hover:bg-muted/30 text-muted-foreground hover:text-foreground'}`}>
               <FileText className="w-4 h-4 shrink-0" />
-              <span className="text-[11px] truncate leading-tight">{a.custom_name || a.original_name}</span>
+              <span className="text-[11px] truncate leading-tight">{obterNomeExibicao(a.custom_name, a.original_name)}</span>
             </button>
           ))
         )}

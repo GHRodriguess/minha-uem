@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Paperclip, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 import { ArquivoClassroom } from '@/lib/api/classroom'
 
 interface SeletorArquivosIAProps {
@@ -56,7 +57,7 @@ export default function SeletorArquivosIA({
                 />
                 <div className="flex items-center gap-1.5 min-w-0">
                   <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="truncate">{fileItem.custom_name || fileItem.original_name}</span>
+                  <span className="truncate">{obterNomeExibicao(fileItem.custom_name, fileItem.original_name)}</span>
                 </div>
               </label>
             )

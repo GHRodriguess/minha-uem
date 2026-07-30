@@ -12,6 +12,7 @@ import {
   StatusVideosClassroom
 } from '@/lib/api/classroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { obterNomeComExtensao } from '@/lib/utils/formatadorNomeArquivo'
 import { useAcademico } from './ProvedorAcademico'
 
 interface ContextoClassroomData {
@@ -569,7 +570,8 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
     const subjectName = cache.materia_nome || "Materia"
     const fileItem = cache.arquivos.find(f => f.drive_file_id === driveFileId)
     const folder = selectedFolder || fileItem?.selected_folder || 'documentos'
-    const finalFileName = fileItem?.custom_name || originalName
+    const nameTarget = fileItem?.custom_name || originalName
+    const finalFileName = obterNomeComExtensao(nameTarget, originalName)
 
     try {
       console.log('[Download] 1/4 Obtendo conteúdo do arquivo do Drive...')
@@ -621,6 +623,10 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
       const fileItem = cache?.arquivos.find(f => f.drive_file_id === driveFileId)
       let newLocalPath: string | null = null
 
+      const targetNewName = novoNome.trim() ? obterNomeComExtensao(novoNome, originalName) : null
+      const oldName = fileItem?.custom_name ? obterNomeComExtensao(fileItem.custom_name, originalName) : originalName
+      const newName = targetNewName || originalName
+
       if (fileItem && directoryHandle && hasFolderPermission) {
         const isDownloaded = localStorage.getItem('baixado_' + driveFileId) === 'true'
         if (isDownloaded) {
@@ -629,8 +635,6 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
           const subjectName = cache.materia_nome || "Materia"
           const folder = fileItem.selected_folder || "documentos"
           const pathParts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
-          const oldName = fileItem.custom_name || fileItem.original_name
-          const newName = novoNome.trim() || fileItem.original_name
 
           if (oldName !== newName) {
             const success = await GerenciadorDiretorio.renomearArquivoLocal(directoryHandle, pathParts, oldName, newName)
@@ -648,7 +652,7 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
         anoId,
         originalName,
         { 
-          custom_name: novoNome.trim() || null,
+          custom_name: targetNewName,
           ...(newLocalPath ? { local_path: newLocalPath } : {})
         }
       )

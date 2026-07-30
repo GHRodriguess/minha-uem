@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { StatusVinculoClassroom } from '@/lib/api/classroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { obterNomeComExtensao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface UseSincronizacaoLocalProps {
   materiaId: number
@@ -38,7 +39,7 @@ export function useSincronizacaoLocal({
       for (const arq of dadosVinculo.arquivos) {
         const folder = arq.selected_folder || "documentos"
         const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
-        const fileName = arq.custom_name || arq.original_name
+        const fileName = obterNomeComExtensao(arq.custom_name || arq.original_name, arq.original_name)
         
         try {
           const exists = await GerenciadorDiretorio.verificarArquivoExiste(directoryHandle, parts, fileName)

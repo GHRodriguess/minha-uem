@@ -12,6 +12,7 @@ import FeedbackIADesativada from '../molecules/FeedbackIADesativada'
 import SeletorModeloChatIA from '../molecules/SeletorModeloChatIA'
 import ListaConversasIA from '../molecules/ListaConversasIA'
 import { Button } from '@/components/ui/button'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface SidebarChatProps {
   isOpen: boolean
@@ -188,7 +189,7 @@ export default function SidebarChatIA({
                 {arquivosAbertos.map(f => (
                   <div key={f.drive_file_id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold">
                     <FileText className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate flex-1">Documento: {f.custom_name || f.original_name}</span>
+                    <span className="truncate flex-1">Documento: {obterNomeExibicao(f.custom_name, f.original_name)}</span>
                     <span className="bg-primary/20 text-primary font-black px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider shrink-0">Auto-anexo</span>
                   </div>
                 ))}

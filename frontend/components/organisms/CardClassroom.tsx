@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   ArquivoClassroom
 } from '@/lib/api/classroom'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 import {
   RefreshCw,
   Download,
@@ -143,7 +144,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
 
   const iniciarEdicaoNome = (arquivo: ArquivoClassroom) => {
     setEditingFileId(arquivo.drive_file_id)
-    setCustomNameInput(arquivo.custom_name || arquivo.original_name)
+    setCustomNameInput(obterNomeExibicao(arquivo.custom_name, arquivo.original_name))
   }
 
   const confirmarEdicaoNome = async (arquivo: ArquivoClassroom) => {
@@ -278,7 +279,7 @@ export function CardClassroom({ materiaId, anoId }: CardClassroomProps) {
                 ) : (
                   <div className="flex items-center gap-2 group">
                     <p className="text-xs font-bold text-foreground leading-tight truncate">
-                      {arquivo.custom_name || arquivo.original_name}
+                      {obterNomeExibicao(arquivo.custom_name, arquivo.original_name)}
                     </p>
                     <button
                       onClick={() => iniciarEdicaoNome(arquivo)}
