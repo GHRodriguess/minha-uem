@@ -6,6 +6,7 @@ import { PainelPDF } from './PainelPDF'
 import { VisualizadorVideo } from './VisualizadorVideo'
 import { VisualizadorTexto } from './VisualizadorTexto'
 import { VisualizadorWord } from './VisualizadorWord'
+import { obterNomeExibicao, obterNomeComExtensao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface ItemArquivoUnificado {
   drive_file_id: string
@@ -127,7 +128,7 @@ export function PainelVisualizador({
         <div className="flex items-center gap-2 min-w-0 flex-1 pr-4">
           {obterIconeCabecalho()}
           <span className="text-xs font-bold text-foreground truncate uppercase tracking-wide">
-            {file.custom_name || file.original_name}
+            {obterNomeExibicao(file.custom_name, file.original_name)}
           </span>
         </div>
 
@@ -163,7 +164,7 @@ export function PainelVisualizador({
             {fileUrl && (
               <a
                 href={fileUrl}
-                download={file.original_name}
+                download={obterNomeComExtensao(file.custom_name || file.original_name, file.original_name)}
                 className="h-9 px-4 rounded-xl border border-border bg-background hover:bg-muted text-xs font-bold text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
               >
                 Download do Arquivo

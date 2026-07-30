@@ -3,6 +3,7 @@
 import React from 'react'
 import { FileText, ChevronLeft, ChevronRight, Eye, EyeOff, Video, FileCode, FileEdit } from 'lucide-react'
 import { obterTipoVisualizador } from '@/components/organisms/PainelVisualizador'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface ArquivoMateriaSimples {
   drive_file_id: string
@@ -87,7 +88,7 @@ export function ItemArquivoSidebar({
       {obterIcone()}
       
       <span className="text-[11px] font-bold text-foreground leading-relaxed truncate-2-lines flex-1 group-hover:pr-20 transition-all duration-150">
-        {file.custom_name || file.original_name}
+        {obterNomeExibicao(file.custom_name, file.original_name)}
         {file.is_ignored && (
           <EyeOff className="inline-block w-3 h-3 text-muted-foreground/60 ml-1.5 align-middle shrink-0" />
         )}

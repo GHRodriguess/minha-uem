@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { FileEdit, ExternalLink, Laptop } from 'lucide-react'
+import { obterNomeExibicao, obterNomeComExtensao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface VisualizadorWordProps {
   driveFileId: string | null
@@ -38,7 +39,7 @@ export function VisualizadorWord({
 
       <div className="space-y-2">
         <h4 className="text-sm font-black text-foreground uppercase tracking-wide truncate max-w-xs">
-          {originalName}
+          {obterNomeExibicao(null, originalName)}
         </h4>
         <p className="text-[10px] text-muted-foreground leading-relaxed">
           Documentos do Word locais não podem ser pré-visualizados diretamente no navegador. Você pode abrir o arquivo utilizando o editor do seu dispositivo.
@@ -59,7 +60,7 @@ export function VisualizadorWord({
         {localUrl && (
           <a
             href={localUrl}
-            download={originalName}
+            download={obterNomeComExtensao(originalName, originalName)}
             className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl text-xs font-bold border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer active:scale-95"
           >
             <ExternalLink className="w-4 h-4" />

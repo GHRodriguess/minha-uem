@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { StatusVinculoClassroom, ArquivoClassroom } from '@/lib/api/classroom'
 import { GerenciadorDiretorio } from '@/lib/utils/gerenciadorDiretorio'
+import { obterNomeComExtensao } from '@/lib/utils/formatadorNomeArquivo'
 
 export function useAcoesArquivos({
   materiaId,
@@ -86,8 +87,9 @@ export function useAcoesArquivos({
       const subjectName = dadosVinculo.materia_nome || ""
       const folder = arquivoParaExcluir.selected_folder || "documentos"
       const parts = ['UEM', 'Cursos', courseName, year, subjectName, folder]
+      const fileName = obterNomeComExtensao(arquivoParaExcluir.custom_name || arquivoParaExcluir.original_name, arquivoParaExcluir.original_name)
       
-      const success = await GerenciadorDiretorio.removerArquivoLocal(directoryHandle, parts, arquivoParaExcluir.custom_name || arquivoParaExcluir.original_name)
+      const success = await GerenciadorDiretorio.removerArquivoLocal(directoryHandle, parts, fileName)
       if (success) {
         localStorage.removeItem('baixado_' + arquivoParaExcluir.drive_file_id)
         await escanearPastaLocal(materiaId, anoId)

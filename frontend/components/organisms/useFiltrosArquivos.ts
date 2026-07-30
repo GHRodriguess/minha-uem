@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { ArquivoClassroom } from '@/lib/api/classroom'
+import { obterNomeExibicao } from '@/lib/utils/formatadorNomeArquivo'
 
 interface UseFiltrosArquivosProps {
   arquivos: ArquivoClassroom[]
@@ -39,7 +40,7 @@ export function useFiltrosArquivos({
     return arquivos.filter(arq => {
       if (!isFileSystemSupported && arq.drive_file_id.startsWith('local_')) return false
       
-      const fileTitle = (arq.custom_name || arq.original_name).toLowerCase()
+      const fileTitle = obterNomeExibicao(arq.custom_name, arq.original_name).toLowerCase()
       const matchSearch = fileTitle.includes(searchText.toLowerCase()) || arq.original_name.toLowerCase().includes(searchText.toLowerCase())
       
       const matchExt = selectedExtension === 'todos' || categorizarExt(arq.original_name) === selectedExtension
@@ -73,7 +74,7 @@ export function useFiltrosArquivos({
           localStorage.removeItem(`minha_uem_visualizador_ordem_${materiaId}`)
         }
       }
-      return (a.custom_name || a.original_name).toLowerCase().localeCompare((b.custom_name || b.original_name).toLowerCase(), 'pt-BR')
+      return obterNomeExibicao(a.custom_name, a.original_name).toLowerCase().localeCompare(obterNomeExibicao(b.custom_name, b.original_name).toLowerCase(), 'pt-BR')
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arquivosFiltrados, materiaId, ordemManualVersao])
