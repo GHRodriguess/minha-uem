@@ -3,11 +3,10 @@
 import { useState, useRef } from 'react'
 import { academic_service } from '@/lib/api/academico'
 import { Perfil } from '@/types/academico'
-import { Upload, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from 'lucide-react'
+import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAcademico } from '../providers/ProvedorAcademico'
-import Modal from '../shared/Modal'
-import { Button } from '../ui/button'
+import { ModalConflitoHorario } from '../molecules/ModalConflitoHorario'
 
 interface CardUploadPDFProps {
   onSuccess: (data: Perfil) => void
@@ -24,12 +23,12 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const processarUpload = async (file: File, confirmed: boolean = false) => {
+  const processarUpload = async (file: File, confirmed: boolean = false, mode: 'mesclar' | 'recriar' = 'mesclar') => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await academic_service.enviarHorario(token, file, confirmed)
+      const response = await academic_service.enviarHorario(token, file, confirmed, mode)
       
       if ('conflito' in response && response.conflito) {
         setPendingFile(file)
@@ -44,6 +43,7 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
       notificarMudanca()
       onSuccess(data)
       setPendingFile(null)
+      setIsModalOpen(false)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
       setError(errorMessage)
@@ -61,11 +61,10 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
     processarUpload(file)
   }
 
-  const confirmarUpload = () => {
+  const confirmarUpload = (mode: 'mesclar' | 'recriar') => {
     if (pendingFile) {
-      processarUpload(pendingFile, true)
+      processarUpload(pendingFile, true, mode)
     }
-    setIsModalOpen(false)
   }
 
   const cancelarUpload = () => {
@@ -173,44 +172,14 @@ export default function CardUploadPDF({ onSuccess, token }: CardUploadPDFProps) 
         </div>
       </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
+      <ModalConflitoHorario
+        isOpen={isModalOpen}
+        conflictYear={conflictYear}
+        pendingFileName={pendingFile?.name}
+        loading={loading}
         onClose={cancelarUpload}
-        title="Confirmar Envio de Horário"
-      >
-        <div className="flex flex-col items-center text-center gap-4">
-          <div className="bg-destructive/10 p-4 rounded-full">
-            <AlertTriangle className="w-12 h-12 text-destructive" />
-          </div>
-          <div className="space-y-2">
-            <p className="text-foreground font-bold text-lg">Substituir dados de {conflictYear}?</p>
-            <p className="text-muted-foreground">
-              Detectamos que este horário é para o ano de {conflictYear}. Você já possui dados cadastrados para este período. Deseja sobrescrevê-los?
-            </p>
-            {pendingFile && (
-              <p className="text-sm font-medium text-primary bg-primary/5 py-1 px-3 rounded-lg inline-block">
-                Arquivo: {pendingFile.name}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-3 w-full mt-4">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={cancelarUpload}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive" 
-              className="flex-1"
-              onClick={confirmarUpload}
-            >
-              Confirmar e Enviar
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onConfirm={confirmarUpload}
+      />
     </div>
   )
 }

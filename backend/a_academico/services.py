@@ -19,10 +19,9 @@ class ServicoExtracaoHorario:
         self.texto = ""
         self.ano = None
 
-    def processar(self, apenas_analisar=False):
+    def processar(self, apenas_analisar=False, modo="mesclar"):
         self._extrair_texto()
         self._extrair_ano()
-        print(f"Ano letivo identificado: {self.ano}")
         
         if apenas_analisar:
             return {"ano": self.ano}
@@ -30,7 +29,7 @@ class ServicoExtracaoHorario:
         self._extrair_curso()
         self._extrair_materias()
         self._extrair_horarios()
-        return self._salvar_dados()
+        return self._salvar_dados(modo=modo)
 
     def _extrair_texto(self):
         if self.texto:
@@ -236,7 +235,7 @@ class ServicoExtracaoHorario:
                             })
                             vistos.add(chave)
 
-    def _salvar_dados(self):
+    def _salvar_dados(self, modo="mesclar"):
         if not self.ano and self.materias_data:
             from collections import Counter
             anos = [data['inicio'].year for data in self.materias_data.values()]
@@ -299,16 +298,23 @@ class ServicoExtracaoHorario:
             perfil.curso = curso
             perfil.save()
 
-            # Limpa dados anteriores do mesmo ano letivo (incluindo faltas via CASCADE)
-            AnoLetivo.objects.filter(perfil=perfil, ano=self.ano).delete()
-
-            ano_letivo = AnoLetivo.objects.create(
-                perfil=perfil,
-                ano=self.ano
-            )
-            ano_letivo.materias.set(materias_salvas)
-            ano_letivo.horarios.set(horarios_criados_objs)
-            ano_letivo.save()
+            if modo == "recriar":
+                AnoLetivo.objects.filter(perfil=perfil, ano=self.ano).delete()
+                ano_letivo = AnoLetivo.objects.create(
+                    perfil=perfil,
+                    ano=self.ano
+                )
+                ano_letivo.materias.set(materias_salvas)
+                ano_letivo.horarios.set(horarios_criados_objs)
+                ano_letivo.save()
+            else:
+                ano_letivo, _ = AnoLetivo.objects.get_or_create(
+                    perfil=perfil,
+                    ano=self.ano
+                )
+                ano_letivo.materias.add(*materias_salvas)
+                ano_letivo.horarios.add(*horarios_criados_objs)
+                ano_letivo.save()
             
             return perfil
 
