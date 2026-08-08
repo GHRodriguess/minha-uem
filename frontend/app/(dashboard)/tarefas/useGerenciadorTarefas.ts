@@ -15,6 +15,8 @@ export function useGerenciadorTarefas() {
   const [tipoSelecionado, setTipoSelecionado] = useState('TODOS')
   const [abaAtiva, setAbaAtiva] = useState<'kanban' | 'lista' | 'calendario'>('kanban')
   const [modalAberto, setModalAberto] = useState(false)
+  const [modalTipoAberto, setModalTipoAberto] = useState(false)
+  const [tipoPredefinido, setTipoPredefinido] = useState<Avaliacao['tipo'] | undefined>(undefined)
   const [tarefaSelecionada, setTarefaSelecionada] = useState<Avaliacao | null>(null)
   const [materiaPadraoId, setMateriaPadraoId] = useState<number | undefined>(undefined)
   const [statusPadrao, setStatusPadrao] = useState<'A_FAZER' | 'EM_ANDAMENTO' | 'CONCLUIDO'>('A_FAZER')
@@ -52,8 +54,7 @@ export function useGerenciadorTarefas() {
     if (!session?.accessToken) return
     const t = obterTarefasComMateria().find(x => x.id === id)
     if (!t) return
-    const att = { ...t, status }
-    atualizarLocalmente(t.materia.id, att, 'EDITAR')
+    atualizarLocalmente(t.materia.id, { ...t, status }, 'EDITAR')
     try { await academic_service.atualizarAvaliacao(session.accessToken, id, { status }) }
     catch { atualizarLocalmente(t.materia.id, t, 'EDITAR') }
   }
@@ -92,10 +93,17 @@ export function useGerenciadorTarefas() {
     setTarefaSelecionada(null)
     setStatusPadrao(s)
     setMateriaPadraoId(materiaSelecionada !== 'TODAS' ? parseInt(materiaSelecionada) : undefined)
+    setModalTipoAberto(true)
+  }
+
+  const confirmarTipo = (tipo: Avaliacao['tipo']) => {
+    setTipoPredefinido(tipo)
+    setModalTipoAberto(false)
     setModalAberto(true)
   }
 
   const abrirEdicao = (a: Avaliacao, materiaId: number) => {
+    setTipoPredefinido(undefined)
     setTarefaSelecionada(a)
     setMateriaPadraoId(materiaId)
     setModalAberto(true)
@@ -103,7 +111,8 @@ export function useGerenciadorTarefas() {
 
   return {
     materias, materiaSelecionada, setMateriaSelecionada, tipoSelecionado, setTipoSelecionado,
-    abaAtiva, setAbaAtiva, modalAberto, setModalAberto, tarefaSelecionada, materiaPadraoId,
-    statusPadrao, tarefasFiltradas, handleStatusChange, handleSave, handleDelete, abrirNovo, abrirEdicao
+    abaAtiva, setAbaAtiva, modalAberto, setModalAberto, modalTipoAberto, setModalTipoAberto,
+    tipoPredefinido, tarefaSelecionada, materiaPadraoId, statusPadrao, tarefasFiltradas,
+    handleStatusChange, handleSave, handleDelete, abrirNovo, confirmarTipo, abrirEdicao
   }
 }

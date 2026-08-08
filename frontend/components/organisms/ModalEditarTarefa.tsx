@@ -10,6 +10,7 @@ interface ModalEditarTarefaProps {
   onSave: (materiaId: number, data: Partial<Avaliacao> & { id?: number }) => Promise<void>
   materias: Materia[]
   materiaPadraoId?: number
+  tipoPadrao?: Avaliacao['tipo']
   avaliacao?: Avaliacao | null
   statusPadrao?: 'A_FAZER' | 'EM_ANDAMENTO' | 'CONCLUIDO'
 }
@@ -20,6 +21,7 @@ export default function ModalEditarTarefa({
   onSave,
   materias,
   materiaPadraoId,
+  tipoPadrao,
   avaliacao,
   statusPadrao = 'A_FAZER'
 }: ModalEditarTarefaProps) {
@@ -27,6 +29,7 @@ export default function ModalEditarTarefa({
     <Modal isOpen={isOpen} onClose={onClose} title={avaliacao ? 'Editar Tarefa' : 'Nova Tarefa'}>
       <FormTarefa
         avaliacao={avaliacao}
+        tipoPadrao={tipoPadrao}
         materias={materias}
         materiaPadraoId={materiaPadraoId}
         statusPadrao={statusPadrao}
