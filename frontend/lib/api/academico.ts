@@ -12,11 +12,12 @@ export const academic_service = {
     return api_client.obter<Materia>(`${base_path}/materias/${materia_id}/`, { ano_id }, token, signal);
   },
 
-  enviarHorario(token: string, file: File, confirmar: boolean = false, signal?: AbortSignal) {
+  enviarHorario(token: string, file: File, confirmar: boolean = false, modo: 'mesclar' | 'recriar' = 'mesclar', signal?: AbortSignal) {
     const form_data = new FormData();
     form_data.append("file", file);
     if (confirmar) {
       form_data.append("confirmar", "true");
+      form_data.append("modo", modo);
     }
     return api_client.postar<Perfil | { conflito: boolean, ano: number, mensagem: string }>(`${base_path}/upload-horario/`, form_data, token, signal);
   },

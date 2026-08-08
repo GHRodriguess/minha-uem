@@ -78,6 +78,7 @@ class UploadHorarioView(APIView):
         
         pdf_file = request.FILES['file']
         confirmar = request.data.get('confirmar') == 'true'
+        modo = request.data.get('modo', 'mesclar')
         perfil, user_ativo = obter_perfil_ativo(request)
         servico = ServicoExtracaoHorario(pdf_file, user_ativo)
         
@@ -90,10 +91,10 @@ class UploadHorarioView(APIView):
                     return Response({
                         "conflito": True,
                         "ano": ano_detectado,
-                        "mensagem": f"Já existem dados para o ano {ano_detectado}. Deseja sobrescrever?"
+                        "mensagem": f"Já existem dados para o ano {ano_detectado}. Selecione como deseja proceder."
                     }, status=status.HTTP_200_OK)
 
-            perfil_atualizado = servico.processar()
+            perfil_atualizado = servico.processar(modo=modo)
             serializer = PerfilAcademicoSerializer(perfil_atualizado, context={'perfil': perfil_atualizado})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
