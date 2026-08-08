@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 
 interface FormTarefaProps {
   avaliacao?: Avaliacao | null
+  tipoPadrao?: Avaliacao['tipo']
   materias: Materia[]
   materiaPadraoId?: number
   statusPadrao: 'A_FAZER' | 'EM_ANDAMENTO' | 'CONCLUIDO'
@@ -13,17 +14,39 @@ interface FormTarefaProps {
   onCancel: () => void
 }
 
+const obter_rotulo_data = (t: Avaliacao['tipo']) => {
+  if (t === 'PROVA') return 'Data da Prova'
+  if (t === 'TRABALHO' || t === 'PESQUISA') return 'Data de Entrega'
+  if (t === 'EXAME') return 'Data do Exame'
+  return 'Data Limite'
+}
+
+const obter_nome_padrao = (t: Avaliacao['tipo']) => {
+  if (t === 'PROVA') return 'Avaliação '
+  if (t === 'TRABALHO') return 'Trabalho - '
+  if (t === 'EXAME') return 'Exame Final'
+  if (t === 'TAREFA') return 'Tarefa - '
+  if (t === 'PESQUISA') return 'Pesquisa - '
+  return ''
+}
+
 export default function FormTarefa({
-  avaliacao, materias, materiaPadraoId, statusPadrao, onSave, onCancel
+  avaliacao, tipoPadrao, materias, materiaPadraoId, statusPadrao, onSave, onCancel
 }: FormTarefaProps) {
-  const [nome, setNome] = useState(avaliacao?.nome || '')
-  const [tipo, setTipo] = useState(avaliacao?.tipo || 'TAREFA')
+  const initial_tipo = avaliacao?.tipo || tipoPadrao || 'TAREFA'
+  const [tipo, setTipo] = useState<Avaliacao['tipo']>(initial_tipo)
+  const [nome, setNome] = useState(avaliacao?.nome || (tipoPadrao ? obter_nome_padrao(tipoPadrao) : ''))
   const [data, setData] = useState(avaliacao?.data || '')
   const [peso, setPeso] = useState(avaliacao ? avaliacao.peso.toString() : '1')
   const [nota, setNota] = useState(avaliacao && avaliacao.nota !== null ? avaliacao.nota.toString() : '')
   const [status, setStatus] = useState(avaliacao?.status || statusPadrao)
   const [materiaId, setMateriaId] = useState(avaliacao ? (materiaPadraoId ? materiaPadraoId.toString() : '') : (materiaPadraoId ? materiaPadraoId.toString() : materias[0]?.id.toString() || ''))
   const [submitting, setSubmitting] = useState(false)
+
+  const alterar_tipo = (novo_tipo: Avaliacao['tipo']) => {
+    setTipo(novo_tipo)
+    if (!avaliacao) setNome(obter_nome_padrao(novo_tipo))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,14 +78,14 @@ export default function FormTarefa({
         </div>
         <div className="flex flex-col gap-1">
           <label className="font-black text-muted-foreground uppercase">Tipo</label>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className={selectClass}>
+          <select value={tipo} onChange={(e) => alterar_tipo(e.target.value as Avaliacao['tipo'])} className={selectClass}>
             {['PROVA', 'TRABALHO', 'EXAME', 'TAREFA', 'PESQUISA', 'OUTRO'].map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
-          <label className="font-black text-muted-foreground uppercase">Data Limite</label>
+          <label className="font-black text-muted-foreground uppercase">{obter_rotulo_data(tipo)}</label>
           <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inputClass} />
         </div>
         <div className="flex flex-col gap-1">

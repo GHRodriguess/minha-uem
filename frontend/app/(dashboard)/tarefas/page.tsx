@@ -6,6 +6,7 @@ import VisualizacaoKanban from '@/components/organisms/VisualizacaoKanban'
 import VisualizacaoLista from '@/components/organisms/VisualizacaoLista'
 import VisualizacaoCalendario from '@/components/organisms/VisualizacaoCalendario'
 import ModalEditarTarefa from '@/components/organisms/ModalEditarTarefa'
+import ModalSelecaoTipoTarefa from '@/components/organisms/ModalSelecaoTipoTarefa'
 import { Button } from '@/components/ui/button'
 import { Plus, LayoutGrid, List, Calendar as CalendarIcon } from 'lucide-react'
 import { Suspense } from 'react'
@@ -13,8 +14,9 @@ import { Suspense } from 'react'
 function ConteudoPaginaTarefas() {
   const {
     materias, materiaSelecionada, setMateriaSelecionada, tipoSelecionado, setTipoSelecionado,
-    abaAtiva, setAbaAtiva, modalAberto, setModalAberto, tarefaSelecionada, materiaPadraoId,
-    statusPadrao, tarefasFiltradas, handleStatusChange, handleSave, handleDelete, abrirNovo, abrirEdicao
+    abaAtiva, setAbaAtiva, modalAberto, setModalAberto, modalTipoAberto, setModalTipoAberto,
+    tipoPredefinido, tarefaSelecionada, materiaPadraoId, statusPadrao, tarefasFiltradas,
+    handleStatusChange, handleSave, handleDelete, abrirNovo, confirmarTipo, abrirEdicao
   } = useGerenciadorTarefas()
 
   const abas = [
@@ -88,6 +90,14 @@ function ConteudoPaginaTarefas() {
         )}
       </div>
 
+      {modalTipoAberto && (
+        <ModalSelecaoTipoTarefa
+          isOpen={modalTipoAberto}
+          onClose={() => setModalTipoAberto(false)}
+          onSelectType={confirmarTipo}
+        />
+      )}
+
       {modalAberto && (
         <ModalEditarTarefa
           isOpen={modalAberto}
@@ -95,6 +105,7 @@ function ConteudoPaginaTarefas() {
           onSave={handleSave}
           materias={materias}
           materiaPadraoId={materiaPadraoId}
+          tipoPadrao={tipoPredefinido}
           avaliacao={tarefaSelecionada}
           statusPadrao={statusPadrao}
         />
