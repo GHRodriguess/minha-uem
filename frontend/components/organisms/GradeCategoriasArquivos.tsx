@@ -1,9 +1,8 @@
 'use client'
 
-import React from 'react'
-import { FolderOpen } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
 import { ArquivoClassroom } from '@/lib/api/classroom'
-import { CardArquivoCompacto } from '@/components/molecules/CardArquivoCompacto'
+import { ContainerCategoriaArquivo } from '@/components/molecules/ContainerCategoriaArquivo'
 
 interface GradeCategoriasArquivosProps {
   arquivosOrdenados: ArquivoClassroom[]
@@ -17,8 +16,7 @@ interface GradeCategoriasArquivosProps {
   onExcluirLocal: (arq: ArquivoClassroom) => void
   onBaixarLocal: (arq: ArquivoClassroom) => void
   onSalvarNome: (arq: ArquivoClassroom, novoNome: string) => Promise<void>
-  onAlterarPastaDestino: (arq: ArquivoClassroom, novaPasta: string) => Promise<void>
-  onReordenarManual: (draggedId: string, targetId: string) => void
+  onMoverArquivo: (draggedId: string, targetId: string | null, posicao: 'antes' | 'depois' | 'fim', categoriaDestino: string) => void
 }
 
 export function GradeCategoriasArquivos({
@@ -33,28 +31,28 @@ export function GradeCategoriasArquivos({
   onExcluirLocal,
   onBaixarLocal,
   onSalvarNome,
-  onAlterarPastaDestino,
-  onReordenarManual
+  onMoverArquivo
 }: GradeCategoriasArquivosProps) {
-  
-  const [dragOverCategory, setDragOverCategory] = React.useState<string | null>(null)
+  const [activeDraggedId, setActiveDraggedId] = useState<string | null>(null)
 
-  const formatarNomePasta = (nome: string) => {
-    if (nome === 'documentos') return 'Documentos'
-    if (nome === 'exercicios') return 'Exercícios'
-    return nome.charAt(0).toUpperCase() + nome.slice(1)
-  }
-
-  const lidarComDropPasta = async (e: React.DragEvent, destino: string) => {
-    e.preventDefault()
-    const fileId = e.dataTransfer.getData('text/plain')
-    const sourceFolder = e.dataTransfer.getData('source-folder')
-    if (sourceFolder && sourceFolder !== destino) {
-      const arq = arquivosOrdenados.find(a => a.drive_file_id === fileId)
-      if (arq) {
-        await onAlterarPastaDestino(arq, destino)
-      }
+  useEffect(() => {
+    const limparArrasteGlobal = () => setActiveDraggedId(null)
+    window.addEventListener('dragend', limparArrasteGlobal)
+    window.addEventListener('drop', limparArrasteGlobal)
+    return () => {
+      window.removeEventListener('dragend', limparArrasteGlobal)
+      window.removeEventListener('drop', limparArrasteGlobal)
     }
+  }, [])
+
+  const lidarComMover = (
+    draggedId: string,
+    targetId: string | null,
+    posicao: 'antes' | 'depois' | 'fim',
+    categoriaDestino: string
+  ) => {
+    setActiveDraggedId(null)
+    onMoverArquivo(draggedId, targetId, posicao, categoriaDestino)
   }
 
   const allCategories = [...listaCategorias, 'outros']
@@ -72,66 +70,23 @@ export function GradeCategoriasArquivos({
         if (cat === 'outros' && categoryFiles.length === 0) return null
 
         return (
-          <div
+          <ContainerCategoriaArquivo
             key={cat}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'move'
-            }}
-            onDragEnter={(e) => {
-              e.preventDefault()
-              setDragOverCategory(cat)
-            }}
-            onDragLeave={() => setDragOverCategory(null)}
-            onDrop={async (e) => {
-              setDragOverCategory(null)
-              await lidarComDropPasta(e, cat)
-            }}
-            className={`bg-card/25 backdrop-blur-md border rounded-2xl p-4 transition-all ${
-              dragOverCategory === cat ? 'border-primary bg-primary/10 scale-[1.002] z-10' : 'border-border/30'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-3 border-b border-border/40 pb-2">
-              <FolderOpen className="w-4 h-4 text-primary" />
-              <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
-                {cat === 'outros' ? 'Sem Categoria' : formatarNomePasta(cat)}
-              </h3>
-              <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-auto">
-                {categoryFiles.length}
-              </span>
-            </div>
-
-            {categoryFiles.length === 0 ? (
-              <div className="border border-dashed border-border/60 rounded-xl py-6 text-center text-muted-foreground/60 text-[10px] font-semibold">
-                Arraste arquivos aqui para mover para esta pasta
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {categoryFiles.map((arq) => {
-                  const isDownloaded = hasFolderPermission
-                    ? !missingFiles[arq.drive_file_id]
-                    : localStorage.getItem('baixado_' + arq.drive_file_id) === 'true'
-
-                  return (
-                    <CardArquivoCompacto
-                      key={arq.drive_file_id}
-                      arquivo={arq}
-                      categoriaNome={cat}
-                      isFileSystemSupported={isFileSystemSupported}
-                      isReallyDownloaded={isDownloaded}
-                      progressoDownload={downloadProgress[arq.drive_file_id]}
-                      onPreVisualizar={onPreVisualizar}
-                      onAlternarOcultar={onAlternarOcultar}
-                      onExcluirLocal={onExcluirLocal}
-                      onBaixarLocal={onBaixarLocal}
-                      onSalvarNome={onSalvarNome}
-                      onReordenar={onReordenarManual}
-                    />
-                  )
-                })}
-              </div>
-            )}
-          </div>
+            categoria={cat}
+            arquivos={categoryFiles}
+            missingFiles={missingFiles}
+            hasFolderPermission={hasFolderPermission}
+            isFileSystemSupported={isFileSystemSupported}
+            downloadProgress={downloadProgress}
+            activeDraggedId={activeDraggedId}
+            onPreVisualizar={onPreVisualizar}
+            onAlternarOcultar={onAlternarOcultar}
+            onExcluirLocal={onExcluirLocal}
+            onBaixarLocal={onBaixarLocal}
+            onSalvarNome={onSalvarNome}
+            onMoverArquivo={lidarComMover}
+            onDefinirArquivoArrastando={setActiveDraggedId}
+          />
         )
       })}
     </div>
