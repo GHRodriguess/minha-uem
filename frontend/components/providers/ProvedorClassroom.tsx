@@ -677,6 +677,10 @@ export function ProvedorClassroom({ children }: { children: React.ReactNode }) {
   ) => {
     if (!session?.accessToken) return
 
+    atualizarArquivoLocal(materiaId, driveFileId, {
+      selected_folder: novaPasta
+    })
+
     try {
       const updatedItem = await classroom_service.atualizarArquivo(
         session.accessToken,
